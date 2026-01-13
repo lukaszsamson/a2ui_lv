@@ -70,7 +70,7 @@ Agent (LLM) → A2UI Generator → Transport (SSE/WS/A2A) → Client (Stream Rea
 1. **Structure Definition**: Agent sends `surfaceUpdate` with component definitions
 2. **Data Population**: Agent sends `dataModelUpdate` with values
 3. **Render Signal**: Agent sends `beginRendering` to display UI
-4. **Local Updates**: User modifies inputs → client updates local data model (no server communication)
+4. **Local Updates**: User modifies inputs → renderer updates its local data model (no agent round-trip; in LiveView this still travels over the LiveView socket)
 5. **User Action**: Explicit action (button click) → client sends `userAction` with resolved context
 6. **Response**: Agent processes action, sends new updates or deletes surface
 
@@ -96,7 +96,10 @@ For the PoC, we implement **8 core components** from the [standard catalog](http
 |-----------|---------|----------------|
 | `Button` | Clickable action trigger | `child`, `action`, `primary` |
 | `TextField` | Text input with label | `label`, `text`, `textFieldType` |
-| `CheckBox` | Boolean toggle | `label`, `value` |
+| `Checkbox` | Boolean toggle | `label`, `value` |
+
+Notes:
+- The A2UI component reference uses the type name `Checkbox` (not `CheckBox`). For renderer robustness, accept both spellings and normalize internally.
 
 This subset enables building meaningful forms, layouts, and interactive flows.
 
@@ -164,15 +167,15 @@ When using template children, paths are **scoped** to the current array item:
 {"children": {"template": {"dataBinding": "/products", "componentId": "card"}}}
 ```
 
-Inside the template component, a relative path like `name` resolves to `/products/0/name`, `/products/1/name`, etc.
+In v0.8 docs, scoped bindings inside templates still appear as JSON Pointer strings that start with `/` (example: `{"path": "/name"}`), but they are interpreted as **relative to the template item**. In practice for this LiveView renderer we implement this by prefixing the computed `scope_path` (e.g. `/products/0`) to any `BoundValue.path` used while rendering a template item.
 
 ### Two-Way Binding for Inputs
 
 From the documentation: "Interactive components update the data model bidirectionally":
 - **TextField**: User types → updates bound path in data model
-- **CheckBox**: User toggles → updates bound boolean path
-- Updates happen locally without server communication
-- Server notified only on explicit actions (button click)
+- **Checkbox**: User toggles → updates bound boolean path
+- Updates happen locally in the **renderer’s data model** (the “client-side” model in A2UI terms)
+- In this PoC, the renderer lives in the LiveView process, so input events still travel over the LiveView socket; the key constraint is: **no agent round-trip is required** until an explicit action (`userAction`)
 
 ## Guardrails & Safety Limits
 
@@ -229,57 +232,21 @@ end
 
 defmodule A2UI.V0_9.Adapter do
   @moduledoc """
-  Adapter to translate v0.9 messages to internal v0.8-compatible format.
+  Notes for a v0.9 upgrade path (correct per the v0.9 spec):
 
-  v0.9 changes:
-  - createSurface (was beginRendering), root is implicit (id="root")
-  - updateComponents (was surfaceUpdate)
-  - updateDataModel (was dataModelUpdate)
-  - Component format: {"component": "Text", "text": ...} (flat)
-  - Data model: standard JSON (not typed key-values)
+  v0.9 changes the envelope and some payload shapes:
+  - `beginRendering` is replaced by `createSurface` and **there is no root field**; instead a component with `id: "root"` must exist.
+  - `surfaceUpdate` is renamed to `updateComponents` and component objects are flattened (`%{"component" => "Text", ...props...}`).
+  - `dataModelUpdate` is renamed to `updateDataModel` and uses CRDT metadata:
+    - `%{"updateDataModel" => %{"surfaceId" => ..., "actorId" => ..., "updates" => [%{"path" => ..., "value" => ..., "hlc" => ...}], "versions" => %{...}}}`
+  - `watchDataModel` configures when the renderer sends `dataModelChanged` back to the agent.
 
-  For PoC, this adapter allows accepting v0.9 messages while
-  the core renderer targets v0.8 semantics.
+  The PoC renderer targets v0.8 end-to-end; do not implement partial v0.9 parsing in production code unless it matches the above shapes.
+
+  Minimal PoC-compatible v0.9 strategy (if added later):
+  - Treat `createSurface` as “surface exists + ready to render”.
+  - Apply each `updateDataModel.updates[]` entry as a replace-at-path operation in the renderer’s data model, ignoring conflict resolution metadata for PoC (but document this is not spec-compliant for convergence).
   """
-
-  alias A2UI.{Component}
-  alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
-
-  def parse_message(%{"updateComponents" => data}) do
-    components = Enum.map(data["components"] || [], &parse_component_v09/1)
-    {:ok, {:surface_update, %SurfaceUpdate{
-      surface_id: data["surfaceId"],
-      components: components
-    }}}
-  end
-
-  def parse_message(%{"createSurface" => data}) do
-    {:ok, {:begin_rendering, %BeginRendering{
-      surface_id: data["surfaceId"],
-      root_id: "root",  # v0.9: implicit root
-      catalog_id: data["catalogId"],
-      styles: nil
-    }}}
-  end
-
-  def parse_message(%{"updateDataModel" => data}) do
-    {:ok, {:data_model_update, %DataModelUpdate{
-      surface_id: data["surfaceId"],
-      path: data["path"],
-      contents: data["contents"] || %{}  # v0.9: standard JSON
-    }}}
-  end
-
-  def parse_message(%{"deleteSurface" => data}) do
-    {:ok, {:delete_surface, %DeleteSurface{surface_id: data["surfaceId"]}}}
-  end
-
-  def parse_message(_), do: {:error, :unknown_v09_message}
-
-  defp parse_component_v09(%{"id" => id, "component" => type} = data) do
-    props = Map.drop(data, ["id", "component"])
-    %Component{id: id, type: type, props: props}
-  end
 end
 ```
 
@@ -323,14 +290,6 @@ defmodule A2UI.Parser do
     do: {:begin_rendering, BeginRendering.from_map(data)}
   defp dispatch_message(%{"deleteSurface" => data}),
     do: {:delete_surface, DeleteSurface.from_map(data)}
-
-  # v0.9 message dispatch (for future compatibility)
-  defp dispatch_message(%{"updateComponents" => data}),
-    do: {:surface_update, SurfaceUpdate.from_map_v09(data)}
-  defp dispatch_message(%{"updateDataModel" => data}),
-    do: {:data_model_update, DataModelUpdate.from_map_v09(data)}
-  defp dispatch_message(%{"createSurface" => data}),
-    do: {:begin_rendering, BeginRendering.from_map_v09(data)}
 
   defp dispatch_message(_), do: {:error, :unknown_message_type}
 end
@@ -421,15 +380,17 @@ defmodule A2UI.Messages.DataModelUpdate do
 
   Updates application state via path-based entries.
   Per Data Binding Concepts: "Components automatically update when bound data changes"
+
+  IMPORTANT: The v0.9 message shape is **not** compatible with v0.8:
+  - v0.8: `%{"dataModelUpdate" => %{"surfaceId" => ..., "path" => optional, "contents" => [%{"key" => ..., "valueString" => ...} | %{"valueMap" => [...]}, ...]}}`
+  - v0.9: `%{"updateDataModel" => %{"surfaceId" => ..., "actorId" => ..., "updates" => [%{"path" => ..., "value" => ..., "hlc" => ...}], "versions" => %{...}}}`
+
+  For the PoC, we only implement v0.8 parsing/apply; v0.9 is documented as an upgrade path.
   """
 
   defstruct [:surface_id, :path, :contents]
 
-  @type t :: %__MODULE__{
-    surface_id: String.t(),
-    path: String.t() | nil,
-    contents: list() | map()
-  }
+  @type t :: %__MODULE__{surface_id: String.t(), path: String.t() | nil, contents: list()}
 
   # v0.8: contents is array of key-value entries with typed values
   def from_map(%{"surfaceId" => sid} = data) do
@@ -437,15 +398,6 @@ defmodule A2UI.Messages.DataModelUpdate do
       surface_id: sid,
       path: Map.get(data, "path"),
       contents: Map.get(data, "contents", [])
-    }
-  end
-
-  # v0.9: contents is standard JSON object
-  def from_map_v09(%{"surfaceId" => sid} = data) do
-    %__MODULE__{
-      surface_id: sid,
-      path: Map.get(data, "path"),
-      contents: Map.get(data, "contents", %{})
     }
   end
 end
@@ -476,16 +428,6 @@ defmodule A2UI.Messages.BeginRendering do
       root_id: root,
       catalog_id: Map.get(data, "catalogId"),
       styles: Map.get(data, "styles")
-    }
-  end
-
-  # v0.9: root is implicit (component with id "root")
-  def from_map_v09(%{"surfaceId" => sid} = data) do
-    %__MODULE__{
-      surface_id: sid,
-      root_id: "root",
-      catalog_id: Map.get(data, "catalogId"),
-      styles: nil  # v0.9 removes styles from createSurface
     }
   end
 end
@@ -543,7 +485,15 @@ defmodule A2UI.Surface do
       Enum.reduce(components, surface.components, fn comp, acc ->
         Map.put(acc, comp.id, comp)
       end)
-    %{surface | components: new_components}
+    surface = %{surface | components: new_components}
+
+    # v0.8 renderer checklist: if a BoundValue includes both `path` and `literal*`,
+    # initialize the data model at `path` with the literal (if missing) before binding.
+    # Implement this as a dedicated initializer pass that scans newly added/updated components
+    # and updates `surface.data_model` deterministically (no side effects in render/resolve).
+    #
+    # surface = A2UI.Initializers.apply(surface)
+    surface
   end
 
   def apply_message(%__MODULE__{} = surface, %DataModelUpdate{} = update) do
@@ -557,8 +507,10 @@ defmodule A2UI.Surface do
 
   @doc "Updates a single path in the data model (for two-way binding)"
   def update_data_at_path(%__MODULE__{} = surface, path, value) do
-    keys = parse_path(path)
-    new_data = put_at_path(surface.data_model, keys, value)
+    # Two-way binding uses RFC6901 pointers (same resolver as reads).
+    # Normalize and apply as a replace-at-path operation.
+    pointer = A2UI.Binding.expand_path(path, nil)
+    new_data = A2UI.Binding.set_at_pointer(surface.data_model, pointer, value)
     %{surface | data_model: new_data}
   end
 
@@ -599,11 +551,6 @@ defmodule A2UI.Surface do
     end)
   end
 
-  # v0.9 format: standard JSON object
-  defp merge_contents(existing, contents) when is_map(contents) do
-    Map.merge(existing, contents)
-  end
-
   defp extract_typed_value(%{"valueString" => v}), do: v
   defp extract_typed_value(%{"valueNumber" => v}), do: v
   defp extract_typed_value(%{"valueBoolean" => v}), do: v
@@ -618,7 +565,7 @@ end
 
 Per DESIGN_GPT.md, implements proper RFC 6901 JSON Pointer with:
 - Unescaping (`~1` → `/`, `~0` → `~`)
-- Write-on-mount behavior for path+literal (from DESIGN_G3.md)
+- Path+literal initializer behavior (from the v0.8 renderer checklist)
 - Template scope_path approach (pass path string, not full scope object)
 
 ```elixir
@@ -641,16 +588,20 @@ defmodule A2UI.Binding do
   @doc """
   Resolves a BoundValue to its actual value.
 
-  The `scope_path` parameter is the base JSON Pointer path for template contexts.
-  This avoids embedding large scope objects in the DOM - we pass the path string
-  and resolve at render/event time.
+  The `scope_path` parameter is the base JSON Pointer path for template contexts
+  (for example: `"/products/0"`). This avoids embedding large scope objects in the DOM.
+  Instead we pass a short pointer string and resolve on the server at render/event time.
 
   ## BoundValue Resolution Rules (from Renderer Guide)
 
   1. **Literal Only**: Return the literal value directly
   2. **Path Only**: Resolve path against data_model
-  3. **Path + Literal**: Write-on-mount behavior - if data at path is nil,
-     initialize with literal, then bind to path
+  3. **Path + Literal**: The v0.8 renderer checklist describes an initializer behavior:
+     if both `path` and `literal*` exist, the renderer should initialize the data model at
+     `path` with the literal (if missing) and then treat the property as bound to `path`.
+     In a server-rendered LiveView renderer, do not mutate assigns inside `resolve/3`;
+     apply initializers during message ingestion (after `surfaceUpdate`) or in a dedicated
+     “initializer pass” that returns an updated surface state.
   """
   @spec resolve(bound_value(), data_model(), scope_path()) :: term()
   def resolve(bound_value, data_model, scope_path \\ nil)
@@ -666,8 +617,8 @@ defmodule A2UI.Binding do
     resolve_path(path, data_model, scope_path)
   end
 
-  # Path + Literal: write-on-mount behavior (per DESIGN_G3.md)
-  # If path resolves to nil, return literal as fallback/initializer
+  # Path + Literal: resolver returns fallback value only.
+  # Initializing the data model (the “write” part) is handled outside this module.
   def resolve(%{"path" => path} = bound, data_model, scope_path) do
     case resolve_path(path, data_model, scope_path) do
       nil -> get_literal_fallback(bound)
@@ -688,19 +639,44 @@ defmodule A2UI.Binding do
   Resolves a JSON Pointer path against data model.
 
   Scope handling per spec:
-  - v0.8: Scoped paths like `/name` inside a template resolve against the item
-  - v0.9: Relative paths like `firstName` expand to `{scope_path}/firstName`
+  - v0.8: Scoped paths inside templates are written like `/name` but resolve against the item
+    (we implement this by prefixing `scope_path`).
+  - v0.9: Relative paths like `firstName` resolve as `{scope_path}/firstName`.
   """
   def resolve_path(path, data_model, scope_path) do
-    absolute_path = expand_path(path, scope_path)
-    get_at_pointer(data_model, absolute_path)
+    get_at_pointer(data_model, expand_path(path, scope_path))
   end
 
   @doc "Expands a potentially relative path to absolute"
-  def expand_path(path, nil), do: path
-  def expand_path("/" <> _ = path, _scope_path), do: path  # Already absolute
-  def expand_path("./" <> relative, scope_path), do: "#{scope_path}/#{relative}"
-  def expand_path(relative, scope_path), do: "#{scope_path}/#{relative}"
+  def expand_path(path, nil), do: normalize_pointer(path)
+
+  def expand_path(path, scope_path) when is_binary(scope_path) do
+    path = to_string(path)
+
+    cond do
+      path == "" ->
+        scope_path
+
+      String.starts_with?(path, "./") ->
+        join_pointer(scope_path, "/" <> String.trim_leading(path, "./"))
+
+      # v0.8 template scoping: `/name` is scoped to the template item.
+      String.starts_with?(path, "/") ->
+        join_pointer(scope_path, path)
+
+      # v0.9 scoped relative segments: `firstName`
+      true ->
+        join_pointer(scope_path, "/" <> path)
+    end
+  end
+
+  defp normalize_pointer(nil), do: ""
+  defp normalize_pointer(""), do: ""
+  defp normalize_pointer("/" <> _ = path), do: path
+  defp normalize_pointer(path), do: "/" <> path
+
+  defp join_pointer(scope_path, "/"), do: scope_path
+  defp join_pointer(scope_path, "/" <> rest), do: scope_path <> "/" <> rest
 
   @doc "Extracts the binding path from a BoundValue (for two-way binding)"
   def get_path(%{"path" => path}), do: path
@@ -717,7 +693,7 @@ defmodule A2UI.Binding do
   """
   def get_at_pointer(data, "/" <> path) do
     segments = path
-      |> String.split("/")
+      |> String.split("/", trim: true)
       |> Enum.map(&unescape_pointer_segment/1)
 
     traverse(data, segments)
@@ -731,10 +707,14 @@ defmodule A2UI.Binding do
   """
   def set_at_pointer(data, "/" <> path, value) do
     segments = path
-      |> String.split("/")
+      |> String.split("/", trim: true)
       |> Enum.map(&unescape_pointer_segment/1)
 
-    put_at_path(data, segments, value)
+    if segments == [] do
+      value
+    else
+      put_at_path(data, segments, value)
+    end
   end
   def set_at_pointer(data, "", value), do: value
   def set_at_pointer(data, _, _value), do: data
@@ -751,7 +731,7 @@ defmodule A2UI.Binding do
   defp traverse(nil, _), do: nil
 
   defp traverse(data, [key | rest]) when is_map(data) do
-    value = Map.get(data, key) || Map.get(data, safe_to_atom(key))
+    value = Map.get(data, key)
     traverse(value, rest)
   end
 
@@ -766,18 +746,34 @@ defmodule A2UI.Binding do
 
   # Path setting implementation
   defp put_at_path(data, [key], value) do
-    Map.put(data || %{}, key, value)
+    cond do
+      is_list(data) ->
+        case Integer.parse(key) do
+          {index, ""} when index >= 0 -> List.replace_at(data, index, value)
+          _ -> data
+        end
+
+      true ->
+        Map.put(data || %{}, key, value)
+    end
   end
 
   defp put_at_path(data, [key | rest], value) do
-    current = Map.get(data || %{}, key, %{})
-    Map.put(data || %{}, key, put_at_path(current, rest, value))
-  end
+    cond do
+      is_list(data) ->
+        case Integer.parse(key) do
+          {index, ""} when index >= 0 ->
+            current = Enum.at(data, index) || %{}
+            List.replace_at(data, index, put_at_path(current, rest, value))
 
-  defp safe_to_atom(key) do
-    String.to_existing_atom(key)
-  rescue
-    ArgumentError -> nil
+          _ ->
+            data
+        end
+
+      true ->
+        current = Map.get(data || %{}, key, %{})
+        Map.put(data || %{}, key, put_at_path(current, rest, value))
+    end
   end
 
   defp get_literal_fallback(%{"literalString" => v}), do: v
@@ -786,6 +782,19 @@ defmodule A2UI.Binding do
   defp get_literal_fallback(_), do: nil
 end
 ```
+
+### 6b. `A2UI.Initializers` - Path+Literal Initialization Pass
+
+The v0.8 renderer checklist specifies an initializer behavior for `BoundValue`s that include both `path` and a `literal*`:
+- If the data model has no value at `path`, initialize it with the literal.
+- Then treat the component property as bound to `path`.
+
+In this LiveView renderer, implement this as a deterministic pass that runs:
+- after every `surfaceUpdate` (and optionally once after `beginRendering`), scanning only the components that changed,
+- producing a set of `set_at_pointer/3` operations applied to `surface.data_model`,
+- never mutating assigns inside `render/1` or inside `A2UI.Binding.resolve/3`.
+
+This avoids hidden side effects during rendering and keeps LiveView diffs predictable.
 
 ### 7. `A2UI.Catalog.Standard` - Component Implementations
 
@@ -798,9 +807,8 @@ defmodule A2UI.Catalog.Standard do
   Standard A2UI component catalog as Phoenix function components.
 
   From LiveView docs on change tracking:
-  - Never create local variables in templates
   - Be explicit about which data each component needs
-  - Use Phoenix's assign modification functions
+  - Prefer stable DOM ids for efficient diffs
   """
 
   use Phoenix.Component
@@ -821,7 +829,7 @@ defmodule A2UI.Catalog.Standard do
   bindings are resolved at render/event time.
   """
   attr :id, :string, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def render_component(assigns) do
@@ -847,6 +855,8 @@ defmodule A2UI.Catalog.Standard do
             <.a2ui_button props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
           <% "TextField" -> %>
             <.a2ui_text_field props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
+          <% "Checkbox" -> %>
+            <.a2ui_checkbox props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
           <% "CheckBox" -> %>
             <.a2ui_checkbox props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
           <% unknown -> %>
@@ -866,7 +876,7 @@ defmodule A2UI.Catalog.Standard do
   # ============================================
 
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def a2ui_column(assigns) do
@@ -885,7 +895,7 @@ defmodule A2UI.Catalog.Standard do
   end
 
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def a2ui_row(assigns) do
@@ -904,7 +914,7 @@ defmodule A2UI.Catalog.Standard do
   end
 
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
 
@@ -926,7 +936,7 @@ defmodule A2UI.Catalog.Standard do
   # ============================================
 
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def a2ui_text(assigns) do
@@ -962,7 +972,7 @@ defmodule A2UI.Catalog.Standard do
   action.context at event time. This avoids large DOM payloads.
   """
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
 
@@ -996,7 +1006,7 @@ defmodule A2UI.Catalog.Standard do
   form with phx-change for proper LiveView form handling.
   """
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
 
@@ -1015,42 +1025,28 @@ defmodule A2UI.Catalog.Standard do
     assigns = assign(assigns, label: label, text: text, field_type: field_type, path: path)
 
     ~H"""
-    <.form
-      for={%{}}
-      as={:a2ui_input}
-      phx-change="a2ui:input"
-      class="a2ui-text-field"
-      id={"a2ui-form-#{@surface.id}-#{@id}"}
-    >
-      <input type="hidden" name="surface_id" value={@surface.id} />
-      <input type="hidden" name="path" value={@path} />
+    <%!-- In real code, build the form with to_form/2 so params use string keys --%>
+    <% form = Phoenix.Component.to_form(%{"surface_id" => @surface.id, "path" => @path, "value" => @text || ""}, as: :a2ui_input) %>
 
-      <%!-- Use project's <.input> from core_components when available --%>
-      <label class="block text-sm font-medium text-gray-700 mb-1">
-        <%= @label %>
-      </label>
-      <%= if @field_type == "longText" do %>
-        <textarea
-          class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          rows="4"
-          name="value"
-          phx-debounce="300"
-        ><%= @text || "" %></textarea>
-      <% else %>
-        <input
-          type={input_type(@field_type)}
-          value={@text || ""}
-          class="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          name="value"
-          phx-debounce="300"
-        />
-      <% end %>
+    <.form for={form} phx-change="a2ui:input" class="a2ui-text-field" id={"a2ui-form-#{@surface.id}-#{@id}"}>
+      <.input field={form[:surface_id]} type="hidden" />
+      <.input field={form[:path]} type="hidden" />
+
+      <%!-- NOTE: core_components <.input> currently does not allow phx-* attrs via :rest.
+            For the PoC implementation, extend it to accept at least phx-debounce/phx-throttle. --%>
+      <.input
+        field={form[:value]}
+        id={"a2ui-input-#{@surface.id}-#{@id}"}
+        label={@label}
+        type={if @field_type == "longText", do: "textarea", else: input_type(@field_type)}
+        phx-debounce="300"
+      />
     </.form>
     """
   end
 
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
 
@@ -1065,17 +1061,18 @@ defmodule A2UI.Catalog.Standard do
     assigns = assign(assigns, label: label, value: !!value, path: path)
 
     ~H"""
-    <label class="a2ui-checkbox flex items-center gap-2 cursor-pointer select-none">
-      <input
+    <% form = Phoenix.Component.to_form(%{"surface_id" => @surface.id, "path" => @path, "value" => @value}, as: :a2ui_input) %>
+
+    <.form for={form} phx-change="a2ui:toggle" id={"a2ui-form-#{@surface.id}-#{@id}"}>
+      <.input field={form[:surface_id]} type="hidden" />
+      <.input field={form[:path]} type="hidden" />
+      <.input
+        field={form[:value]}
+        id={"a2ui-checkbox-#{@surface.id}-#{@id}"}
         type="checkbox"
-        checked={@value}
-        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-        phx-click="a2ui:toggle"
-        phx-value-surface-id={@surface.id}
-        phx-value-path={@path}
+        label={@label}
       />
-      <span class="text-gray-700"><%= @label %></span>
-    </label>
+    </.form>
     """
   end
 
@@ -1091,7 +1088,7 @@ defmodule A2UI.Catalog.Standard do
   and resolves bindings at render/event time.
   """
   attr :props, :map, required: true
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def render_children(assigns) do
@@ -1225,7 +1222,7 @@ defmodule A2UI.Renderer do
   alias A2UI.Catalog.Standard
 
   @doc "Renders an A2UI surface"
-  attr :surface, A2UI.Surface, required: true
+  attr :surface, :map, required: true
 
   def surface(assigns) do
     ~H"""
@@ -1272,6 +1269,10 @@ defmodule A2UI.Live do
   - phx-click for button actions
   - phx-change with phx-debounce for text inputs
   - phx-value-* for passing data to server
+
+  Phoenix v1.8 project detail:
+  - The generated `core_components.ex` `<.input>` component restricts which attributes are forwarded via its `:rest` allowlist.
+  - To implement A2UI TextField debouncing cleanly while still using `<.input>`, extend that allowlist to include `phx-debounce` (and optionally `phx-throttle`).
   """
 
   alias A2UI.{Parser, Surface, Binding}
@@ -1355,6 +1356,11 @@ defmodule A2UI.Live do
         }
       }
 
+      # Transport note (A2A extension, v0.8):
+      # - user events are sent separately from the server→client JSONL stream.
+      # - when using A2A, wrap this JSON in a DataPart with metadata mimeType "application/json+a2ui"
+      #   and include `a2uiClientCapabilities` in the A2A message metadata (supportedCatalogIds, etc.).
+
       # Dispatch to callback if configured
       if callback = socket.assigns[:a2ui_action_callback] do
         callback.(user_action, socket)
@@ -1370,11 +1376,14 @@ defmodule A2UI.Live do
 
   def handle_a2ui_event("a2ui:input", params, socket) do
     # Two-way binding: update local data model on input change
-    # Params come from the form wrapper's hidden inputs
-    surface_id = params["surface_id"]
-    path = params["path"]
-    # Value comes from the input's name attribute
-    value = params["value"] || get_input_value(params)
+    # Params come from the TextField form:
+    #   %{"a2ui_input" => %{"surface_id" => "...", "path" => "...", "value" => "..."}}.
+    input = params["a2ui_input"] || %{}
+    surface_id = input["surface_id"]
+    path = input["path"]
+    value = input["value"]
+    # Type note: LiveView form params arrive as strings. If the bound component is a number/date/etc,
+    # coerce the value before writing to the data model (based on `textFieldType` or catalog metadata).
 
     if path && surface_id do
       socket = update_data_at_path(socket, surface_id, path, value)
@@ -1385,15 +1394,22 @@ defmodule A2UI.Live do
   end
 
   def handle_a2ui_event("a2ui:toggle", params, socket) do
-    # Two-way binding: toggle boolean at path
-    surface_id = params["surface-id"]
-    path = params["path"]
+    # Two-way binding: update boolean at path based on form param.
+    input = params["a2ui_input"] || %{}
+    surface_id = input["surface_id"]
+    path = input["path"]
+    value = input["value"]
+
+    checked? =
+      case value do
+        true -> true
+        "true" -> true
+        "on" -> true
+        _ -> false
+      end
 
     if path && surface_id do
-      surface = socket.assigns.a2ui_surfaces[surface_id]
-      current = Binding.resolve(%{"path" => path}, surface.data_model, nil)
-      socket = update_data_at_path(socket, surface_id, path, !current)
-      {:noreply, socket}
+      {:noreply, update_data_at_path(socket, surface_id, path, checked?)}
     else
       {:noreply, socket}
     end
@@ -1420,16 +1436,6 @@ defmodule A2UI.Live do
     end
   end
 
-  defp get_input_value(params) do
-    # Find the actual input value from the params
-    # LiveView sends form data under nested keys
-    case params do
-      %{"a2ui_input" => %{"value" => value}} -> value
-      %{"value" => value} -> value
-      _ -> nil
-    end
-  end
-
   defp resolve_action_context(context_list, data_model, scope_path) do
     Enum.reduce(context_list, %{}, fn
       %{"key" => key, "value" => bound_value}, acc ->
@@ -1445,6 +1451,10 @@ end
 ## Demo Implementation
 
 ### Demo LiveView
+
+Important (Phoenix v1.8 scaffolding in this repo):
+- LiveView templates should start with `<Layouts.app ...>` and must pass `current_scope`.
+- Ensure the demo route lives under the authenticated `live_session` so `@current_scope` is assigned (otherwise you’ll hit the “no current_scope assign” error).
 
 ```elixir
 defmodule A2uiLvWeb.DemoLive do
@@ -1481,49 +1491,51 @@ defmodule A2uiLvWeb.DemoLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-gray-50 py-8">
-      <div class="container mx-auto px-4">
-        <h1 class="text-3xl font-bold text-gray-900 mb-8">A2UI LiveView Demo</h1>
+    <Layouts.app flash={@flash} current_scope={@current_scope}>
+      <div class="min-h-screen bg-gray-50 py-8">
+        <div class="container mx-auto px-4">
+          <h1 class="text-3xl font-bold text-gray-900 mb-8">A2UI LiveView Demo</h1>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <%!-- Rendered Surface --%>
-          <div>
-            <h2 class="text-lg font-semibold text-gray-700 mb-4">Rendered Surface</h2>
-            <div class="bg-white rounded-lg shadow p-6">
-              <%= for {_id, surface} <- @a2ui_surfaces do %>
-                <A2UI.Renderer.surface surface={surface} />
-              <% end %>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <%!-- Rendered Surface --%>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-700 mb-4">Rendered Surface</h2>
+              <div class="bg-white rounded-lg shadow p-6">
+                <%= for {_id, surface} <- @a2ui_surfaces do %>
+                  <A2UI.Renderer.surface surface={surface} />
+                <% end %>
 
-              <%= if map_size(@a2ui_surfaces) == 0 do %>
-                <div class="text-gray-400 text-center py-8">
-                  No surfaces loaded
-                </div>
-              <% end %>
+                <%= if map_size(@a2ui_surfaces) == 0 do %>
+                  <div class="text-gray-400 text-center py-8">
+                    No surfaces loaded
+                  </div>
+                <% end %>
+              </div>
             </div>
-          </div>
 
-          <%!-- Debug Panel --%>
-          <div>
-            <h2 class="text-lg font-semibold text-gray-700 mb-4">Debug Info</h2>
-            <div class="bg-gray-800 rounded-lg shadow p-4 text-sm font-mono text-gray-100 overflow-auto max-h-[600px]">
-              <%= if @a2ui_last_action do %>
-                <div class="mb-4">
-                  <div class="text-green-400 mb-1">Last Action:</div>
-                  <pre class="text-gray-300 whitespace-pre-wrap"><%= Jason.encode!(@a2ui_last_action, pretty: true) %></pre>
-                </div>
-              <% end %>
+            <%!-- Debug Panel --%>
+            <div>
+              <h2 class="text-lg font-semibold text-gray-700 mb-4">Debug Info</h2>
+              <div class="bg-gray-800 rounded-lg shadow p-4 text-sm font-mono text-gray-100 overflow-auto max-h-[600px]">
+                <%= if @a2ui_last_action do %>
+                  <div class="mb-4">
+                    <div class="text-green-400 mb-1">Last Action:</div>
+                    <pre class="text-gray-300 whitespace-pre-wrap"><%= Jason.encode!(@a2ui_last_action, pretty: true) %></pre>
+                  </div>
+                <% end %>
 
-              <%= for {id, surface} <- @a2ui_surfaces do %>
-                <div class="mb-4">
-                  <div class="text-blue-400 mb-1">Data Model (<%= id %>):</div>
-                  <pre class="text-gray-300 whitespace-pre-wrap"><%= Jason.encode!(surface.data_model, pretty: true) %></pre>
-                </div>
-              <% end %>
+                <%= for {id, surface} <- @a2ui_surfaces do %>
+                  <div class="mb-4">
+                    <div class="text-blue-400 mb-1">Data Model (<%= id %>):</div>
+                    <pre class="text-gray-300 whitespace-pre-wrap"><%= Jason.encode!(surface.data_model, pretty: true) %></pre>
+                  </div>
+                <% end %>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </Layouts.app>
     """
   end
 
@@ -1551,7 +1563,7 @@ defmodule A2UI.MockAgent do
       {"id":"name_field","component":{"TextField":{"label":{"literalString":"Name"},"text":{"path":"/form/name"},"textFieldType":"shortText"}}},
       {"id":"email_field","component":{"TextField":{"label":{"literalString":"Email"},"text":{"path":"/form/email"},"textFieldType":"shortText"}}},
       {"id":"message_field","component":{"TextField":{"label":{"literalString":"Message"},"text":{"path":"/form/message"},"textFieldType":"longText"}}},
-      {"id":"subscribe","component":{"CheckBox":{"label":{"literalString":"Subscribe to updates"},"value":{"path":"/form/subscribe"}}}},
+      {"id":"subscribe","component":{"Checkbox":{"label":{"literalString":"Subscribe to updates"},"value":{"path":"/form/subscribe"}}}},
       {"id":"actions","component":{"Row":{"children":{"explicitList":["reset_btn","submit_btn"]},"distribution":"end"}}},
       {"id":"reset_btn","component":{"Button":{"child":"reset_text","primary":false,"action":{"name":"reset_form"}}}},
       {"id":"reset_text","component":{"Text":{"text":{"literalString":"Reset"}}}},
@@ -1576,6 +1588,10 @@ end
 ```
 
 ## Directory Structure
+
+Implementation note:
+- In actual Elixir code, place **one module per file** to avoid cyclic dependencies and compilation issues.
+- The multiple `defmodule` examples below are for documentation only and should be split accordingly.
 
 ```
 lib/
@@ -1622,7 +1638,7 @@ test/
 ### Phase 2: Component Catalog
 1. Layout components (Column, Row, Card)
 2. Display components (Text, Divider)
-3. Interactive components (Button, TextField, CheckBox)
+3. Interactive components (Button, TextField, Checkbox)
 4. Children rendering (explicitList, template)
 
 ### Phase 3: LiveView Integration
@@ -1657,7 +1673,7 @@ A2UI components are stateless renders - state lives in the Surface. Function com
 
 ### 3. Two-Way Binding Implementation
 
-Per A2UI Data Binding concepts: "User interactions immediately update local data model" without server communication until explicit action.
+Per A2UI Data Binding concepts: user interactions immediately update the renderer’s local data model without an agent round-trip until an explicit action.
 
 In LiveView, we update `data_model` in assigns on `phx-change`, with `phx-debounce` to reduce round-trips. The action sends resolved values.
 
@@ -1665,17 +1681,16 @@ In LiveView, we update `data_model` in assigns on `phx-change`, with `phx-deboun
 
 Target v0.8 for PoC but structure code to support v0.9:
 - Component parsing abstracted (`from_map` vs `from_map_v09`)
-- Message names abstracted in parser
-- Data model handling supports both formats
+- Keep v0.9 changes isolated behind an adapter layer (documented above); do not claim v0.9 support until `updateDataModel` (CRDT updates + `watchDataModel`) is implemented.
 
 ## v0.8 vs v0.9 Differences
 
 | Aspect | v0.8 | v0.9 |
 |--------|------|------|
-| Message names | surfaceUpdate, dataModelUpdate, beginRendering | updateComponents, updateDataModel, createSurface |
+| Envelope messages | surfaceUpdate, dataModelUpdate, beginRendering, deleteSurface | createSurface, updateComponents, updateDataModel, deleteSurface, watchDataModel |
 | Component format | `{"component": {"Text": {...}}}` | `{"component": "Text", ...}` |
-| Data model | Array of typed key-values | Standard JSON object |
-| Root specification | Explicit in beginRendering | Implicit (id="root") |
+| Data model updates | Typed adjacency list (`contents` with `valueString`/`valueMap`/...) | CRDT-style `updates[]` (path/value/hlc) + `versions` |
+| Root specification | Explicit `beginRendering.root` | Convention: a component with `id: "root"` must exist; no root field in `createSurface` |
 | Action context | Array of key-value | Standard map |
 | Layout props | distribution, alignment | justify, align |
 | TextField | text, textFieldType | value, variant |
@@ -1686,9 +1701,9 @@ Target v0.8 for PoC but structure code to support v0.9:
 
 ```elixir
 defmodule A2UI.Validator do
-  @max_components 200
-  @max_depth 15
-  @allowed_types ~w(Column Row Card Text Divider Button TextField CheckBox)
+  @max_components 1000
+  @max_depth 30
+  @allowed_types ~w(Column Row Card Text Divider Button TextField Checkbox CheckBox)
 
   def validate_surface_update(%{components: components}) do
     with :ok <- validate_count(components),
@@ -1844,8 +1859,14 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
     # Simulate user input
     view
-    |> element("input[name='value']")
-    |> render_change(%{value: "new text"})
+    |> form("#a2ui-form-test-email-input", %{
+      "a2ui_input" => %{
+        "surface_id" => "test",
+        "path" => "/form/email",
+        "value" => "new text"
+      }
+    })
+    |> render_change()
 
     # Verify data model updated
     # (check via debug panel or internal state)
@@ -1860,27 +1881,7 @@ end
 
 ### Property-Based Tests (Optional)
 
-```elixir
-# test/a2ui/binding_property_test.exs
-defmodule A2UI.BindingPropertyTest do
-  use ExUnit.Case
-  use ExUnitProperties
-
-  property "get_at_pointer returns nil for any path on empty map" do
-    check all path <- string(:alphanumeric, min_length: 1) do
-      assert A2UI.Binding.get_at_pointer(%{}, "/" <> path) == nil
-    end
-  end
-
-  property "set then get returns same value" do
-    check all key <- string(:alphanumeric, min_length: 1),
-              value <- term() do
-      data = A2UI.Binding.set_at_pointer(%{}, "/" <> key, value)
-      assert A2UI.Binding.get_at_pointer(data, "/" <> key) == value
-    end
-  end
-end
-```
+If you choose to add property-based tests, add `:stream_data` to deps and use it to exercise pointer traversal and template-scoping rules. Do not add it for the PoC unless you explicitly want that extra dependency.
 
 ## Open Questions
 
