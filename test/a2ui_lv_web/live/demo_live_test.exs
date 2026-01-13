@@ -6,8 +6,8 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "renders loading state initially", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/demo")
 
-      assert html =~ "A2UI LiveView Renderer"
-      assert html =~ "Loading"
+      assert html =~ "A2UI LiveView Renderer Demo"
+      assert html =~ "Loading surface"
     end
 
     test "renders surface after beginRendering", %{conn: conn} do
@@ -53,7 +53,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
       # Find the name field form and submit a change
       view
-      |> form("#a2ui-form-main-name_field", %{
+      |> form("#a2ui-main-name_field-form", %{
         "a2ui_input" => %{
           "surface_id" => "main",
           "path" => "/form/name",
@@ -99,7 +99,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
       # First fill in some form data
       view
-      |> form("#a2ui-form-main-name_field", %{
+      |> form("#a2ui-main-name_field-form", %{
         "a2ui_input" => %{
           "surface_id" => "main",
           "path" => "/form/name",

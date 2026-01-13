@@ -268,5 +268,6 @@ defmodule A2UI.Binding do
   defp get_literal_fallback(%{"literalString" => v}), do: v
   defp get_literal_fallback(%{"literalNumber" => v}), do: v
   defp get_literal_fallback(%{"literalBoolean" => v}), do: v
+  defp get_literal_fallback(%{"literalArray" => v}), do: v
   defp get_literal_fallback(_), do: nil
 end

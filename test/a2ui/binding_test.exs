@@ -45,6 +45,11 @@ defmodule A2UI.BindingTest do
       assert Binding.resolve(bound, %{}, nil) == "default"
     end
 
+    test "returns literal array fallback when path is nil" do
+      bound = %{"path" => "/missing", "literalArray" => [1, 2, 3]}
+      assert Binding.resolve(bound, %{}, nil) == [1, 2, 3]
+    end
+
     test "returns path value when both path and literal exist" do
       data = %{"user" => %{"name" => "Alice"}}
       bound = %{"path" => "/user/name", "literalString" => "default"}

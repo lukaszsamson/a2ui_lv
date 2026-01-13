@@ -7,11 +7,10 @@ defmodule A2uiLvWeb.DemoLive do
 
   use A2uiLvWeb, :live_view
 
-  alias A2uiLvWeb.Layouts
-
   @impl true
   def mount(_params, _session, socket) do
     socket = A2UI.Live.init(socket, action_callback: &handle_action/2)
+    socket = Phoenix.Component.assign(socket, :current_scope, nil)
 
     if connected?(socket) do
       send(self(), :load_demo)
@@ -40,65 +39,66 @@ defmodule A2uiLvWeb.DemoLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-base-200">
-      <header class="navbar bg-base-100 shadow-sm px-4 sm:px-6 lg:px-8">
-        <div class="flex-1">
-          <a href="/" class="btn btn-ghost text-xl">A2UI Demo</a>
+    <Layouts.app flash={@flash} current_scope={@current_scope}>
+      <div class="space-y-8">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-3xl">
+            A2UI LiveView Renderer Demo
+          </h1>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-zinc-700 dark:text-zinc-200">
+            This page ingests a small A2UI v0.8 message sequence and renders it as LiveView components.
+            Use the form to validate two-way binding and button actions.
+          </p>
         </div>
-        <div class="flex-none">
-          <a href="/" class="btn btn-sm btn-outline">Back to Home</a>
-        </div>
-      </header>
 
-      <main class="container mx-auto px-4 py-8 max-w-6xl">
-        <h1 class="text-3xl font-bold mb-8">A2UI LiveView Renderer</h1>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <%!-- Rendered Surface --%>
-          <div>
-            <h2 class="text-lg font-semibold mb-4">Rendered Surface</h2>
-            <div class="bg-base-100 rounded-lg shadow p-6 border border-base-300 min-h-[400px]">
+          <section class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <h2 class="text-sm font-semibold text-zinc-950 dark:text-zinc-50">Rendered Surface</h2>
+            <div class="mt-4 min-h-[420px]">
               <%= for {_id, surface} <- @a2ui_surfaces do %>
                 <A2UI.Renderer.surface surface={surface} />
               <% end %>
 
               <%= if map_size(@a2ui_surfaces) == 0 do %>
-                <div class="text-base-content/50 text-center py-8">
-                  <span class="loading loading-spinner loading-md mr-2"></span>
-                  Loading surface...
+                <div class="flex items-center justify-center gap-3 py-16 text-sm text-zinc-600 dark:text-zinc-300">
+                  <div class="size-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700 dark:border-zinc-700 dark:border-t-zinc-200" />
+                  Loading surface…
                 </div>
               <% end %>
             </div>
-          </div>
+          </section>
 
           <%!-- Debug Panel --%>
-          <div>
-            <h2 class="text-lg font-semibold mb-4">Debug Info</h2>
-            <div class="bg-neutral rounded-lg shadow p-4 text-sm font-mono text-neutral-content overflow-auto max-h-[600px]">
+          <section class="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <h2 class="text-sm font-semibold text-zinc-950 dark:text-zinc-50">Debug</h2>
+            <div class="mt-4 space-y-4 overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
               <%= if @a2ui_last_action do %>
-                <div class="mb-4">
-                  <div class="text-success mb-1">Last Action:</div>
-                  <pre class="text-neutral-content/80 whitespace-pre-wrap"><%= Jason.encode!(@a2ui_last_action, pretty: true) %></pre>
+                <div>
+                  <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Last Action
+                  </div>
+                  <pre class="whitespace-pre-wrap"><%= Jason.encode!(@a2ui_last_action, pretty: true) %></pre>
                 </div>
               <% end %>
 
               <%= for {id, surface} <- @a2ui_surfaces do %>
-                <div class="mb-4">
-                  <div class="text-info mb-1">Data Model (<%= id %>):</div>
-                  <pre class="text-neutral-content/80 whitespace-pre-wrap"><%= Jason.encode!(surface.data_model, pretty: true) %></pre>
+                <div>
+                  <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    Data Model ({id})
+                  </div>
+                  <pre class="whitespace-pre-wrap"><%= Jason.encode!(surface.data_model, pretty: true) %></pre>
                 </div>
               <% end %>
 
               <%= if map_size(@a2ui_surfaces) == 0 and is_nil(@a2ui_last_action) do %>
-                <div class="text-neutral-content/50">Waiting for data...</div>
+                <div class="text-zinc-500 dark:text-zinc-400">Waiting for data…</div>
               <% end %>
             </div>
-          </div>
+          </section>
         </div>
-      </main>
-
-      <Layouts.flash_group flash={@flash} />
-    </div>
+      </div>
+    </Layouts.app>
     """
   end
 

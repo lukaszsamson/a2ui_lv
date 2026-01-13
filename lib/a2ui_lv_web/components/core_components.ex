@@ -9,11 +9,7 @@ defmodule A2uiLvWeb.CoreComponents do
   them in any way you want, based on your application growth and needs.
 
   The foundation for styling is Tailwind CSS, a utility-first CSS framework,
-  augmented with daisyUI, a Tailwind CSS plugin that provides UI components
-  and themes. Here are useful references:
-
-    * [daisyUI](https://daisyui.com/docs/intro/) - a good place to get
-      started and see the available components.
+  Here are useful references:
 
     * [Tailwind CSS](https://tailwindcss.com) - the foundational framework
       we build on. You will use it for layout, sizing, flexbox, grid, and
@@ -56,25 +52,32 @@ defmodule A2uiLvWeb.CoreComponents do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="toast toast-top toast-end z-50"
+      class={[
+        "flex items-start gap-3 rounded-xl border px-4 py-3 shadow-lg backdrop-blur",
+        "bg-white/90 text-zinc-950 border-zinc-200",
+        "dark:bg-zinc-950/90 dark:text-zinc-50 dark:border-zinc-800",
+        @kind == :info &&
+          "border-sky-200 bg-sky-50/90 text-sky-950 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-100",
+        @kind == :error &&
+          "border-rose-200 bg-rose-50/90 text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100"
+      ]}
       {@rest}
     >
-      <div class={[
-        "alert w-80 sm:w-96 max-w-80 sm:max-w-96 text-wrap",
-        @kind == :info && "alert-info",
-        @kind == :error && "alert-error"
-      ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
-        <div>
-          <p :if={@title} class="font-semibold">{@title}</p>
-          <p>{msg}</p>
-        </div>
-        <div class="flex-1" />
-        <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
-        </button>
+      <.icon :if={@kind == :info} name="hero-information-circle" class="mt-0.5 size-5 shrink-0" />
+      <.icon :if={@kind == :error} name="hero-exclamation-circle" class="mt-0.5 size-5 shrink-0" />
+
+      <div class="min-w-0">
+        <p :if={@title} class="text-sm font-semibold leading-5">{@title}</p>
+        <p class="text-sm leading-5">{msg}</p>
       </div>
+
+      <button
+        type="button"
+        class="ml-2 inline-flex rounded-md p-1 opacity-70 transition hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+        aria-label={gettext("close")}
+      >
+        <.icon name="hero-x-mark" class="size-4" />
+      </button>
     </div>
     """
   end
@@ -94,11 +97,18 @@ defmodule A2uiLvWeb.CoreComponents do
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
-    variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
-
     assigns =
       assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
+        [
+          "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold",
+          "shadow-sm ring-1 ring-inset transition-colors",
+          "focus:outline-none focus:ring-2 focus:ring-indigo-500/40",
+          "disabled:opacity-50 disabled:pointer-events-none",
+          assigns[:variant] == "primary" &&
+            "bg-indigo-600 text-white ring-indigo-600 hover:bg-indigo-500 active:bg-indigo-600/90",
+          assigns[:variant] != "primary" &&
+            "bg-white text-zinc-900 ring-zinc-200 hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-50 dark:ring-zinc-800 dark:hover:bg-zinc-800"
+        ]
       end)
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
@@ -178,8 +188,9 @@ defmodule A2uiLvWeb.CoreComponents do
   attr :error_class, :any, default: nil, doc: "the input error class to use over defaults"
 
   attr :rest, :global,
-    include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
-                multiple pattern placeholder readonly required rows size step)
+    include:
+      ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
+                multiple pattern placeholder readonly required rows size step phx-debounce phx-throttle)
 
   def input(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
     errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
@@ -205,8 +216,8 @@ defmodule A2uiLvWeb.CoreComponents do
       end)
 
     ~H"""
-    <div class="fieldset mb-2">
-      <label>
+    <div class="mb-3">
+      <label class="inline-flex items-center gap-2 text-sm text-zinc-900 dark:text-zinc-50">
         <input
           type="hidden"
           name={@name}
@@ -214,17 +225,20 @@ defmodule A2uiLvWeb.CoreComponents do
           disabled={@rest[:disabled]}
           form={@rest[:form]}
         />
-        <span class="label">
-          <input
-            type="checkbox"
-            id={@id}
-            name={@name}
-            value="true"
-            checked={@checked}
-            class={@class || "checkbox checkbox-sm"}
-            {@rest}
-          />{@label}
-        </span>
+        <input
+          type="checkbox"
+          id={@id}
+          name={@name}
+          value="true"
+          checked={@checked}
+          class={[
+            @class ||
+              "size-4 rounded border-zinc-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 dark:border-zinc-700 dark:bg-zinc-950 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/30",
+            @errors != [] && "border-rose-400 focus:border-rose-500 focus:ring-rose-500/30"
+          ]}
+          {@rest}
+        />
+        <span :if={@label} class="select-none">{@label}</span>
       </label>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
@@ -233,13 +247,20 @@ defmodule A2uiLvWeb.CoreComponents do
 
   def input(%{type: "select"} = assigns) do
     ~H"""
-    <div class="fieldset mb-2">
-      <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+    <div class="mb-3">
+      <label class="block">
+        <span :if={@label} class="mb-1 block text-sm font-medium text-zinc-900 dark:text-zinc-50">
+          {@label}
+        </span>
         <select
           id={@id}
           name={@name}
-          class={[@class || "w-full select", @errors != [] && (@error_class || "select-error")]}
+          class={[
+            @class ||
+              "block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20",
+            @errors != [] &&
+              (@error_class || "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20")
+          ]}
           multiple={@multiple}
           {@rest}
         >
@@ -254,15 +275,19 @@ defmodule A2uiLvWeb.CoreComponents do
 
   def input(%{type: "textarea"} = assigns) do
     ~H"""
-    <div class="fieldset mb-2">
-      <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+    <div class="mb-3">
+      <label class="block">
+        <span :if={@label} class="mb-1 block text-sm font-medium text-zinc-900 dark:text-zinc-50">
+          {@label}
+        </span>
         <textarea
           id={@id}
           name={@name}
           class={[
-            @class || "w-full textarea",
-            @errors != [] && (@error_class || "textarea-error")
+            @class ||
+              "block w-full min-h-28 rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20",
+            @errors != [] &&
+              (@error_class || "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20")
           ]}
           {@rest}
         >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
@@ -275,17 +300,21 @@ defmodule A2uiLvWeb.CoreComponents do
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
-    <div class="fieldset mb-2">
-      <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+    <div class="mb-3">
+      <label class="block">
+        <span :if={@label} class="mb-1 block text-sm font-medium text-zinc-900 dark:text-zinc-50">
+          {@label}
+        </span>
         <input
           type={@type}
           name={@name}
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            @class || "w-full input",
-            @errors != [] && (@error_class || "input-error")
+            @class ||
+              "block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none placeholder:text-zinc-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:placeholder:text-zinc-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20",
+            @errors != [] &&
+              (@error_class || "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20")
           ]}
           {@rest}
         />
@@ -298,7 +327,7 @@ defmodule A2uiLvWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
+    <p class="mt-1.5 flex gap-2 items-center text-sm text-rose-600 dark:text-rose-400">
       <.icon name="hero-exclamation-circle" class="size-5" />
       {render_slot(@inner_block)}
     </p>
@@ -319,7 +348,7 @@ defmodule A2uiLvWeb.CoreComponents do
         <h1 class="text-lg font-semibold leading-8">
           {render_slot(@inner_block)}
         </h1>
-        <p :if={@subtitle != []} class="text-sm text-base-content/70">
+        <p :if={@subtitle != []} class="text-sm text-zinc-600 dark:text-zinc-400">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -360,34 +389,44 @@ defmodule A2uiLvWeb.CoreComponents do
       end
 
     ~H"""
-    <table class="table table-zebra">
-      <thead>
-        <tr>
-          <th :for={col <- @col}>{col[:label]}</th>
-          <th :if={@action != []}>
-            <span class="sr-only">{gettext("Actions")}</span>
-          </th>
-        </tr>
-      </thead>
-      <tbody id={@id} phx-update={is_struct(@rows, Phoenix.LiveView.LiveStream) && "stream"}>
-        <tr :for={row <- @rows} id={@row_id && @row_id.(row)}>
-          <td
-            :for={col <- @col}
-            phx-click={@row_click && @row_click.(row)}
-            class={@row_click && "hover:cursor-pointer"}
+    <div class="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <table class="min-w-full divide-y divide-zinc-200 text-left text-sm dark:divide-zinc-800">
+        <thead class="bg-zinc-50 text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-200">
+          <tr>
+            <th :for={col <- @col} class="px-4 py-3 font-semibold">{col[:label]}</th>
+            <th :if={@action != []} class="px-4 py-3">
+              <span class="sr-only">{gettext("Actions")}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody
+          id={@id}
+          phx-update={is_struct(@rows, Phoenix.LiveView.LiveStream) && "stream"}
+          class="divide-y divide-zinc-100 text-zinc-900 dark:divide-zinc-900 dark:text-zinc-50"
+        >
+          <tr
+            :for={row <- @rows}
+            id={@row_id && @row_id.(row)}
+            class="hover:bg-zinc-50/70 dark:hover:bg-zinc-900/40"
           >
-            {render_slot(col, @row_item.(row))}
-          </td>
-          <td :if={@action != []} class="w-0 font-semibold">
-            <div class="flex gap-4">
-              <%= for action <- @action do %>
-                {render_slot(action, @row_item.(row))}
-              <% end %>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            <td
+              :for={col <- @col}
+              phx-click={@row_click && @row_click.(row)}
+              class={["px-4 py-3", @row_click && "hover:cursor-pointer"]}
+            >
+              {render_slot(col, @row_item.(row))}
+            </td>
+            <td :if={@action != []} class="px-4 py-3 whitespace-nowrap font-semibold">
+              <div class="flex items-center justify-end gap-3">
+                <%= for action <- @action do %>
+                  {render_slot(action, @row_item.(row))}
+                <% end %>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     """
   end
 
@@ -407,14 +446,14 @@ defmodule A2uiLvWeb.CoreComponents do
 
   def list(assigns) do
     ~H"""
-    <ul class="list">
-      <li :for={item <- @item} class="list-row">
-        <div class="list-col-grow">
-          <div class="font-bold">{item.title}</div>
-          <div>{render_slot(item)}</div>
-        </div>
-      </li>
-    </ul>
+    <dl class="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white shadow-sm dark:divide-zinc-900 dark:border-zinc-800 dark:bg-zinc-950">
+      <div :for={item <- @item} class="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-3 sm:gap-4">
+        <dt class="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{item.title}</dt>
+        <dd class="text-sm text-zinc-700 sm:col-span-2 dark:text-zinc-200">
+          {render_slot(item)}
+        </dd>
+      </div>
+    </dl>
     """
   end
 

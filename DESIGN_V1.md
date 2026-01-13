@@ -1283,7 +1283,8 @@ defmodule A2UI.Live do
   Returns socket with :a2ui_surfaces assign.
   """
   def init(socket, opts \\ []) do
-    Phoenix.LiveView.assign(socket,
+    # `assign/2` is provided by Phoenix.Component (imported in LiveViews).
+    Phoenix.Component.assign(socket,
       a2ui_surfaces: %{},
       a2ui_action_callback: opts[:action_callback]
     )
@@ -1306,7 +1307,7 @@ defmodule A2UI.Live do
 
       {:delete_surface, %DeleteSurface{surface_id: sid}} ->
         surfaces = Map.delete(socket.assigns.a2ui_surfaces, sid)
-        {:noreply, Phoenix.LiveView.assign(socket, :a2ui_surfaces, surfaces)}
+        {:noreply, Phoenix.Component.assign(socket, :a2ui_surfaces, surfaces)}
 
       {:error, reason} ->
         require Logger
@@ -1366,7 +1367,7 @@ defmodule A2UI.Live do
         callback.(user_action, socket)
       end
 
-      {:noreply, Phoenix.LiveView.assign(socket, :a2ui_last_action, user_action)}
+      {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, user_action)}
     else
       require Logger
       Logger.warning("A2UI action event for component without action: #{component_id}")
@@ -1421,7 +1422,7 @@ defmodule A2UI.Live do
     surfaces = socket.assigns.a2ui_surfaces
     surface = Map.get(surfaces, surface_id) || Surface.new(surface_id)
     updated = Surface.apply_message(surface, message)
-    Phoenix.LiveView.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
+    Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
   end
 
   defp update_data_at_path(socket, surface_id, path, value) do
@@ -1430,7 +1431,7 @@ defmodule A2UI.Live do
 
     if surface do
       updated = Surface.update_data_at_path(surface, path, value)
-      Phoenix.LiveView.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
+      Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
     else
       socket
     end

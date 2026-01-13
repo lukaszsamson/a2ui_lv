@@ -94,21 +94,18 @@ defmodule A2UI.Surface do
   end
 
   defp apply_data_update(data_model, path, contents) do
-    keys = parse_path(path)
+    pointer = Binding.expand_path(path, nil)
 
-    update_at_path(data_model, keys, fn existing ->
-      merge_contents(existing || %{}, contents)
-    end)
-  end
+    cond do
+      pointer in ["", "/"] ->
+        merge_contents(data_model, contents)
 
-  defp parse_path("/" <> path), do: String.split(path, "/", trim: true)
-  defp parse_path(path), do: String.split(path, "/", trim: true)
-
-  defp update_at_path(data, [], updater), do: updater.(data)
-
-  defp update_at_path(data, [key | rest], updater) do
-    current = Map.get(data || %{}, key, %{})
-    Map.put(data || %{}, key, update_at_path(current, rest, updater))
+      true ->
+        existing = Binding.get_at_pointer(data_model, pointer)
+        existing_map = if is_map(existing), do: existing, else: %{}
+        merged = merge_contents(existing_map, contents)
+        Binding.set_at_pointer(data_model, pointer, merged)
+    end
   end
 
   # v0.8 format: array of {key, valueType} entries
@@ -119,6 +116,8 @@ defmodule A2UI.Surface do
       Map.put(acc, key, value)
     end)
   end
+
+  defp merge_contents(existing, _contents), do: existing
 
   defp extract_typed_value(%{"valueString" => v}), do: v
   defp extract_typed_value(%{"valueNumber" => v}), do: v

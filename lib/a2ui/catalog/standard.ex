@@ -43,29 +43,72 @@ defmodule A2UI.Catalog.Standard do
 
       # Use display:contents to not break flex layout while keeping the wrapper for debugging
       ~H"""
-      <div class="a2ui-component contents" id={"a2ui-#{@surface.id}-#{@id}"}>
+      <div
+        class="a2ui-component contents"
+        id={component_dom_id(@surface.id, @id, @scope_path)}
+        data-a2ui-scope={@scope_path || ""}
+      >
         <%= if @depth > A2UI.Validator.max_depth() do %>
-          <div class="a2ui-error text-error text-sm p-2">Max render depth exceeded</div>
+          <div class="a2ui-error rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
+            Max render depth exceeded
+          </div>
         <% else %>
           <%= case @component.type do %>
             <% "Column" -> %>
-              <.a2ui_column props={@component.props} surface={@surface} scope_path={@scope_path} depth={@depth} />
+              <.a2ui_column
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                depth={@depth}
+              />
             <% "Row" -> %>
-              <.a2ui_row props={@component.props} surface={@surface} scope_path={@scope_path} depth={@depth} />
+              <.a2ui_row
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                depth={@depth}
+              />
             <% "Card" -> %>
-              <.a2ui_card props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} depth={@depth} />
+              <.a2ui_card
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+                depth={@depth}
+              />
             <% "Text" -> %>
               <.a2ui_text props={@component.props} surface={@surface} scope_path={@scope_path} />
             <% "Divider" -> %>
               <.a2ui_divider props={@component.props} />
             <% "Button" -> %>
-              <.a2ui_button props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} depth={@depth} />
+              <.a2ui_button
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+                depth={@depth}
+              />
             <% "TextField" -> %>
-              <.a2ui_text_field props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
+              <.a2ui_text_field
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+              />
             <% "Checkbox" -> %>
-              <.a2ui_checkbox props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
+              <.a2ui_checkbox
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+              />
             <% "CheckBox" -> %>
-              <.a2ui_checkbox props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
+              <.a2ui_checkbox
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+              />
             <% unknown -> %>
               <.a2ui_unknown type={unknown} />
           <% end %>
@@ -74,7 +117,9 @@ defmodule A2UI.Catalog.Standard do
       """
     else
       ~H"""
-      <div class="a2ui-missing text-error text-sm">Missing component: <%= @id %></div>
+      <div class="a2ui-missing rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
+        Missing component: {@id}
+      </div>
       """
     end
   end
@@ -131,7 +176,7 @@ defmodule A2UI.Catalog.Standard do
 
   def a2ui_card(assigns) do
     ~H"""
-    <div class="a2ui-card card bg-base-100 shadow-sm border border-base-300 p-4">
+    <div class="a2ui-card rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
       <.render_component
         :if={@props["child"]}
         id={@props["child"]}
@@ -157,7 +202,7 @@ defmodule A2UI.Catalog.Standard do
     assigns = assign(assigns, text: text, hint: hint)
 
     ~H"""
-    <span class={text_classes(@hint)}><%= @text %></span>
+    <span class={text_classes(@hint)}>{@text}</span>
     """
   end
 
@@ -168,7 +213,7 @@ defmodule A2UI.Catalog.Standard do
     assigns = assign(assigns, axis: axis)
 
     ~H"""
-    <div class={divider_classes(@axis)}></div>
+    <div class={divider_classes(@axis)} />
     """
   end
 
@@ -225,7 +270,9 @@ defmodule A2UI.Catalog.Standard do
   attr :id, :string, required: true
 
   def a2ui_text_field(assigns) do
-    label = Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
+    label =
+      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
+
     # v0.8 uses "text", v0.9 uses "value"
     text_prop = assigns.props["text"] || assigns.props["value"]
     text = Binding.resolve(text_prop, assigns.surface.data_model, assigns.scope_path)
@@ -244,13 +291,13 @@ defmodule A2UI.Catalog.Standard do
       as={:a2ui_input}
       phx-change="a2ui:input"
       class="a2ui-text-field"
-      id={"a2ui-form-#{@surface.id}-#{@id}"}
+      id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
       <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
       <input type="hidden" name="a2ui_input[path]" value={@path} />
       <.input
         name="a2ui_input[value]"
-        id={"a2ui-input-#{@surface.id}-#{@id}"}
+        id={component_dom_id(@surface.id, @id, @scope_path, "input")}
         label={@label}
         value={@text}
         type={input_type(@field_type)}
@@ -269,8 +316,11 @@ defmodule A2UI.Catalog.Standard do
   attr :id, :string, required: true
 
   def a2ui_checkbox(assigns) do
-    label = Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
-    value = Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
+    label =
+      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
+
+    value =
+      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
@@ -283,13 +333,13 @@ defmodule A2UI.Catalog.Standard do
       for={%{}}
       as={:a2ui_input}
       phx-change="a2ui:toggle"
-      id={"a2ui-form-#{@surface.id}-#{@id}"}
+      id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
       <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
       <input type="hidden" name="a2ui_input[path]" value={@path} />
       <.input
         name="a2ui_input[value]"
-        id={"a2ui-checkbox-#{@surface.id}-#{@id}"}
+        id={component_dom_id(@surface.id, @id, @scope_path, "checkbox")}
         type="checkbox"
         label={@label}
         value={@value}
@@ -337,7 +387,11 @@ defmodule A2UI.Catalog.Standard do
 
         # Resolve the array path to get items
         items =
-          Binding.resolve(%{"path" => data_binding}, assigns.surface.data_model, assigns.scope_path) ||
+          Binding.resolve(
+            %{"path" => data_binding},
+            assigns.surface.data_model,
+            assigns.scope_path
+          ) ||
             []
 
         # Enforce template item limit
@@ -377,8 +431,8 @@ defmodule A2UI.Catalog.Standard do
 
   def a2ui_unknown(assigns) do
     ~H"""
-    <div class="a2ui-unknown text-warning border border-warning rounded p-2 text-sm">
-      Unsupported component type: <%= @type %>
+    <div class="a2ui-unknown rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100">
+      Unsupported component type: {@type}
     </div>
     """
   end
@@ -413,26 +467,26 @@ defmodule A2UI.Catalog.Standard do
 
   defp text_classes(hint) do
     case hint do
-      "h1" -> "text-3xl font-bold"
-      "h2" -> "text-2xl font-bold"
-      "h3" -> "text-xl font-semibold"
-      "h4" -> "text-lg font-semibold"
-      "h5" -> "text-base font-medium"
-      "caption" -> "text-sm text-base-content/60"
-      "body" -> "text-base"
-      _ -> "text-base"
+      "h1" -> "text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
+      "h2" -> "text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
+      "h3" -> "text-xl font-semibold text-zinc-950 dark:text-zinc-50"
+      "h4" -> "text-lg font-semibold text-zinc-950 dark:text-zinc-50"
+      "h5" -> "text-base font-semibold text-zinc-950 dark:text-zinc-50"
+      "caption" -> "text-sm text-zinc-600 dark:text-zinc-400"
+      "body" -> "text-sm text-zinc-900 dark:text-zinc-50"
+      _ -> "text-sm text-zinc-900 dark:text-zinc-50"
     end
   end
 
-  defp divider_classes("vertical"), do: "divider divider-horizontal h-full"
-  defp divider_classes(_), do: "divider w-full"
+  defp divider_classes("vertical"), do: "h-full w-px bg-zinc-200 dark:bg-zinc-800"
+  defp divider_classes(_), do: "h-px w-full bg-zinc-200 dark:bg-zinc-800"
 
   defp button_classes(true) do
-    "btn btn-primary"
+    "inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:bg-indigo-600/90"
   end
 
   defp button_classes(false) do
-    "btn btn-outline"
+    "inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 transition hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-50 dark:ring-zinc-800 dark:hover:bg-zinc-800"
   end
 
   defp input_type("number"), do: "number"
@@ -440,4 +494,25 @@ defmodule A2UI.Catalog.Standard do
   defp input_type("obscured"), do: "password"
   defp input_type("longText"), do: "textarea"
   defp input_type(_), do: "text"
+
+  defp component_dom_id(surface_id, component_id, scope_path, suffix \\ nil) do
+    base = "a2ui-#{surface_id}-#{component_id}"
+
+    base =
+      case scope_dom_suffix(scope_path) do
+        nil -> base
+        scope_suffix -> base <> "-s" <> scope_suffix
+      end
+
+    if suffix, do: base <> "-" <> suffix, else: base
+  end
+
+  defp scope_dom_suffix(nil), do: nil
+  defp scope_dom_suffix(""), do: nil
+
+  defp scope_dom_suffix(scope_path) when is_binary(scope_path) do
+    scope_path
+    |> :erlang.phash2()
+    |> Integer.to_string(36)
+  end
 end
