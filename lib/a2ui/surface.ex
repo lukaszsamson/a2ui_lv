@@ -27,7 +27,7 @@ defmodule A2UI.Surface do
         }
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering}
-  alias A2UI.Binding
+  alias A2UI.{Binding, Initializers}
 
   @doc """
   Creates a new surface with the given ID.
@@ -56,7 +56,8 @@ defmodule A2UI.Surface do
         Map.put(acc, comp.id, comp)
       end)
 
-    %{surface | components: new_components}
+    new_data_model = Initializers.apply(surface.data_model, components)
+    %{surface | components: new_components, data_model: new_data_model}
   end
 
   def apply_message(%__MODULE__{} = surface, %DataModelUpdate{} = update) do

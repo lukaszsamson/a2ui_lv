@@ -34,7 +34,12 @@ defmodule A2UI.Parser do
   def parse_line(json_line) do
     case Jason.decode(json_line) do
       {:ok, decoded} ->
-        dispatch_message(decoded)
+        try do
+          dispatch_message(decoded)
+        rescue
+          exception ->
+            {:error, {:parse_exception, exception}}
+        end
 
       {:error, reason} ->
         {:error, {:json_decode, reason}}

@@ -14,7 +14,7 @@ defmodule A2UI.Live do
   - phx-value-* for passing data to server
   """
 
-  alias A2UI.{Parser, Surface, Binding}
+  alias A2UI.{Parser, Surface, Binding, Validator}
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
 
   require Logger
@@ -59,7 +59,14 @@ defmodule A2UI.Live do
   def handle_a2ui_message({:a2ui, json_line}, socket) do
     case Parser.parse_line(json_line) do
       {:surface_update, %SurfaceUpdate{surface_id: sid} = msg} ->
-        {:noreply, update_surface(socket, sid, msg)}
+        case Validator.validate_surface_update(msg) do
+          :ok ->
+            {:noreply, update_surface(socket, sid, msg)}
+
+          {:error, reason} ->
+            Logger.warning("A2UI surfaceUpdate rejected: #{inspect(reason)}")
+            {:noreply, socket}
+        end
 
       {:data_model_update, %DataModelUpdate{surface_id: sid} = msg} ->
         {:noreply, update_surface(socket, sid, msg)}
@@ -130,9 +137,16 @@ defmodule A2UI.Live do
       }
 
       # Dispatch to callback if configured
-      if callback = socket.assigns[:a2ui_action_callback] do
-        callback.(user_action, socket)
-      end
+      socket =
+        if callback = socket.assigns[:a2ui_action_callback] do
+          case callback.(user_action, socket) do
+            %Phoenix.LiveView.Socket{} = updated_socket -> updated_socket
+            {:noreply, %Phoenix.LiveView.Socket{} = updated_socket} -> updated_socket
+            _ -> socket
+          end
+        else
+          socket
+        end
 
       {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, user_action)}
     else
@@ -184,7 +198,15 @@ defmodule A2UI.Live do
     surfaces = socket.assigns.a2ui_surfaces
     surface = Map.get(surfaces, surface_id) || Surface.new(surface_id)
     updated = Surface.apply_message(surface, message)
-    Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
+
+    case Validator.validate_data_model_size(updated.data_model) do
+      :ok ->
+        Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
+
+      {:error, reason} ->
+        Logger.warning("A2UI data model update rejected: #{inspect(reason)}")
+        socket
+    end
   end
 
   defp update_data_at_path(socket, surface_id, path, value) do
@@ -193,7 +215,15 @@ defmodule A2UI.Live do
 
     if surface do
       updated = Surface.update_data_at_path(surface, path, value)
-      Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
+
+      case Validator.validate_data_model_size(updated.data_model) do
+        :ok ->
+          Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
+
+        {:error, reason} ->
+          Logger.warning("A2UI local data model update rejected: #{inspect(reason)}")
+          socket
+      end
     else
       socket
     end

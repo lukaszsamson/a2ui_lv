@@ -1,22 +1,20 @@
 defmodule A2uiLvWeb.DemoLiveTest do
   use A2uiLvWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
+  import LazyHTML
 
   describe "demo page" do
     test "renders loading state initially", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/demo")
 
       assert html =~ "A2UI LiveView Renderer Demo"
-      assert html =~ "Loading surface"
+      assert html =~ "Rendered Surface"
     end
 
     test "renders surface after beginRendering", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # Wait for the mock agent to send messages
-      # The mount sends :load_demo which triggers MockAgent.send_sample_form
-      # Give it a moment to process
-      Process.sleep(50)
+      load_form(view)
 
       html = render(view)
       assert html =~ "Contact Form"
@@ -48,8 +46,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "updates data model on text input", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # Wait for surface to render
-      Process.sleep(50)
+      load_form(view)
 
       # Find the name field form and submit a change
       view
@@ -70,8 +67,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "updates data model on checkbox toggle", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # Wait for surface to render
-      Process.sleep(50)
+      load_form(view)
 
       # Toggle the subscribe checkbox - send the event directly to avoid form complexity
       render_change(view, "a2ui:toggle", %{
@@ -94,8 +90,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "button click triggers action and updates last_action", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # Wait for surface to render
-      Process.sleep(50)
+      load_form(view)
 
       # First fill in some form data
       view
@@ -123,8 +118,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "reset button triggers reset_form action", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # Wait for surface to render
-      Process.sleep(50)
+      load_form(view)
 
       # Click the reset button
       view
@@ -140,6 +134,8 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "renders multiple surfaces independently", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
+      load_form(view)
+
       # Send messages for a second surface
       send(
         view.pid,
@@ -149,8 +145,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
       send(view.pid, {:a2ui, ~s({"beginRendering":{"surfaceId":"second","root":"root"}})})
 
-      # Wait for processing
-      Process.sleep(50)
+      sync(view)
 
       html = render(view)
       # Should have both the main form and the second surface
@@ -163,8 +158,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
     test "removes surface on deleteSurface message", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
 
-      # Wait for main surface to render
-      Process.sleep(50)
+      load_form(view)
 
       html = render(view)
       assert html =~ "Contact Form"
@@ -175,5 +169,56 @@ defmodule A2uiLvWeb.DemoLiveTest do
       html = render(view)
       refute html =~ "Contact Form"
     end
+  end
+
+  describe "template expansion" do
+    test "renders template instances with unique DOM ids" do
+      pid = self()
+      A2UI.MockAgent.send_sample_list(pid)
+
+      lines =
+        for _ <- 1..3 do
+          receive do
+            {:a2ui, line} -> line
+          end
+        end
+
+      surface =
+        Enum.reduce(lines, A2UI.Surface.new("list"), fn line, acc ->
+          case A2UI.Parser.parse_line(line) do
+            {:surface_update, msg} -> A2UI.Surface.apply_message(acc, msg)
+            {:data_model_update, msg} -> A2UI.Surface.apply_message(acc, msg)
+            {:begin_rendering, msg} -> A2UI.Surface.apply_message(acc, msg)
+            _ -> acc
+          end
+        end)
+
+      html = render_component(&A2UI.Renderer.surface/1, surface: surface)
+      document = from_fragment(html)
+
+      all_ids =
+        document
+        |> query("div")
+        |> attribute("id")
+        |> Enum.filter(&is_binary/1)
+
+      ids =
+        all_ids
+        |> Enum.filter(&String.starts_with?(&1, "a2ui-list-product_card-"))
+
+      assert length(ids) == 3
+      assert Enum.uniq(ids) == ids
+    end
+  end
+
+  defp load_form(view) do
+    A2UI.MockAgent.send_sample_form(view.pid)
+    sync(view)
+    :ok
+  end
+
+  defp sync(view) do
+    _ = :sys.get_state(view.pid)
+    :ok
   end
 end

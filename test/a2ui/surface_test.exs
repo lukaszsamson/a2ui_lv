@@ -74,6 +74,66 @@ defmodule A2UI.SurfaceTest do
       surface = Surface.apply_message(surface, update)
       assert Map.keys(surface.components) |> Enum.sort() == ["a", "b", "c"]
     end
+
+    test "initializer pass sets data model defaults for path+literal bound values" do
+      surface = Surface.new("test")
+
+      update = %SurfaceUpdate{
+        surface_id: "test",
+        components: [
+          %Component{
+            id: "name_field",
+            type: "TextField",
+            props: %{
+              "text" => %{"path" => "/form/name", "literalString" => "Alice"}
+            }
+          }
+        ]
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{"form" => %{"name" => "Alice"}}
+    end
+
+    test "initializer pass does not overwrite existing data model values" do
+      surface = %Surface{id: "test", data_model: %{"form" => %{"name" => "Bob"}}}
+
+      update = %SurfaceUpdate{
+        surface_id: "test",
+        components: [
+          %Component{
+            id: "name_field",
+            type: "TextField",
+            props: %{
+              "text" => %{"path" => "/form/name", "literalString" => "Alice"}
+            }
+          }
+        ]
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{"form" => %{"name" => "Bob"}}
+    end
+
+    test "initializer pass skips pointers with numeric segments" do
+      surface = Surface.new("test")
+
+      update = %SurfaceUpdate{
+        surface_id: "test",
+        components: [
+          %Component{
+            id: "name",
+            type: "Text",
+            props: %{
+              "text" => %{"path" => "/items/0/name", "literalString" => "Alice"}
+            }
+          }
+        ]
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{}
+    end
   end
 
   describe "apply_message/2 with DataModelUpdate" do

@@ -81,5 +81,12 @@ defmodule A2UI.ParserTest do
       json = ~s({})
       assert {:error, :unknown_message_type} = Parser.parse_line(json)
     end
+
+    test "returns error when parsing raises an exception" do
+      json =
+        ~s({"surfaceUpdate":{"surfaceId":"main","components":[{"id":"broken","component":{}}]}})
+
+      assert {:error, {:parse_exception, _}} = Parser.parse_line(json)
+    end
   end
 end
