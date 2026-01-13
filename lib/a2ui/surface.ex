@@ -12,6 +12,7 @@ defmodule A2UI.Surface do
     :id,
     :root_id,
     :catalog_id,
+    :styles,
     components: %{},
     data_model: %{},
     ready?: false
@@ -21,6 +22,7 @@ defmodule A2UI.Surface do
           id: String.t(),
           root_id: String.t() | nil,
           catalog_id: String.t() | nil,
+          styles: map() | nil,
           components: %{String.t() => A2UI.Component.t()},
           data_model: map(),
           ready?: boolean()
@@ -65,8 +67,14 @@ defmodule A2UI.Surface do
     %{surface | data_model: new_data}
   end
 
-  def apply_message(%__MODULE__{} = surface, %BeginRendering{root_id: root, catalog_id: catalog}) do
-    %{surface | root_id: root, catalog_id: catalog, ready?: true}
+  def apply_message(%__MODULE__{} = surface, %BeginRendering{} = msg) do
+    %{
+      surface
+      | root_id: msg.root_id,
+        catalog_id: msg.catalog_id,
+        styles: msg.styles,
+        ready?: true
+    }
   end
 
   @doc """
@@ -90,8 +98,9 @@ defmodule A2UI.Surface do
 
   # Private helpers for data model manipulation
 
-  defp apply_data_update(data_model, nil, contents) do
-    merge_contents(data_model, contents)
+  defp apply_data_update(_data_model, nil, contents) do
+    # v0.8: if path is omitted, the entire data model is replaced
+    decode_contents(contents)
   end
 
   defp apply_data_update(data_model, path, contents) do
@@ -99,7 +108,8 @@ defmodule A2UI.Surface do
 
     cond do
       pointer in ["", "/"] ->
-        merge_contents(data_model, contents)
+        # v0.8: if path is '/', the entire data model is replaced
+        decode_contents(contents)
 
       true ->
         existing = Binding.get_at_pointer(data_model, pointer)
@@ -109,22 +119,121 @@ defmodule A2UI.Surface do
     end
   end
 
+  # v0.8 format: adjacency-list map representation
+  defp decode_contents(contents), do: merge_contents(%{}, contents)
+
   # v0.8 format: array of {key, valueType} entries
-  defp merge_contents(existing, contents) when is_list(contents) do
+  defp merge_contents(existing, contents) when is_map(existing) and is_list(contents) do
     Enum.reduce(contents, existing, fn entry, acc ->
-      key = entry["key"]
-      value = extract_typed_value(entry)
-      Map.put(acc, key, value)
+      case decode_entry(entry) do
+        {:ok, {key, value}} -> Map.put(acc, key, value)
+        {:error, _reason} -> acc
+      end
     end)
   end
 
   defp merge_contents(existing, _contents), do: existing
 
-  defp extract_typed_value(%{"valueString" => v}), do: v
-  defp extract_typed_value(%{"valueNumber" => v}), do: v
-  defp extract_typed_value(%{"valueBoolean" => v}), do: v
-  defp extract_typed_value(%{"valueArray" => v}), do: Enum.map(v, &extract_typed_value/1)
-  defp extract_typed_value(%{"valueMap" => v}), do: merge_contents(%{}, v)
-  defp extract_typed_value(v) when is_binary(v) or is_number(v) or is_boolean(v), do: v
-  defp extract_typed_value(_), do: nil
+  # Strict v0.8 decoding per server_to_client.json:
+  # - Exactly one of valueString/valueNumber/valueBoolean/valueMap
+  # - valueMap entries do NOT support nested valueMap/valueArray (nested objects are built via path updates)
+  defp decode_entry(%{"key" => key} = entry) when is_binary(key) do
+    value_keys =
+      ["valueString", "valueNumber", "valueBoolean", "valueMap"]
+      |> Enum.filter(&Map.has_key?(entry, &1))
+
+    case value_keys do
+      ["valueString"] ->
+        value = entry["valueString"]
+
+        if is_binary(value) do
+          {:ok, {key, value}}
+        else
+          {:error, {:invalid_value, key}}
+        end
+
+      ["valueNumber"] ->
+        value = entry["valueNumber"]
+
+        if is_number(value) do
+          {:ok, {key, value}}
+        else
+          {:error, {:invalid_value, key}}
+        end
+
+      ["valueBoolean"] ->
+        value = entry["valueBoolean"]
+
+        if is_boolean(value) do
+          {:ok, {key, value}}
+        else
+          {:error, {:invalid_value, key}}
+        end
+
+      ["valueMap"] ->
+        {:ok, {key, decode_value_map(entry["valueMap"])}}
+
+      [] ->
+        {:error, {:missing_value, key}}
+
+      _ ->
+        {:error, {:invalid_value, key}}
+    end
+  end
+
+  defp decode_entry(_), do: {:error, :invalid_entry}
+
+  defp decode_value_map(entries) when is_list(entries) do
+    Enum.reduce(entries, %{}, fn entry, acc ->
+      case decode_entry_shallow(entry) do
+        {:ok, {key, value}} -> Map.put(acc, key, value)
+        {:error, _reason} -> acc
+      end
+    end)
+  end
+
+  defp decode_value_map(_), do: %{}
+
+  defp decode_entry_shallow(%{"key" => key} = entry) when is_binary(key) do
+    value_keys =
+      ["valueString", "valueNumber", "valueBoolean"]
+      |> Enum.filter(&Map.has_key?(entry, &1))
+
+    case value_keys do
+      ["valueString"] ->
+        value = entry["valueString"]
+
+        if is_binary(value) do
+          {:ok, {key, value}}
+        else
+          {:error, {:invalid_value, key}}
+        end
+
+      ["valueNumber"] ->
+        value = entry["valueNumber"]
+
+        if is_number(value) do
+          {:ok, {key, value}}
+        else
+          {:error, {:invalid_value, key}}
+        end
+
+      ["valueBoolean"] ->
+        value = entry["valueBoolean"]
+
+        if is_boolean(value) do
+          {:ok, {key, value}}
+        else
+          {:error, {:invalid_value, key}}
+        end
+
+      [] ->
+        {:error, {:missing_value, key}}
+
+      _ ->
+        {:error, {:invalid_value, key}}
+    end
+  end
+
+  defp decode_entry_shallow(_), do: {:error, :invalid_entry}
 end

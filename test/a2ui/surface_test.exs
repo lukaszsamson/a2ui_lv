@@ -14,6 +14,7 @@ defmodule A2UI.SurfaceTest do
       assert surface.ready? == false
       assert surface.root_id == nil
       assert surface.catalog_id == nil
+      assert surface.styles == nil
     end
   end
 
@@ -153,6 +154,32 @@ defmodule A2UI.SurfaceTest do
       assert surface.data_model == %{"name" => "Alice", "age" => 30}
     end
 
+    test "replaces the entire data model when path is omitted" do
+      surface = %Surface{id: "test", data_model: %{"old" => "value"}}
+
+      update = %DataModelUpdate{
+        surface_id: "test",
+        path: nil,
+        contents: [%{"key" => "name", "valueString" => "Alice"}]
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{"name" => "Alice"}
+    end
+
+    test "replaces the entire data model when path is '/'" do
+      surface = %Surface{id: "test", data_model: %{"old" => "value"}}
+
+      update = %DataModelUpdate{
+        surface_id: "test",
+        path: "/",
+        contents: [%{"key" => "name", "valueString" => "Alice"}]
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{"name" => "Alice"}
+    end
+
     test "updates data model at path" do
       surface = Surface.new("test")
 
@@ -168,7 +195,7 @@ defmodule A2UI.SurfaceTest do
       assert surface.data_model == %{"form" => %{"email" => "test@example.com"}}
     end
 
-    test "handles nested valueMap" do
+    test "handles valueMap" do
       surface = Surface.new("test")
 
       update = %DataModelUpdate{
@@ -195,7 +222,7 @@ defmodule A2UI.SurfaceTest do
              }
     end
 
-    test "handles valueArray" do
+    test "ignores out-of-schema valueArray entries" do
       surface = Surface.new("test")
 
       update = %DataModelUpdate{
@@ -213,7 +240,7 @@ defmodule A2UI.SurfaceTest do
       }
 
       surface = Surface.apply_message(surface, update)
-      assert surface.data_model == %{"items" => ["a", "b"]}
+      assert surface.data_model == %{}
     end
 
     test "handles valueBoolean" do
@@ -247,6 +274,7 @@ defmodule A2UI.SurfaceTest do
       surface = Surface.apply_message(surface, render)
       assert surface.ready? == true
       assert surface.root_id == "root"
+      assert surface.styles == nil
     end
 
     test "sets catalog_id" do
@@ -261,6 +289,7 @@ defmodule A2UI.SurfaceTest do
 
       surface = Surface.apply_message(surface, render)
       assert surface.catalog_id == "standard"
+      assert surface.styles == nil
     end
   end
 

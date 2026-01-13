@@ -23,6 +23,8 @@ defmodule A2uiLvWeb.DemoLiveTest do
       assert html =~ "Message"
       assert html =~ "Subscribe to updates"
       assert html =~ "Submit"
+      assert html =~ "--a2ui-primary-color: #4f46e5"
+      assert html =~ "a2ui-button-primary"
     end
 
     test "renders surface from manual messages", %{conn: conn} do
@@ -154,6 +156,27 @@ defmodule A2uiLvWeb.DemoLiveTest do
     end
   end
 
+  describe "surfaceUpdate weight" do
+    test "applies weight as flex-grow for Row children", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo")
+
+      send(
+        view.pid,
+        {:a2ui,
+         ~s({"surfaceUpdate":{"surfaceId":"weighted","components":[) <>
+           ~s({"id":"root","component":{"Row":{"children":{"explicitList":["a","b"]}}}},) <>
+           ~s({"id":"a","weight":1,"component":{"Text":{"text":{"literalString":"A"}}}},) <>
+           ~s({"id":"b","weight":2,"component":{"Text":{"text":{"literalString":"B"}}}}) <>
+           ~s(]}})}
+      )
+
+      send(view.pid, {:a2ui, ~s({"beginRendering":{"surfaceId":"weighted","root":"root"}})})
+
+      html = render(view)
+      assert html =~ "flex-grow: 2"
+    end
+  end
+
   describe "deleteSurface" do
     test "removes surface on deleteSurface message", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo")
@@ -177,7 +200,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
       A2UI.MockAgent.send_sample_list(pid)
 
       lines =
-        for _ <- 1..3 do
+        for _ <- 1..5 do
           receive do
             {:a2ui, line} -> line
           end

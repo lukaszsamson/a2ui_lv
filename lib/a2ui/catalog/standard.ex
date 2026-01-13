@@ -143,7 +143,13 @@ defmodule A2UI.Catalog.Standard do
       class="a2ui-column"
       style={"display: flex; flex-direction: column; gap: 0.5rem; #{flex_style(@distribution, @alignment)}"}
     >
-      <.render_children props={@props} surface={@surface} scope_path={@scope_path} depth={@depth} />
+      <.render_children
+        props={@props}
+        surface={@surface}
+        scope_path={@scope_path}
+        depth={@depth}
+        apply_weight={true}
+      />
     </div>
     """
   end
@@ -163,7 +169,13 @@ defmodule A2UI.Catalog.Standard do
       class="a2ui-row"
       style={"display: flex; flex-direction: row; gap: 0.5rem; #{flex_style(@distribution, @alignment)}"}
     >
-      <.render_children props={@props} surface={@surface} scope_path={@scope_path} depth={@depth} />
+      <.render_children
+        props={@props}
+        surface={@surface}
+        scope_path={@scope_path}
+        depth={@depth}
+        apply_weight={true}
+      />
     </div>
     """
   end
@@ -364,6 +376,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
+  attr :apply_weight, :boolean, default: false
 
   def render_children(assigns) do
     children_spec = assigns.props["children"]
@@ -371,11 +384,34 @@ defmodule A2UI.Catalog.Standard do
     cond do
       # Explicit list of component IDs
       is_map(children_spec) && Map.has_key?(children_spec, "explicitList") ->
-        assigns = assign(assigns, child_ids: children_spec["explicitList"])
+        child_ids = children_spec["explicitList"]
+
+        child_entries =
+          Enum.map(child_ids, fn child_id ->
+            {child_id, assigns.apply_weight && component_weight(assigns.surface, child_id)}
+          end)
+
+        assigns = assign(assigns, child_entries: child_entries)
 
         ~H"""
-        <%= for child_id <- @child_ids do %>
-          <.render_component id={child_id} surface={@surface} scope_path={@scope_path} depth={@depth + 1} />
+        <%= for {child_id, weight} <- @child_entries do %>
+          <%= if is_number(weight) do %>
+            <div class="a2ui-weighted" style={"flex-grow: #{weight}; flex-shrink: 1; min-width: 0;"}>
+              <.render_component
+                id={child_id}
+                surface={@surface}
+                scope_path={@scope_path}
+                depth={@depth + 1}
+              />
+            </div>
+          <% else %>
+            <.render_component
+              id={child_id}
+              surface={@surface}
+              scope_path={@scope_path}
+              depth={@depth + 1}
+            />
+          <% end %>
         <% end %>
         """
 
@@ -385,38 +421,93 @@ defmodule A2UI.Catalog.Standard do
         data_binding = template["dataBinding"]
         template_id = template["componentId"]
 
-        # Resolve the array path to get items
-        items =
-          Binding.resolve(
-            %{"path" => data_binding},
-            assigns.surface.data_model,
-            assigns.scope_path
-          ) ||
-            []
-
-        # Enforce template item limit
-        items =
-          if length(items) > A2UI.Validator.max_template_items() do
-            Enum.take(items, A2UI.Validator.max_template_items())
-          else
-            items
-          end
-
         # Compute base path for template items
         base_path = Binding.expand_path(data_binding, assigns.scope_path)
 
-        assigns = assign(assigns, items: items, template_id: template_id, base_path: base_path)
+        collection = Binding.get_at_pointer(assigns.surface.data_model, base_path)
+        max_items = A2UI.Validator.max_template_items()
+        template_weight = assigns.apply_weight && component_weight(assigns.surface, template_id)
 
-        ~H"""
-        <%= for {_item, idx} <- Enum.with_index(@items) do %>
-          <.render_component
-            id={@template_id}
-            surface={@surface}
-            scope_path={"#{@base_path}/#{idx}"}
-            depth={@depth + 1}
-          />
-        <% end %>
-        """
+        cond do
+          is_map(collection) ->
+            keys =
+              collection
+              |> stable_template_keys()
+              |> Enum.take(max_items)
+
+            assigns =
+              assign(assigns,
+                keys: keys,
+                template_id: template_id,
+                base_path: base_path,
+                template_weight: template_weight
+              )
+
+            ~H"""
+            <%= for key <- @keys do %>
+              <%= if is_number(@template_weight) do %>
+                <div
+                  class="a2ui-weighted"
+                  style={"flex-grow: #{@template_weight}; flex-shrink: 1; min-width: 0;"}
+                >
+                  <.render_component
+                    id={@template_id}
+                    surface={@surface}
+                    scope_path={Binding.append_pointer_segment(@base_path, key)}
+                    depth={@depth + 1}
+                  />
+                </div>
+              <% else %>
+                <.render_component
+                  id={@template_id}
+                  surface={@surface}
+                  scope_path={Binding.append_pointer_segment(@base_path, key)}
+                  depth={@depth + 1}
+                />
+              <% end %>
+            <% end %>
+            """
+
+          is_list(collection) ->
+            # Compatibility fallback: some docs/examples show arrays in the data model.
+            items = Enum.take(collection, max_items)
+
+            assigns =
+              assign(assigns,
+                items: items,
+                template_id: template_id,
+                base_path: base_path,
+                template_weight: template_weight
+              )
+
+            ~H"""
+            <%= for {_item, idx} <- Enum.with_index(@items) do %>
+              <%= if is_number(@template_weight) do %>
+                <div
+                  class="a2ui-weighted"
+                  style={"flex-grow: #{@template_weight}; flex-shrink: 1; min-width: 0;"}
+                >
+                  <.render_component
+                    id={@template_id}
+                    surface={@surface}
+                    scope_path={Binding.append_pointer_segment(@base_path, Integer.to_string(idx))}
+                    depth={@depth + 1}
+                  />
+                </div>
+              <% else %>
+                <.render_component
+                  id={@template_id}
+                  surface={@surface}
+                  scope_path={Binding.append_pointer_segment(@base_path, Integer.to_string(idx))}
+                  depth={@depth + 1}
+                />
+              <% end %>
+            <% end %>
+            """
+
+          true ->
+            ~H""
+        end
 
       true ->
         ~H""
@@ -482,7 +573,7 @@ defmodule A2UI.Catalog.Standard do
   defp divider_classes(_), do: "h-px w-full bg-zinc-200 dark:bg-zinc-800"
 
   defp button_classes(true) do
-    "inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 active:bg-indigo-600/90"
+    "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition"
   end
 
   defp button_classes(false) do
@@ -515,4 +606,35 @@ defmodule A2UI.Catalog.Standard do
     |> :erlang.phash2()
     |> Integer.to_string(36)
   end
+
+  defp component_weight(surface, component_id) do
+    component = surface.components[component_id]
+
+    case component && component.weight do
+      weight when is_number(weight) -> weight
+      _ -> nil
+    end
+  end
+
+  defp stable_template_keys(map) when is_map(map) do
+    keys = Map.keys(map)
+
+    if Enum.all?(keys, &numeric_string?/1) do
+      keys
+      |> Enum.map(fn key -> {key, String.to_integer(key)} end)
+      |> Enum.sort_by(fn {_key, int} -> int end)
+      |> Enum.map(fn {key, _int} -> key end)
+    else
+      Enum.sort_by(keys, &to_string/1)
+    end
+  end
+
+  defp numeric_string?(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} when int >= 0 -> true
+      _ -> false
+    end
+  end
+
+  defp numeric_string?(_), do: false
 end

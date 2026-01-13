@@ -62,13 +62,17 @@ defmodule A2UI.MockAgent do
   end
 
   defp begin_rendering_json do
-    ~s({"beginRendering":{"surfaceId":"main","root":"root"}})
+    ~s({"beginRendering":{"surfaceId":"main","root":"root","styles":{"font":"Inter","primaryColor":"#4f46e5"}}})
   end
 
   @doc """
   Sends a sample list with template to demonstrate dynamic rendering.
 
-  The list shows items from an array in the data model using template children.
+  The list shows items from a map in the data model using template children.
+
+  For strict v0.8 conformance, the data model is updated via multiple
+  `dataModelUpdate` messages targeting paths (rather than using an out-of-schema
+  `valueArray`).
   """
   @spec send_sample_list(pid()) :: :ok
   def send_sample_list(pid) do
@@ -83,18 +87,16 @@ defmodule A2UI.MockAgent do
         ~s({"id":"product_price","component":{"Text":{"text":{"path":"/price"},"usageHint":"caption"}}}) <>
         ~s(]}})
 
-    data_model =
-      ~s({"dataModelUpdate":{"surfaceId":"list","contents":[) <>
-        ~s({"key":"products","valueArray":[) <>
-        ~s({"valueMap":[{"key":"name","valueString":"Widget A"},{"key":"price","valueString":"$19.99"}]},) <>
-        ~s({"valueMap":[{"key":"name","valueString":"Widget B"},{"key":"price","valueString":"$29.99"}]},) <>
-        ~s({"valueMap":[{"key":"name","valueString":"Widget C"},{"key":"price","valueString":"$39.99"}]}) <>
-        ~s(]}]}})
+    data_updates = [
+      ~s({"dataModelUpdate":{"surfaceId":"list","path":"/products/0","contents":[{"key":"name","valueString":"Widget A"},{"key":"price","valueString":"$19.99"}]}}),
+      ~s({"dataModelUpdate":{"surfaceId":"list","path":"/products/1","contents":[{"key":"name","valueString":"Widget B"},{"key":"price","valueString":"$29.99"}]}}),
+      ~s({"dataModelUpdate":{"surfaceId":"list","path":"/products/2","contents":[{"key":"name","valueString":"Widget C"},{"key":"price","valueString":"$39.99"}]}})
+    ]
 
     begin_rendering = ~s({"beginRendering":{"surfaceId":"list","root":"root"}})
 
     send(pid, {:a2ui, surface_update})
-    send(pid, {:a2ui, data_model})
+    Enum.each(data_updates, fn line -> send(pid, {:a2ui, line}) end)
     send(pid, {:a2ui, begin_rendering})
 
     :ok

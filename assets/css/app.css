@@ -19,3 +19,25 @@
 [data-phx-session], [data-phx-teleported-src] { display: contents }
 
 /* This file is for your main application CSS */
+
+/* A2UI */
+.a2ui-surface {
+  font-family: var(--a2ui-font, ui-sans-serif, system-ui, sans-serif);
+}
+
+.a2ui-button-primary {
+  background-color: var(--a2ui-primary-color, #4f46e5);
+}
+
+.a2ui-button-primary:hover {
+  filter: brightness(1.05);
+}
+
+.a2ui-button-primary:active {
+  filter: brightness(0.98);
+}
+
+.a2ui-button-primary:focus-visible {
+  outline: 2px solid var(--a2ui-primary-color, #4f46e5);
+  outline-offset: 2px;
+}

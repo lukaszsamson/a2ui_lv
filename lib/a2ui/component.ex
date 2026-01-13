@@ -11,12 +11,13 @@ defmodule A2UI.Component do
   - props: Type-specific configuration
   """
 
-  defstruct [:id, :type, :props]
+  defstruct [:id, :type, :props, :weight]
 
   @type t :: %__MODULE__{
           id: String.t(),
           type: String.t(),
-          props: map()
+          props: map(),
+          weight: number() | nil
         }
 
   @doc """
@@ -31,9 +32,9 @@ defmodule A2UI.Component do
       %A2UI.Component{id: "title", type: "Text", props: %{"text" => %{"literalString" => "Hello"}}}
   """
   @spec from_map(map()) :: t()
-  def from_map(%{"id" => id, "component" => component_def}) do
+  def from_map(%{"id" => id, "component" => component_def} = data) do
     [{type, props}] = Map.to_list(component_def)
-    %__MODULE__{id: id, type: type, props: props}
+    %__MODULE__{id: id, type: type, props: props, weight: Map.get(data, "weight")}
   end
 
   @doc """
@@ -49,7 +50,8 @@ defmodule A2UI.Component do
   """
   @spec from_map_v09(map()) :: t()
   def from_map_v09(%{"id" => id, "component" => type} = data) do
-    props = Map.drop(data, ["id", "component"])
-    %__MODULE__{id: id, type: type, props: props}
+    weight = Map.get(data, "weight")
+    props = Map.drop(data, ["id", "component", "weight"])
+    %__MODULE__{id: id, type: type, props: props, weight: weight}
   end
 end

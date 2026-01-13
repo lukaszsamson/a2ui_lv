@@ -27,8 +27,9 @@ defmodule A2UI.Messages.DataModelUpdate do
   - `%{"key" => "name", "valueString" => "Alice"}`
   - `%{"key" => "count", "valueNumber" => 42}`
   - `%{"key" => "active", "valueBoolean" => true}`
-  - `%{"key" => "items", "valueArray" => [...]}`
   - `%{"key" => "nested", "valueMap" => [...]}`
+
+  Note: v0.8 server-to-client schema does **not** include `valueArray`.
   """
   @spec from_map(map()) :: t()
   def from_map(%{"surfaceId" => sid} = data) do

@@ -207,6 +207,40 @@ defmodule A2UI.Binding do
   def set_at_pointer(_data, "", value), do: value
   def set_at_pointer(data, _, _value), do: data
 
+  @doc """
+  Escapes a single JSON Pointer segment (RFC 6901).
+
+  Use this when constructing pointer strings from user/data-model keys.
+  """
+  @spec escape_pointer_segment(String.t()) :: String.t()
+  def escape_pointer_segment(segment) when is_binary(segment) do
+    segment
+    |> String.replace("~", "~0")
+    |> String.replace("/", "~1")
+  end
+
+  @doc """
+  Appends a segment to a JSON Pointer, escaping the segment as needed.
+
+  ## Examples
+
+      iex> A2UI.Binding.append_pointer_segment("/products", "0")
+      "/products/0"
+
+      iex> A2UI.Binding.append_pointer_segment("", "a/b")
+      "/a~1b"
+  """
+  @spec append_pointer_segment(String.t(), String.t()) :: String.t()
+  def append_pointer_segment(pointer, segment) when is_binary(pointer) and is_binary(segment) do
+    segment = escape_pointer_segment(segment)
+    pointer = normalize_pointer(pointer)
+
+    cond do
+      pointer in ["", "/"] -> "/" <> segment
+      true -> pointer <> "/" <> segment
+    end
+  end
+
   # RFC 6901 JSON Pointer unescaping
   # Order matters: ~1 before ~0 to avoid double-unescaping
   defp unescape_pointer_segment(segment) do

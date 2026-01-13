@@ -18,6 +18,22 @@ defmodule A2UI.ComponentTest do
       assert comp.id == "title"
       assert comp.type == "Text"
       assert comp.props == %{"text" => %{"literalString" => "Hello"}}
+      assert comp.weight == nil
+    end
+
+    test "parses weight alongside component definition" do
+      data = %{
+        "id" => "weighted",
+        "weight" => 2,
+        "component" => %{
+          "Text" => %{"text" => %{"literalString" => "Weighted"}}
+        }
+      }
+
+      comp = Component.from_map(data)
+      assert comp.id == "weighted"
+      assert comp.type == "Text"
+      assert comp.weight == 2
     end
 
     test "parses Button component" do
