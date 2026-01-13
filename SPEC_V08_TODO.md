@@ -15,70 +15,69 @@ This document tracks what is still missing, stubbed, or non-conformant in the cu
 
 ## 1. Standard Catalog Components (18 total)
 
-The v0.8 standard catalog defines **18** component types. The PoC currently implements **8/18**.
+The v0.8 standard catalog defines **18** component types. **All 18 are now implemented.**
 
-### Implemented (8/18)
+### Implemented (18/18)
 
+**Layout Components:**
 - ✅ `Column` (partial; template semantics mismatch, see §4)
 - ✅ `Row` (partial; template semantics mismatch, see §4)
 - ✅ `Card`
+- ✅ `List` (direction, alignment)
+
+**Display Components:**
 - ✅ `Text`
 - ✅ `Divider`
+- ✅ `Icon` (mapped to Heroicons)
+- ✅ `Image` (fit, usageHint)
+
+**Media Components:**
+- ✅ `AudioPlayer` (url, description)
+- ✅ `Video` (url)
+
+**Interactive Components:**
 - ✅ `Button`
-- ✅ `TextField` (missing `validationRegexp` behavior)
+- ✅ `TextField` (with `validationRegexp` support)
 - ✅ `CheckBox` (PoC also accepts non-spec alias `Checkbox`)
+- ✅ `Slider` (value, minValue, maxValue)
+- ✅ `DateTimeInput` (value, enableDate, enableTime)
+- ✅ `MultipleChoice` (selections, options, maxAllowedSelections)
 
-### Missing (10/18)
+**Container Components:**
+- ✅ `Tabs` (tabItems with JS-based switching)
+- ✅ `Modal` (entryPointChild, contentChild with JS-based show/hide)
 
-Each item lists the **required** properties per `standard_catalog_definition.json`.
+### Remaining gaps in implemented components
 
-- ❌ `AudioPlayer` (`url`, optional `description`)
-- ❌ `DateTimeInput` (`value`, optional `enableDate`, `enableTime`)
-- ❌ `Icon` (`name` with a fixed standard icon enum for `literalString`)
-- ❌ `Image` (`url`, optional `fit`, `usageHint`)
-- ❌ `List` (`children`, optional `direction`, `alignment`)
-- ❌ `Modal` (`entryPointChild`, `contentChild`)
-- ❌ `MultipleChoice` (`selections`, `options`, optional `maxAllowedSelections`)
-- ❌ `Slider` (`value`, optional `minValue`, `maxValue`)
-- ❌ `Tabs` (`tabItems`)
-- ❌ `Video` (`url`)
-
-### Gaps inside “implemented” components
-
-- `TextField.validationRegexp` is defined in the standard catalog but currently ignored.
-- `Row`/`Column` template expansion currently assumes the bound collection is a **list**; the standard catalog defines template `dataBinding` as a path to a **map** (“values in the map define the list of children”). This is a spec-level mismatch that blocks full conformance for dynamic lists (§4).
+- `Row`/`Column` template expansion currently assumes the bound collection is a **list**; the standard catalog defines template `dataBinding` as a path to a **map** ("values in the map define the list of children"). This is a spec-level mismatch that blocks full conformance for dynamic lists (§4).
 
 ---
 
 ## 2. Server→Client Wire Schema Conformance Gaps
 
-### 2.1 `surfaceUpdate.components[].weight` (not implemented)
+### 2.1 `surfaceUpdate.components[].weight` ✅ IMPLEMENTED
 
 The server→client schema includes optional `weight` alongside `id` and `component`:
 - It corresponds to CSS `flex-grow`.
 - It may only be set when the component is a direct descendant of a `Row` or `Column`.
 
-**Current state:** The PoC does not parse, store, validate, or apply `weight` at render time.
+**Current state:** ✅ The Component struct stores `weight`, and `render_children` applies `flex-grow` via wrapper divs when `apply_weight=true` (used by Row/Column).
 
-### 2.2 `dataModelUpdate.path` root semantics (non-conformant)
+### 2.2 `dataModelUpdate.path` root semantics ✅ IMPLEMENTED
 
 The server→client schema says:
 - If `path` is omitted **or** set to `/`, **the entire data model will be replaced**.
 
-**Current state:** The PoC merges `contents` into the existing root data model (it does not replace it).
+**Current state:** ✅ `Surface.apply_data_update/3` now replaces the entire data model when path is `nil` or `/`.
 
-### 2.3 `dataModelUpdate.contents` value types (out-of-schema behavior)
+### 2.3 `dataModelUpdate.contents` value types ✅ IMPLEMENTED
 
 The server→client schema allows only:
 - `valueString`, `valueNumber`, `valueBoolean`, `valueMap`
 
 **Notably, the schema does not include `valueArray`.**
 
-**Current state:**
-- The PoC accepts a non-schema `valueArray`.
-- The PoC also accepts raw primitives in some cases and recursively nests `valueMap` more flexibly than the schema describes.
-
-This must be reconciled for strict v0.8 conformance (see §7 “Spec inconsistencies / decisions”).
+**Current state:** ✅ Strict v0.8 decoding in `Surface.decode_entry/1` only accepts the four allowed value types. Non-schema extensions like `valueArray` are rejected with `{:error, :ambiguous_value}` or ignored.
 
 ### 2.4 `beginRendering.catalogId` default and catalog selection (missing)
 
@@ -89,15 +88,13 @@ The schema indicates the client MUST default to a standard catalog if `catalogId
 - No validation that the chosen `catalogId` is supported.
 - No inline catalog support.
 
-### 2.5 `beginRendering.styles` (parsed, not applied)
+### 2.5 `beginRendering.styles` ✅ IMPLEMENTED
 
 The standard catalog defines global styles:
 - `font` (string)
 - `primaryColor` (hex color `^#[0-9a-fA-F]{6}$`)
 
-**Current state:**
-- `styles` is parsed into the `beginRendering` struct.
-- The surface state does not store styles and the renderer does not apply them.
+**Current state:** ✅ `styles` is stored in `Surface.styles` and applied by `Renderer.surface_style/1` as CSS custom properties (`--a2ui-font`, `--a2ui-primary-color`) with validation.
 
 ---
 
@@ -137,22 +134,18 @@ Renderer guide rules include:
 
 **Current state:** The PoC implements the “initializer pass” behavior for `path + literal*`.
 
-### 4.2 Template `dataBinding` collection type (spec mismatch)
+### 4.2 Template `dataBinding` collection type ✅ IMPLEMENTED
 
 Standard catalog template docs (for `Row`, `Column`, `List`) describe:
-- `template.dataBinding` points to a **map** in the data model, and “values in the map define the list of children”.
+- `template.dataBinding` points to a **map** in the data model, and "values in the map define the list of children".
 
 But A2UI conceptual docs also present examples using JSON **arrays** for lists.
 
-**Current state:** The PoC’s template expansion assumes the bound collection is an Elixir **list** (indexed, `Enum.with_index/1`).
+**Current state:** ✅ The `render_children/1` template expansion now supports both:
+- **Maps**: Uses `stable_template_keys/1` for deterministic ordering (numeric keys sorted numerically, others alphabetically)
+- **Lists**: Fallback support for array-indexed iteration
 
-**Missing decisions & implementation:**
-- Define the canonical v0.8 representation for “lists” in the data model:
-  - (A) Treat lists as maps keyed by `"0"`, `"1"`, … and iterate values in key order
-  - (B) Treat lists as JSON arrays (requires out-of-schema `valueArray` updates)
-  - (C) Support both with explicit normalization rules (and stable iteration ordering)
-- Update template scoping rules accordingly:
-  - If iterating a map, scope paths likely become `"{base}/{key}"` not `"{base}/{idx}"`.
+Scope paths use the actual key/index: `"{base}/{key}"` for maps, `"{base}/{idx}"` for lists.
 
 ---
 
@@ -249,16 +242,16 @@ Missing tests for full v0.8 conformance:
 
 ## Priority Order (for strict v0.8 conformance)
 
-### P0 — Fix schema-level mismatches
-1. Implement `surfaceUpdate.components[].weight` end-to-end
-2. Make `dataModelUpdate` root updates replace (not merge) when `path` is omitted or `/`
-3. Resolve “list” representation and implement template `dataBinding` map semantics
-4. Remove or formalize any out-of-schema `dataModelUpdate` extensions (`valueArray`, recursive valueMap) behind a compatibility mode
-5. Store + apply `beginRendering.styles` per standard catalog (`font`, `primaryColor`)
+### P0 — Fix schema-level mismatches ✅ DONE
+1. ~~Implement `surfaceUpdate.components[].weight` end-to-end~~ ✅ (Component.weight + render_children flex-grow)
+2. ~~Make `dataModelUpdate` root updates replace (not merge) when `path` is omitted or `/`~~ ✅ (Surface.apply_data_update)
+3. ~~Resolve "list" representation and implement template `dataBinding` map semantics~~ ✅ (stable_template_keys handles maps)
+4. ~~Remove or formalize any out-of-schema `dataModelUpdate` extensions (`valueArray`, recursive valueMap) behind a compatibility mode~~ ✅ (strict v0.8 decoding only)
+5. ~~Store + apply `beginRendering.styles` per standard catalog (`font`, `primaryColor`)~~ ✅ (Surface.styles + Renderer CSS vars)
 
-### P1 — Complete the standard catalog
-6. Implement the remaining 10 standard catalog components
-7. Implement missing props/behaviors in existing components (e.g., `TextField.validationRegexp`)
+### P1 — Complete the standard catalog ✅ DONE
+6. ~~Implement the remaining 10 standard catalog components~~ ✅
+7. ~~Implement missing props/behaviors in existing components (e.g., `TextField.validationRegexp`)~~ ✅
 
 ### P2 — Protocol completeness
 8. Catalog negotiation: client capabilities, catalog selection, inline catalogs (if allowed)
@@ -271,9 +264,9 @@ Missing tests for full v0.8 conformance:
 
 | Area | Status |
 |------|--------|
-| Standard catalog components | 8/18 implemented |
+| Standard catalog components | **18/18 implemented** |
 | Server→client message envelopes | 4/4 parsed/handled (`surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`) |
 | Client→server envelopes | `userAction` constructed but not transported; `error` not implemented |
 | Catalog negotiation | catalogId parsed only; no negotiation/selection/validation |
 | Styles | parsed only; not stored/applied |
-| Key conformance blockers | `weight`, root replace semantics, template collection type (map vs list), out-of-schema `valueArray` |
+| Key conformance blockers | ~~weight~~, ~~root replace~~, ~~template maps~~, ~~valueArray~~ — **All P0 resolved** |

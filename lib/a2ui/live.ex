@@ -192,7 +192,111 @@ defmodule A2UI.Live do
     end
   end
 
+  def handle_a2ui_event("a2ui:slider", params, socket) do
+    # Two-way binding: update numeric value at path
+    input = params["a2ui_input"] || %{}
+    surface_id = input["surface_id"]
+    path = input["path"]
+    value_str = input["value"] || ""
+
+    # Parse as number (integer or float)
+    value =
+      case Integer.parse(value_str) do
+        {int_val, ""} -> int_val
+        _ ->
+          case Float.parse(value_str) do
+            {float_val, _} -> float_val
+            :error -> 0
+          end
+      end
+
+    if path && surface_id do
+      {:noreply, update_data_at_path(socket, surface_id, path, value)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_a2ui_event("a2ui:datetime", params, socket) do
+    # Two-way binding: convert HTML datetime format to ISO 8601
+    input = params["a2ui_input"] || %{}
+    surface_id = input["surface_id"]
+    path = input["path"]
+    value = input["value"] || ""
+    input_type = input["input_type"] || "datetime-local"
+
+    # Convert HTML datetime format to ISO 8601
+    iso_value = html_datetime_to_iso8601(value, input_type)
+
+    if path && surface_id do
+      {:noreply, update_data_at_path(socket, surface_id, path, iso_value)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_a2ui_event("a2ui:choice", params, socket) do
+    # Two-way binding: update selections array at path
+    input = params["a2ui_input"] || %{}
+    surface_id = input["surface_id"]
+    path = input["path"]
+    values = input["values"] || []
+    max_allowed_str = input["max_allowed"]
+
+    # Filter out empty sentinel value and get actual selections
+    selections = Enum.filter(values, &(&1 != "" and &1 != nil))
+
+    # Enforce max_allowed if specified
+    max_allowed = parse_max_allowed(max_allowed_str)
+
+    selections =
+      if is_integer(max_allowed) and max_allowed > 0 do
+        Enum.take(selections, max_allowed)
+      else
+        selections
+      end
+
+    if path && surface_id do
+      {:noreply, update_data_at_path(socket, surface_id, path, selections)}
+    else
+      {:noreply, socket}
+    end
+  end
+
   # Private helpers
+
+  defp html_datetime_to_iso8601("", _type), do: ""
+  defp html_datetime_to_iso8601(nil, _type), do: ""
+
+  defp html_datetime_to_iso8601(value, "datetime-local") do
+    # HTML: "2024-01-15T10:30" → ISO 8601: "2024-01-15T10:30:00Z"
+    value <> ":00Z"
+  end
+
+  defp html_datetime_to_iso8601(value, "date") do
+    # HTML: "2024-01-15" → ISO 8601: "2024-01-15T00:00:00Z"
+    value <> "T00:00:00Z"
+  end
+
+  defp html_datetime_to_iso8601(value, "time") do
+    # HTML: "10:30" → ISO 8601: "1970-01-01T10:30:00Z"
+    "1970-01-01T" <> value <> ":00Z"
+  end
+
+  defp html_datetime_to_iso8601(value, _), do: value
+
+  defp parse_max_allowed(""), do: nil
+  defp parse_max_allowed(nil), do: nil
+
+  defp parse_max_allowed(str) when is_binary(str) do
+    case Integer.parse(str) do
+      {int, ""} -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_max_allowed(int) when is_integer(int), do: int
+  defp parse_max_allowed(_), do: nil
 
   defp update_surface(socket, surface_id, message) do
     surfaces = socket.assigns.a2ui_surfaces

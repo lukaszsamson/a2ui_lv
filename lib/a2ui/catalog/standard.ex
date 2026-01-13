@@ -6,15 +6,92 @@ defmodule A2UI.Catalog.Standard do
   - Be explicit about which data each component needs
   - Prefer stable DOM ids for efficient diffs
 
-  Implements 8 core components from the A2UI specification:
-  - Layout: Column, Row, Card
-  - Display: Text, Divider
-  - Interactive: Button, TextField, Checkbox
+  Implements all 18 standard catalog components from the A2UI v0.8 specification:
+
+  ## Layout Components
+  - `Column` - Vertical flex container
+  - `Row` - Horizontal flex container
+  - `Card` - Elevated visual container
+  - `List` - Flex container with direction/alignment
+
+  ## Display Components
+  - `Text` - Text display with semantic hints (h1-h5, body, caption)
+  - `Divider` - Visual separator (horizontal/vertical)
+  - `Icon` - Standard icon set mapped to Heroicons
+  - `Image` - Image display with fit and usage hints
+
+  ## Media Components
+  - `AudioPlayer` - HTML5 audio player with optional description
+  - `Video` - HTML5 video player
+
+  ## Interactive Components
+  - `Button` - Clickable action trigger
+  - `TextField` - Text input with label, two-way binding, and validation
+  - `CheckBox` - Boolean toggle with two-way binding
+  - `Slider` - Range input with numeric two-way binding
+  - `DateTimeInput` - Date/time input with ISO 8601 binding
+  - `MultipleChoice` - Selection from options with optional max selections
+
+  ## Container Components
+  - `Tabs` - Tabbed container with JS-based switching
+  - `Modal` - Dialog triggered by entry point component
   """
 
   use Phoenix.Component
-  import A2uiLvWeb.CoreComponents, only: [input: 1]
+  import A2uiLvWeb.CoreComponents, only: [input: 1, icon: 1]
   alias A2UI.Binding
+
+  # A2UI standard icon names mapped to Heroicons
+  @icon_mapping %{
+    "accountCircle" => "hero-user-circle",
+    "add" => "hero-plus",
+    "arrowBack" => "hero-arrow-left",
+    "arrowForward" => "hero-arrow-right",
+    "attachFile" => "hero-paper-clip",
+    "calendarToday" => "hero-calendar",
+    "call" => "hero-phone",
+    "camera" => "hero-camera",
+    "check" => "hero-check",
+    "close" => "hero-x-mark",
+    "delete" => "hero-trash",
+    "download" => "hero-arrow-down-tray",
+    "edit" => "hero-pencil",
+    "event" => "hero-calendar-days",
+    "error" => "hero-exclamation-circle",
+    "favorite" => "hero-heart-solid",
+    "favoriteOff" => "hero-heart",
+    "folder" => "hero-folder",
+    "help" => "hero-question-mark-circle",
+    "home" => "hero-home",
+    "info" => "hero-information-circle",
+    "locationOn" => "hero-map-pin",
+    "lock" => "hero-lock-closed",
+    "lockOpen" => "hero-lock-open",
+    "mail" => "hero-envelope",
+    "menu" => "hero-bars-3",
+    "moreVert" => "hero-ellipsis-vertical",
+    "moreHoriz" => "hero-ellipsis-horizontal",
+    "notifications" => "hero-bell",
+    "notificationsOff" => "hero-bell-slash",
+    "payment" => "hero-credit-card",
+    "person" => "hero-user",
+    "phone" => "hero-phone",
+    "photo" => "hero-photo",
+    "print" => "hero-printer",
+    "refresh" => "hero-arrow-path",
+    "search" => "hero-magnifying-glass",
+    "send" => "hero-paper-airplane",
+    "settings" => "hero-cog-6-tooth",
+    "share" => "hero-share",
+    "shoppingCart" => "hero-shopping-cart",
+    "star" => "hero-star-solid",
+    "starHalf" => "hero-star",
+    "starOff" => "hero-star",
+    "upload" => "hero-arrow-up-tray",
+    "visibility" => "hero-eye",
+    "visibilityOff" => "hero-eye-slash",
+    "warning" => "hero-exclamation-triangle"
+  }
 
   # ============================================
   # Component Dispatch
@@ -108,6 +185,62 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 id={@id}
+              />
+            <% "Icon" -> %>
+              <.a2ui_icon props={@component.props} surface={@surface} scope_path={@scope_path} />
+            <% "Image" -> %>
+              <.a2ui_image props={@component.props} surface={@surface} scope_path={@scope_path} />
+            <% "AudioPlayer" -> %>
+              <.a2ui_audio_player
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+              />
+            <% "Video" -> %>
+              <.a2ui_video props={@component.props} surface={@surface} scope_path={@scope_path} />
+            <% "Slider" -> %>
+              <.a2ui_slider
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+              />
+            <% "DateTimeInput" -> %>
+              <.a2ui_datetime_input
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+              />
+            <% "MultipleChoice" -> %>
+              <.a2ui_multiple_choice
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+              />
+            <% "List" -> %>
+              <.a2ui_list
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                depth={@depth}
+              />
+            <% "Tabs" -> %>
+              <.a2ui_tabs
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+                depth={@depth}
+              />
+            <% "Modal" -> %>
+              <.a2ui_modal
+                props={@component.props}
+                surface={@surface}
+                scope_path={@scope_path}
+                id={@id}
+                depth={@depth}
               />
             <% unknown -> %>
               <.a2ui_unknown type={unknown} />
@@ -295,7 +428,19 @@ defmodule A2UI.Catalog.Standard do
     raw_path = Binding.get_path(text_prop)
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
 
-    assigns = assign(assigns, label: label, text: text || "", field_type: field_type, path: path)
+    # Handle validationRegexp (v0.8 standard catalog)
+    validation_regexp = assigns.props["validationRegexp"]
+    is_valid = validate_text_field(text || "", validation_regexp)
+
+    assigns =
+      assign(assigns,
+        label: label,
+        text: text || "",
+        field_type: field_type,
+        path: path,
+        is_valid: is_valid,
+        has_validation: validation_regexp != nil
+      )
 
     ~H"""
     <.form
@@ -314,6 +459,7 @@ defmodule A2UI.Catalog.Standard do
         value={@text}
         type={input_type(@field_type)}
         phx-debounce="300"
+        errors={if @has_validation && !@is_valid && @text != "", do: ["Invalid format"], else: []}
       />
     </.form>
     """
@@ -358,6 +504,473 @@ defmodule A2UI.Catalog.Standard do
         checked={@value}
       />
     </.form>
+    """
+  end
+
+  # ============================================
+  # New Display Components (v0.8 Catalog)
+  # ============================================
+
+  @doc """
+  Icon - displays a standard icon from the A2UI icon set.
+  Maps A2UI icon names to Heroicons.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+
+  def a2ui_icon(assigns) do
+    name = Binding.resolve(assigns.props["name"], assigns.surface.data_model, assigns.scope_path)
+    hero_name = Map.get(@icon_mapping, name, "hero-question-mark-circle")
+    assigns = assign(assigns, hero_name: hero_name)
+
+    ~H"""
+    <.icon name={@hero_name} class="a2ui-icon size-5" />
+    """
+  end
+
+  @doc """
+  Image - displays an image with optional fit and usage hint.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+
+  def a2ui_image(assigns) do
+    url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    fit = assigns.props["fit"] || "contain"
+    hint = assigns.props["usageHint"] || "mediumFeature"
+    assigns = assign(assigns, url: url, fit: fit, hint: hint)
+
+    ~H"""
+    <img
+      src={@url}
+      class={["a2ui-image", image_classes(@hint)]}
+      style={"object-fit: #{@fit};"}
+      loading="lazy"
+    />
+    """
+  end
+
+  @doc """
+  AudioPlayer - HTML5 audio player with optional description.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+
+  def a2ui_audio_player(assigns) do
+    url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+
+    description =
+      Binding.resolve(assigns.props["description"], assigns.surface.data_model, assigns.scope_path)
+
+    assigns = assign(assigns, url: url, description: description)
+
+    ~H"""
+    <div class="a2ui-audio-player">
+      <p :if={@description} class="mb-2 text-sm text-zinc-600 dark:text-zinc-400">{@description}</p>
+      <audio controls class="w-full">
+        <source src={@url} />
+        Your browser does not support the audio element.
+      </audio>
+    </div>
+    """
+  end
+
+  @doc """
+  Video - HTML5 video player.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+
+  def a2ui_video(assigns) do
+    url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    assigns = assign(assigns, url: url)
+
+    ~H"""
+    <video controls class="a2ui-video w-full rounded-lg">
+      <source src={@url} />
+      Your browser does not support the video element.
+    </video>
+    """
+  end
+
+  # ============================================
+  # New Two-Way Binding Components (v0.8 Catalog)
+  # ============================================
+
+  @doc """
+  Slider - range input with numeric two-way binding.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+  attr :id, :string, required: true
+
+  def a2ui_slider(assigns) do
+    value =
+      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
+
+    min_val = assigns.props["minValue"] || 0
+    max_val = assigns.props["maxValue"] || 100
+
+    # Get absolute path for binding
+    raw_path = Binding.get_path(assigns.props["value"])
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+
+    assigns =
+      assign(assigns, value: value || min_val, min_val: min_val, max_val: max_val, path: path)
+
+    ~H"""
+    <.form
+      for={%{}}
+      as={:a2ui_input}
+      phx-change="a2ui:slider"
+      class="a2ui-slider"
+      id={component_dom_id(@surface.id, @id, @scope_path, "form")}
+    >
+      <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
+      <input type="hidden" name="a2ui_input[path]" value={@path} />
+      <div class="flex items-center gap-3">
+        <input
+          type="range"
+          name="a2ui_input[value]"
+          id={component_dom_id(@surface.id, @id, @scope_path, "range")}
+          value={@value}
+          min={@min_val}
+          max={@max_val}
+          class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 dark:bg-zinc-700"
+        />
+        <span class="min-w-[3rem] text-sm text-zinc-600 dark:text-zinc-400">{@value}</span>
+      </div>
+    </.form>
+    """
+  end
+
+  @doc """
+  DateTimeInput - date and/or time input with ISO 8601 binding.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+  attr :id, :string, required: true
+
+  def a2ui_datetime_input(assigns) do
+    value =
+      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
+
+    enable_date = assigns.props["enableDate"] != false
+    enable_time = assigns.props["enableTime"] != false
+
+    # Determine input type based on flags
+    input_type =
+      cond do
+        enable_date and enable_time -> "datetime-local"
+        enable_date -> "date"
+        enable_time -> "time"
+        true -> "datetime-local"
+      end
+
+    # Convert ISO 8601 to HTML input format
+    html_value = iso8601_to_html_datetime(value, input_type)
+
+    # Get absolute path for binding
+    raw_path = Binding.get_path(assigns.props["value"])
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+
+    assigns = assign(assigns, html_value: html_value, input_type: input_type, path: path)
+
+    ~H"""
+    <.form
+      for={%{}}
+      as={:a2ui_input}
+      phx-change="a2ui:datetime"
+      class="a2ui-datetime-input"
+      id={component_dom_id(@surface.id, @id, @scope_path, "form")}
+    >
+      <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
+      <input type="hidden" name="a2ui_input[path]" value={@path} />
+      <input type="hidden" name="a2ui_input[input_type]" value={@input_type} />
+      <input
+        type={@input_type}
+        name="a2ui_input[value]"
+        id={component_dom_id(@surface.id, @id, @scope_path, "input")}
+        value={@html_value}
+        class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+      />
+    </.form>
+    """
+  end
+
+  @doc """
+  MultipleChoice - selection from multiple options with optional max selections.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+  attr :id, :string, required: true
+
+  def a2ui_multiple_choice(assigns) do
+    selections =
+      Binding.resolve(assigns.props["selections"], assigns.surface.data_model, assigns.scope_path) ||
+        []
+
+    options = assigns.props["options"] || []
+    max_allowed = assigns.props["maxAllowedSelections"]
+
+    # Get absolute path for binding
+    raw_path = Binding.get_path(assigns.props["selections"])
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+
+    # Determine if this should be radio (single select) or checkbox (multi select)
+    is_single_select = max_allowed == 1
+
+    assigns =
+      assign(assigns,
+        selections: selections,
+        options: options,
+        max_allowed: max_allowed,
+        path: path,
+        is_single_select: is_single_select
+      )
+
+    ~H"""
+    <.form
+      for={%{}}
+      as={:a2ui_input}
+      phx-change="a2ui:choice"
+      class="a2ui-multiple-choice"
+      id={component_dom_id(@surface.id, @id, @scope_path, "form")}
+    >
+      <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
+      <input type="hidden" name="a2ui_input[path]" value={@path} />
+      <input type="hidden" name="a2ui_input[max_allowed]" value={@max_allowed || ""} />
+      <input type="hidden" name="a2ui_input[is_single]" value={to_string(@is_single_select)} />
+      <%!-- Empty value sentinel for when nothing is selected --%>
+      <input type="hidden" name="a2ui_input[values][]" value="" />
+      <div class="space-y-2">
+        <%= for option <- @options do %>
+          <%
+            opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path)
+            opt_value = Binding.resolve(option["value"], @surface.data_model, @scope_path)
+            is_selected = opt_value in @selections
+          %>
+          <label class="flex cursor-pointer items-center gap-2">
+            <%= if @is_single_select do %>
+              <input
+                type="radio"
+                name="a2ui_input[values][]"
+                value={opt_value}
+                checked={is_selected}
+                class="size-4 border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+              />
+            <% else %>
+              <input
+                type="checkbox"
+                name="a2ui_input[values][]"
+                value={opt_value}
+                checked={is_selected}
+                class="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+              />
+            <% end %>
+            <span class="text-sm text-zinc-900 dark:text-zinc-50">{opt_label}</span>
+          </label>
+        <% end %>
+      </div>
+    </.form>
+    """
+  end
+
+  # ============================================
+  # New Container Components (v0.8 Catalog)
+  # ============================================
+
+  @doc """
+  List - flex container for children with direction and alignment.
+  Similar to Row/Column but with explicit List semantics.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+  attr :depth, :integer, default: 0
+
+  def a2ui_list(assigns) do
+    direction = assigns.props["direction"] || "vertical"
+    alignment = assigns.props["alignment"] || "stretch"
+    assigns = assign(assigns, direction: direction, alignment: alignment)
+
+    ~H"""
+    <div
+      class="a2ui-list"
+      style={"display: flex; flex-direction: #{list_flex_direction(@direction)}; gap: 0.5rem; #{list_alignment_style(@alignment)}"}
+    >
+      <.render_children props={@props} surface={@surface} scope_path={@scope_path} depth={@depth} />
+    </div>
+    """
+  end
+
+  @doc """
+  Tabs - tabbed container showing one tab at a time.
+  Uses JS-based tab switching for performance.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+  attr :id, :string, required: true
+  attr :depth, :integer, default: 0
+
+  def a2ui_tabs(assigns) do
+    tab_items = assigns.props["tabItems"] || []
+    assigns = assign(assigns, tab_items: tab_items)
+
+    ~H"""
+    <div class="a2ui-tabs" id={component_dom_id(@surface.id, @id, @scope_path, "tabs")}>
+      <%!-- Tab Headers --%>
+      <div class="flex border-b border-zinc-200 dark:border-zinc-700">
+        <%= for {tab, idx} <- Enum.with_index(@tab_items) do %>
+          <% title = Binding.resolve(tab["title"], @surface.data_model, @scope_path) %>
+          <button
+            type="button"
+            phx-click={
+              Phoenix.LiveView.JS.hide(to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-content")
+              |> Phoenix.LiveView.JS.show(
+                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tab-#{idx}")}"
+              )
+              |> Phoenix.LiveView.JS.remove_class(
+                "border-indigo-500 text-indigo-600",
+                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-btn"
+              )
+              |> Phoenix.LiveView.JS.add_class(
+                "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700",
+                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-btn"
+              )
+              |> Phoenix.LiveView.JS.remove_class(
+                "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700",
+                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tab-btn-#{idx}")}"
+              )
+              |> Phoenix.LiveView.JS.add_class(
+                "border-indigo-500 text-indigo-600",
+                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tab-btn-#{idx}")}"
+              )
+            }
+            id={component_dom_id(@surface.id, @id, @scope_path, "tab-btn-#{idx}")}
+            class={[
+              "a2ui-tab-btn -mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              if(idx == 0,
+                do: "border-indigo-500 text-indigo-600",
+                else:
+                  "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
+              )
+            ]}
+          >
+            {title}
+          </button>
+        <% end %>
+      </div>
+      <%!-- Tab Content Panels --%>
+      <div class="pt-4">
+        <%= for {tab, idx} <- Enum.with_index(@tab_items) do %>
+          <div
+            id={component_dom_id(@surface.id, @id, @scope_path, "tab-#{idx}")}
+            class={["a2ui-tab-content", if(idx != 0, do: "hidden")]}
+          >
+            <.render_component
+              :if={tab["child"]}
+              id={tab["child"]}
+              surface={@surface}
+              scope_path={@scope_path}
+              depth={@depth + 1}
+            />
+          </div>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Modal - dialog triggered by entry point, showing content in overlay.
+  Uses JS-based show/hide for performance.
+  """
+  attr :props, :map, required: true
+  attr :surface, :map, required: true
+  attr :scope_path, :string, default: nil
+  attr :id, :string, required: true
+  attr :depth, :integer, default: 0
+
+  def a2ui_modal(assigns) do
+    entry_point_child = assigns.props["entryPointChild"]
+    content_child = assigns.props["contentChild"]
+    assigns = assign(assigns, entry_point_child: entry_point_child, content_child: content_child)
+
+    ~H"""
+    <div class="a2ui-modal">
+      <%!-- Entry Point (trigger) --%>
+      <div
+        phx-click={
+          Phoenix.LiveView.JS.show(
+            to: "##{component_dom_id(@surface.id, @id, @scope_path, "dialog")}",
+            transition: {"ease-out duration-200", "opacity-0", "opacity-100"}
+          )
+        }
+        class="cursor-pointer"
+      >
+        <.render_component
+          :if={@entry_point_child}
+          id={@entry_point_child}
+          surface={@surface}
+          scope_path={@scope_path}
+          depth={@depth + 1}
+        />
+      </div>
+      <%!-- Modal Dialog --%>
+      <div
+        id={component_dom_id(@surface.id, @id, @scope_path, "dialog")}
+        class="fixed inset-0 z-50 hidden overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+      >
+        <%!-- Backdrop --%>
+        <div
+          class="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm"
+          phx-click={
+            Phoenix.LiveView.JS.hide(
+              to: "##{component_dom_id(@surface.id, @id, @scope_path, "dialog")}",
+              transition: {"ease-in duration-150", "opacity-100", "opacity-0"}
+            )
+          }
+        >
+        </div>
+        <%!-- Content Container --%>
+        <div class="flex min-h-full items-center justify-center p-4">
+          <div class="relative w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
+            <%!-- Close Button --%>
+            <button
+              type="button"
+              class="absolute right-4 top-4 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+              phx-click={
+                Phoenix.LiveView.JS.hide(
+                  to: "##{component_dom_id(@surface.id, @id, @scope_path, "dialog")}",
+                  transition: {"ease-in duration-150", "opacity-100", "opacity-0"}
+                )
+              }
+            >
+              <.icon name="hero-x-mark" class="size-5" />
+            </button>
+            <%!-- Modal Content --%>
+            <.render_component
+              :if={@content_child}
+              id={@content_child}
+              surface={@surface}
+              scope_path={@scope_path}
+              depth={@depth + 1}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
     """
   end
 
@@ -585,6 +1198,70 @@ defmodule A2UI.Catalog.Standard do
   defp input_type("obscured"), do: "password"
   defp input_type("longText"), do: "textarea"
   defp input_type(_), do: "text"
+
+  # Image sizing classes based on usageHint
+  defp image_classes("icon"), do: "size-6"
+  defp image_classes("avatar"), do: "size-10 rounded-full"
+  defp image_classes("smallFeature"), do: "h-24 w-auto"
+  defp image_classes("mediumFeature"), do: "h-48 w-auto"
+  defp image_classes("largeFeature"), do: "h-72 w-auto"
+  defp image_classes("header"), do: "h-32 w-full"
+  defp image_classes(_), do: "h-48 w-auto"
+
+  # List component helpers
+  defp list_flex_direction("horizontal"), do: "row"
+  defp list_flex_direction(_), do: "column"
+
+  defp list_alignment_style("start"), do: "align-items: flex-start;"
+  defp list_alignment_style("center"), do: "align-items: center;"
+  defp list_alignment_style("end"), do: "align-items: flex-end;"
+  defp list_alignment_style(_), do: "align-items: stretch;"
+
+  # DateTime conversion helpers
+  defp iso8601_to_html_datetime(nil, _type), do: ""
+  defp iso8601_to_html_datetime("", _type), do: ""
+
+  defp iso8601_to_html_datetime(iso_string, "datetime-local") when is_binary(iso_string) do
+    # ISO 8601: "2024-01-15T10:30:00Z" → HTML: "2024-01-15T10:30"
+    iso_string
+    |> String.replace(~r/Z$/, "")
+    |> String.replace(~r/[+-]\d{2}:\d{2}$/, "")
+    |> String.slice(0, 16)
+  end
+
+  defp iso8601_to_html_datetime(iso_string, "date") when is_binary(iso_string) do
+    # ISO 8601: "2024-01-15T10:30:00Z" → HTML: "2024-01-15"
+    String.slice(iso_string, 0, 10)
+  end
+
+  defp iso8601_to_html_datetime(iso_string, "time") when is_binary(iso_string) do
+    # ISO 8601: "2024-01-15T10:30:00Z" → HTML: "10:30"
+    case String.split(iso_string, "T") do
+      [_, time_part] ->
+        time_part
+        |> String.replace(~r/Z$/, "")
+        |> String.replace(~r/[+-]\d{2}:\d{2}$/, "")
+        |> String.slice(0, 5)
+
+      _ ->
+        ""
+    end
+  end
+
+  defp iso8601_to_html_datetime(_, _), do: ""
+
+  # TextField validation helper
+  defp validate_text_field(_text, nil), do: true
+  defp validate_text_field("", _regexp), do: true
+
+  defp validate_text_field(text, regexp) when is_binary(regexp) do
+    case Regex.compile(regexp) do
+      {:ok, regex} -> Regex.match?(regex, text)
+      {:error, _} -> true
+    end
+  end
+
+  defp validate_text_field(_, _), do: true
 
   defp component_dom_id(surface_id, component_id, scope_path, suffix \\ nil) do
     base = "a2ui-#{surface_id}-#{component_id}"

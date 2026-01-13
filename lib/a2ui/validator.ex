@@ -14,7 +14,11 @@ defmodule A2UI.Validator do
   @max_template_items 200
   @max_data_model_bytes 100_000
 
-  @allowed_types ~w(Column Row Card Text Divider Button TextField Checkbox CheckBox)
+  # All 18 standard catalog components (v0.8)
+  @allowed_types ~w(
+    Column Row Card Text Divider Button TextField Checkbox CheckBox
+    Icon Image AudioPlayer Video Slider DateTimeInput MultipleChoice List Tabs Modal
+  )
 
   @doc """
   Returns the maximum number of components allowed per surface.
