@@ -306,12 +306,15 @@ defmodule A2UI.Catalog.Standard do
   def a2ui_row(assigns) do
     distribution = assigns.props["distribution"] || "start"
     alignment = assigns.props["alignment"] || "center"
-    assigns = assign(assigns, distribution: distribution, alignment: alignment)
+    # Row needs full width only when distribution requires space (spaceBetween, spaceAround, spaceEvenly)
+    needs_full_width = distribution in ["spaceBetween", "spaceAround", "spaceEvenly"]
+    width_style = if needs_full_width, do: "width: 100%;", else: ""
+    assigns = assign(assigns, distribution: distribution, alignment: alignment, width_style: width_style)
 
     ~H"""
     <div
       class="a2ui-row"
-      style={"display: flex; flex-direction: row; gap: 0.5rem; width: 100%; #{flex_style(@distribution, @alignment)}"}
+      style={"display: flex; flex-direction: row; gap: 0.5rem; #{@width_style} #{flex_style(@distribution, @alignment)}"}
     >
       <.render_children
         props={@props}
