@@ -770,6 +770,8 @@ defmodule A2UI.Catalog.Standard do
         true -> []
       end
 
+    selections = Enum.filter(selections, &is_binary/1)
+
     options = assigns.props["options"] || []
     max_allowed = assigns.props["maxAllowedSelections"]
 
@@ -812,7 +814,8 @@ defmodule A2UI.Catalog.Standard do
         <%= for option <- @options do %>
           <% opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path)
           opt_value = option["value"]
-          is_selected = opt_value in @selections
+          opt_value = if is_binary(opt_value), do: opt_value, else: ""
+          is_selected = opt_value != "" and opt_value in @selections
           # Disable if max reached and not already selected
           is_disabled = @suppress_events or (@max_reached and not is_selected) %>
           <label class={[
@@ -1251,11 +1254,25 @@ defmodule A2UI.Catalog.Standard do
 
   # Returns {inline_style, class} for text styling
   # Using inline styles for font-size to avoid Tailwind JIT issues
-  defp text_style("h1"), do: {"font-size: 2.25rem; font-weight: 700; letter-spacing: -0.025em;", "text-zinc-950 dark:text-zinc-50"}
-  defp text_style("h2"), do: {"font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em;", "text-zinc-950 dark:text-zinc-50"}
-  defp text_style("h3"), do: {"font-size: 1.5rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
-  defp text_style("h4"), do: {"font-size: 1.25rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
-  defp text_style("h5"), do: {"font-size: 1.125rem; font-weight: 500;", "text-zinc-950 dark:text-zinc-50"}
+  defp text_style("h1"),
+    do:
+      {"font-size: 2.25rem; font-weight: 700; letter-spacing: -0.025em;",
+       "text-zinc-950 dark:text-zinc-50"}
+
+  defp text_style("h2"),
+    do:
+      {"font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em;",
+       "text-zinc-950 dark:text-zinc-50"}
+
+  defp text_style("h3"),
+    do: {"font-size: 1.5rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
+
+  defp text_style("h4"),
+    do: {"font-size: 1.25rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
+
+  defp text_style("h5"),
+    do: {"font-size: 1.125rem; font-weight: 500;", "text-zinc-950 dark:text-zinc-50"}
+
   defp text_style("caption"), do: {"font-size: 0.875rem;", "text-zinc-600 dark:text-zinc-400"}
   defp text_style("body"), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
   defp text_style(_), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}

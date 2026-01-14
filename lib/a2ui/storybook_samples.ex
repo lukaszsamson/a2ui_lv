@@ -425,8 +425,8 @@ defmodule A2UI.StorybookSamples do
       ]}}),
       ~s({"dataModelUpdate":{"surfaceId":"datetime","contents":[
         {"key":"datetime","valueString":"2024-06-15T14:30:00Z"},
-        {"key":"date","valueString":"2024-06-15T00:00:00Z"},
-        {"key":"time","valueString":"1970-01-01T14:30:00Z"}
+        {"key":"date","valueString":"2024-06-15"},
+        {"key":"time","valueString":"14:30:00"}
       ]}}),
       ~s({"beginRendering":{"surfaceId":"datetime","root":"root"}})
     ]
@@ -438,12 +438,12 @@ defmodule A2UI.StorybookSamples do
         {"id":"root","component":{"Column":{"children":{"explicitList":["label","choice"]}}}},
         {"id":"label","component":{"Text":{"text":{"literalString":"Select one option (radio buttons):"},"usageHint":"caption"}}},
         {"id":"choice","component":{"MultipleChoice":{"selections":{"path":"/selected"},"options":[
-          {"label":{"literalString":"Option A"},"value":{"literalString":"a"}},
-          {"label":{"literalString":"Option B"},"value":{"literalString":"b"}},
-          {"label":{"literalString":"Option C"},"value":{"literalString":"c"}}
+          {"label":{"literalString":"Option A"},"value":"a"},
+          {"label":{"literalString":"Option B"},"value":"b"},
+          {"label":{"literalString":"Option C"},"value":"c"}
         ],"maxAllowedSelections":1}}}
       ]}}|,
-      ~s({"dataModelUpdate":{"surfaceId":"choice-single","contents":[{"key":"selected","valueString":"b"}]}}),
+      ~s({"dataModelUpdate":{"surfaceId":"choice-single","contents":[{"key":"selected","valueMap":[{"key":"0","valueString":"b"}]}]}}),
       ~s({"beginRendering":{"surfaceId":"choice-single","root":"root"}})
     ]
   end
@@ -454,13 +454,14 @@ defmodule A2UI.StorybookSamples do
         {"id":"root","component":{"Column":{"children":{"explicitList":["label","choice","hint"]}}}},
         {"id":"label","component":{"Text":{"text":{"literalString":"Select up to 2 options (checkboxes):"},"usageHint":"caption"}}},
         {"id":"choice","component":{"MultipleChoice":{"selections":{"path":"/selected"},"options":[
-          {"label":{"literalString":"Red"},"value":{"literalString":"red"}},
-          {"label":{"literalString":"Green"},"value":{"literalString":"green"}},
-          {"label":{"literalString":"Blue"},"value":{"literalString":"blue"}},
-          {"label":{"literalString":"Yellow"},"value":{"literalString":"yellow"}}
+          {"label":{"literalString":"Red"},"value":"red"},
+          {"label":{"literalString":"Green"},"value":"green"},
+          {"label":{"literalString":"Blue"},"value":"blue"},
+          {"label":{"literalString":"Yellow"},"value":"yellow"}
         ],"maxAllowedSelections":2}}},
         {"id":"hint","component":{"Text":{"text":{"literalString":"(Options disable when max reached)"},"usageHint":"caption"}}}
       ]}}|,
+      ~s({"dataModelUpdate":{"surfaceId":"choice-multi","contents":[{"key":"selected","valueMap":[{"key":"0","valueString":"red"},{"key":"1","valueString":"green"}]}]}}),
       ~s({"beginRendering":{"surfaceId":"choice-multi","root":"root"}})
     ]
   end

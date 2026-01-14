@@ -68,3 +68,12 @@
   border-bottom-color: var(--a2ui-primary-color, #4f46e5) !important;
   color: var(--a2ui-primary-color, #4f46e5) !important;
 }
+
+/* Storybook-only: make Column distribution sample visibly distinct without adding non-spec props */
+.a2ui-surface[data-surface-id="column-dist"] .a2ui-card {
+  min-height: 180px;
+}
+
+.a2ui-surface[data-surface-id="column-dist"] .a2ui-card .a2ui-column {
+  height: 100%;
+}

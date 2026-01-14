@@ -25,6 +25,12 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/a2ui_lv"
 import topbar from "../vendor/topbar"
 
+// Tailwind v4 only emits heroicon classes it can see in sources.
+// A2UI icon names are dynamic at runtime, so we safelist the catalog icons here.
+const _A2UI_HEROICON_SAFELIST =
+  "hero-arrow-down-tray hero-arrow-left hero-arrow-path hero-arrow-right hero-arrow-up-tray hero-bars-3 hero-bell hero-bell-slash hero-calendar hero-calendar-days hero-camera hero-check hero-cog-6-tooth hero-credit-card hero-ellipsis-horizontal hero-ellipsis-vertical hero-envelope hero-exclamation-circle hero-exclamation-triangle hero-eye hero-eye-slash hero-folder hero-heart hero-heart-solid hero-home hero-information-circle hero-lock-closed hero-lock-open hero-magnifying-glass hero-map-pin hero-paper-airplane hero-paper-clip hero-pencil hero-phone hero-photo hero-plus hero-printer hero-question-mark-circle hero-share hero-shopping-cart hero-star hero-star-solid hero-trash hero-user hero-user-circle hero-x-mark"
+void _A2UI_HEROICON_SAFELIST
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
@@ -80,4 +86,3 @@ if (process.env.NODE_ENV === "development") {
     window.liveReloader = reloader
   })
 }
-
