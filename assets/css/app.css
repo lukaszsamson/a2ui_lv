@@ -71,9 +71,10 @@
 
 /* Storybook-only: make Column distribution sample visibly distinct without adding non-spec props */
 .a2ui-surface[data-surface-id="column-dist"] .a2ui-card {
-  min-height: 180px;
+  min-height: 220px;
+  flex-direction: column;
 }
 
 .a2ui-surface[data-surface-id="column-dist"] .a2ui-card .a2ui-column {
-  height: 100%;
+  flex: 1 1 auto;
 }
