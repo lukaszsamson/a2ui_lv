@@ -306,8 +306,8 @@ defmodule A2UI.Catalog.Standard do
   def a2ui_row(assigns) do
     distribution = assigns.props["distribution"] || "start"
     alignment = assigns.props["alignment"] || "center"
-    # Row needs full width only when distribution requires space (spaceBetween, spaceAround, spaceEvenly)
-    needs_full_width = distribution in ["spaceBetween", "spaceAround", "spaceEvenly"]
+    # Row needs full width for all distributions except "start" (which can be content-sized)
+    needs_full_width = distribution != "start"
     width_style = if needs_full_width, do: "width: 100%;", else: ""
     assigns = assign(assigns, distribution: distribution, alignment: alignment, width_style: width_style)
 
