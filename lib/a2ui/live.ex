@@ -154,10 +154,15 @@ defmodule A2UI.Live do
     component = surface && surface.components[component_id]
     action = component && component.props["action"]
 
-    if action do
-      action_name = action["name"]
-      action_context = action["context"] || []
+    # Action can be a string (just the name) or a map with name and context
+    {action_name, action_context} =
+      case action do
+        name when is_binary(name) -> {name, []}
+        %{"name" => name} -> {name, action["context"] || []}
+        _ -> {nil, []}
+      end
 
+    if action_name do
       # Resolve all context bindings against current data model
       resolved_context = resolve_action_context(action_context, surface.data_model, scope_path)
 
@@ -185,7 +190,7 @@ defmodule A2UI.Live do
 
       {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, user_action)}
     else
-      Logger.warning("A2UI action event for component without action: #{component_id}")
+      Logger.warning("A2UI action event for component without valid action: #{component_id}")
       {:noreply, socket}
     end
   end
