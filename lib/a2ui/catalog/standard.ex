@@ -356,10 +356,11 @@ defmodule A2UI.Catalog.Standard do
   def a2ui_text(assigns) do
     text = Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path)
     hint = assigns.props["usageHint"] || "body"
-    assigns = assign(assigns, text: text, hint: hint)
+    {style, class} = text_style(hint)
+    assigns = assign(assigns, text: text, style: style, class: class)
 
     ~H"""
-    <span class={text_classes(@hint)}>{@text}</span>
+    <span class={@class} style={@style}>{@text}</span>
     """
   end
 
@@ -1248,18 +1249,16 @@ defmodule A2UI.Catalog.Standard do
     "justify-content: #{justify}; align-items: #{align};"
   end
 
-  defp text_classes(hint) do
-    case hint do
-      "h1" -> "text-4xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50"
-      "h2" -> "text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
-      "h3" -> "text-2xl font-semibold text-zinc-950 dark:text-zinc-50"
-      "h4" -> "text-xl font-semibold text-zinc-950 dark:text-zinc-50"
-      "h5" -> "text-lg font-medium text-zinc-950 dark:text-zinc-50"
-      "caption" -> "text-sm text-zinc-600 dark:text-zinc-400"
-      "body" -> "text-base text-zinc-900 dark:text-zinc-50"
-      _ -> "text-base text-zinc-900 dark:text-zinc-50"
-    end
-  end
+  # Returns {inline_style, class} for text styling
+  # Using inline styles for font-size to avoid Tailwind JIT issues
+  defp text_style("h1"), do: {"font-size: 2.25rem; font-weight: 700; letter-spacing: -0.025em;", "text-zinc-950 dark:text-zinc-50"}
+  defp text_style("h2"), do: {"font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em;", "text-zinc-950 dark:text-zinc-50"}
+  defp text_style("h3"), do: {"font-size: 1.5rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
+  defp text_style("h4"), do: {"font-size: 1.25rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
+  defp text_style("h5"), do: {"font-size: 1.125rem; font-weight: 500;", "text-zinc-950 dark:text-zinc-50"}
+  defp text_style("caption"), do: {"font-size: 0.875rem;", "text-zinc-600 dark:text-zinc-400"}
+  defp text_style("body"), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
+  defp text_style(_), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
 
   defp divider_style("vertical"),
     do: "height: 100%; min-height: 2rem; width: 2px; background-color: #a1a1aa;"
