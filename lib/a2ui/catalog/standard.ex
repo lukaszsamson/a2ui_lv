@@ -560,24 +560,24 @@ defmodule A2UI.Catalog.Standard do
   def a2ui_image(assigns) do
     url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
     fit = assigns.props["fit"] || "contain"
-    hint = assigns.props["usageHint"] || "mediumFeature"
-    {wrapper_style, extra_class} = image_size_style(hint)
+    hint = assigns.props["usageHint"]
+    {wrapper_class, wrapper_style} = image_size_style(hint)
 
     assigns =
-      assign(assigns, url: url, fit: fit, wrapper_style: wrapper_style, extra_class: extra_class)
+      assign(assigns, url: url, fit: fit, wrapper_class: wrapper_class, wrapper_style: wrapper_style)
 
     ~H"""
     <div
       class={[
-        "a2ui-image-wrapper overflow-hidden bg-zinc-200 dark:bg-zinc-700 shrink-0",
-        @extra_class
+        "a2ui-image-wrapper overflow-hidden bg-zinc-200 dark:bg-zinc-700",
+        @wrapper_class
       ]}
       style={@wrapper_style}
     >
       <img
         src={@url}
-        class="a2ui-image"
-        style={"width: 100%; height: 100%; object-fit: #{@fit};"}
+        class="a2ui-image w-full h-full"
+        style={"object-fit: #{@fit};"}
         loading="lazy"
       />
     </div>
@@ -1303,13 +1303,16 @@ defmodule A2UI.Catalog.Standard do
   # Using fixed width AND height so object-fit differences are visible
   # Returns {inline_style, extra_classes} for image wrapper sizing
   # Using inline styles to prevent flex containers from overriding dimensions
-  defp image_size_style("icon"), do: {"width: 24px; height: 24px;", ""}
-  defp image_size_style("avatar"), do: {"width: 40px; height: 40px;", "rounded-full"}
-  defp image_size_style("smallFeature"), do: {"width: 128px; height: 96px;", ""}
-  defp image_size_style("mediumFeature"), do: {"width: 256px; height: 192px;", ""}
-  defp image_size_style("largeFeature"), do: {"width: 384px; height: 288px;", ""}
-  defp image_size_style("header"), do: {"width: 100%; height: 128px;", ""}
-  defp image_size_style(_), do: {"width: 256px; height: 192px;", ""}
+  # Returns {class, style} for image wrapper
+  # icon/avatar use fixed sizes, others fill container width with aspect ratio hints
+  defp image_size_style("icon"), do: {"shrink-0", "width: 24px; height: 24px;"}
+  defp image_size_style("avatar"), do: {"shrink-0 rounded-full", "width: 40px; height: 40px;"}
+  defp image_size_style("smallFeature"), do: {"w-full", "aspect-ratio: 4/3; max-width: 128px;"}
+  defp image_size_style("mediumFeature"), do: {"w-full", "aspect-ratio: 4/3; max-width: 256px;"}
+  defp image_size_style("largeFeature"), do: {"w-full", "aspect-ratio: 4/3; max-width: 384px;"}
+  defp image_size_style("header"), do: {"w-full", "height: 128px;"}
+  # No hint: fill container, auto height based on image
+  defp image_size_style(_), do: {"w-full", ""}
 
   # List component helpers
   defp list_flex_direction("horizontal"), do: "row"
