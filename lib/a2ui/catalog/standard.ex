@@ -1250,14 +1250,14 @@ defmodule A2UI.Catalog.Standard do
 
   defp text_classes(hint) do
     case hint do
-      "h1" -> "text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
-      "h2" -> "text-2xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
-      "h3" -> "text-xl font-semibold text-zinc-950 dark:text-zinc-50"
-      "h4" -> "text-lg font-semibold text-zinc-950 dark:text-zinc-50"
-      "h5" -> "text-base font-semibold text-zinc-950 dark:text-zinc-50"
+      "h1" -> "text-4xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50"
+      "h2" -> "text-3xl font-semibold tracking-tight text-zinc-950 dark:text-zinc-50"
+      "h3" -> "text-2xl font-semibold text-zinc-950 dark:text-zinc-50"
+      "h4" -> "text-xl font-semibold text-zinc-950 dark:text-zinc-50"
+      "h5" -> "text-lg font-medium text-zinc-950 dark:text-zinc-50"
       "caption" -> "text-sm text-zinc-600 dark:text-zinc-400"
-      "body" -> "text-sm text-zinc-900 dark:text-zinc-50"
-      _ -> "text-sm text-zinc-900 dark:text-zinc-50"
+      "body" -> "text-base text-zinc-900 dark:text-zinc-50"
+      _ -> "text-base text-zinc-900 dark:text-zinc-50"
     end
   end
 
