@@ -11,7 +11,12 @@ defmodule A2uiLvWeb.StorybookLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    socket = A2UI.Live.init(socket, action_callback: &handle_action/2)
+    socket =
+      A2UI.Live.init(socket,
+        action_callback: &handle_action/2,
+        error_callback: &handle_error/2
+      )
+
     socket = Phoenix.Component.assign(socket, :current_scope, nil)
 
     samples = StorybookSamples.all_samples()
@@ -246,12 +251,21 @@ defmodule A2uiLvWeb.StorybookLive do
                   Data Model
                 </h2>
                 <div class="overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-xs leading-5 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50">
+                  <%= if @a2ui_last_error do %>
+                    <div class="mb-4">
+                      <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-rose-500 dark:text-rose-400">
+                        Last Error
+                      </div>
+                      <pre class="whitespace-pre-wrap text-rose-600 dark:text-rose-400"><%= Jason.encode!(@a2ui_last_error, pretty: true, escape: :html_safe) %></pre>
+                    </div>
+                  <% end %>
+
                   <%= if @a2ui_last_action do %>
                     <div class="mb-4">
                       <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         Last Action
                       </div>
-                      <pre class="whitespace-pre-wrap"><%= Jason.encode!(@a2ui_last_action, pretty: true) %></pre>
+                      <pre class="whitespace-pre-wrap"><%= Jason.encode!(@a2ui_last_action, pretty: true, escape: :html_safe) %></pre>
                     </div>
                   <% end %>
 
@@ -260,7 +274,7 @@ defmodule A2uiLvWeb.StorybookLive do
                       <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                         Surface: {id}
                       </div>
-                      <pre class="whitespace-pre-wrap"><%= Jason.encode!(surface.data_model, pretty: true) %></pre>
+                      <pre class="whitespace-pre-wrap"><%= Jason.encode!(surface.data_model, pretty: true, escape: :html_safe) %></pre>
                     </div>
                   <% end %>
 
@@ -297,7 +311,7 @@ defmodule A2uiLvWeb.StorybookLive do
 
   defp format_json(json_string) do
     case Jason.decode(json_string) do
-      {:ok, decoded} -> Jason.encode!(decoded, pretty: true)
+      {:ok, decoded} -> Jason.encode!(decoded, pretty: true, escape: :html_safe)
       {:error, _} -> json_string
     end
   end
@@ -305,5 +319,10 @@ defmodule A2uiLvWeb.StorybookLive do
   defp handle_action(user_action, _socket) do
     require Logger
     Logger.info("Storybook action: #{inspect(user_action)}")
+  end
+
+  defp handle_error(error, _socket) do
+    require Logger
+    Logger.warning("Storybook error: #{inspect(error)}")
   end
 end

@@ -113,13 +113,18 @@ Per `client_to_server.json`, only two event envelopes exist:
 **Missing for conformance:**
 - A transport that serializes and sends this envelope to the agent/server as defined by the selected transport (A2A extension or otherwise).
 
-### 3.2 `error` (not implemented)
+### 3.2 `error` (partially implemented)
 
-`error` is allowed to be “flexible content” per schema.
+`error` is allowed to be "flexible content" per schema.
+
+**Current state:**
+- `A2UI.Error` module builds error messages with consistent structure (type, message, surfaceId, timestamp, details)
+- `A2UI.Live.init/2` accepts `:error_callback` option (same pattern as `:action_callback`)
+- Errors are emitted for: JSON parse failures, unknown message types, validation errors (component count, unknown types), data model size exceeded
+- Errors stored in `@a2ui_last_error` assign for debugging
 
 **Missing for conformance:**
-- Decide which renderer failures must emit `error` (parse/validation failures, unknown component, binding errors, etc.).
-- Provide a transport hook to deliver it to the agent/server.
+- A transport that serializes and sends this envelope to the agent/server as defined by the selected transport (A2A extension or otherwise).
 
 ---
 
@@ -256,7 +261,7 @@ Missing tests for full v0.8 conformance:
 ### P2 — Protocol completeness
 8. Catalog negotiation: client capabilities, catalog selection, inline catalogs (if allowed)
 9. Real transport: A2A extension integration (or another transport) for both directions
-10. Client→server `error` reporting strategy
+10. ~~Client→server `error` reporting strategy~~ ✅ (Error module + callback; transport pending)
 
 ---
 
@@ -266,10 +271,10 @@ Missing tests for full v0.8 conformance:
 |------|--------|
 | Standard catalog components | **18/18 implemented** |
 | Server→client message envelopes | 4/4 parsed/handled (`surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`) |
-| Client→server envelopes | `userAction` constructed but not transported; `error` not implemented |
+| Client→server envelopes | `userAction` constructed + callback; `error` constructed + callback; transport not implemented |
 | Catalog negotiation | catalogId parsed only; no negotiation/selection/validation |
 | Styles | stored + applied via CSS vars (`--a2ui-font`, `--a2ui-primary-color`, `--a2ui-primary-rgb`) |
-| Key conformance blockers | ~~weight~~, ~~root replace~~, ~~template maps~~, ~~valueArray~~ — **All P0 resolved** |
+| Key conformance blockers | ~~weight~~, ~~root replace~~, ~~template maps~~, ~~valueArray~~, ~~error reporting~~ — **All P0 resolved** |
 
 
 
