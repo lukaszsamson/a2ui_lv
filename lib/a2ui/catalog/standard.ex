@@ -373,10 +373,12 @@ defmodule A2UI.Catalog.Standard do
 
   def a2ui_divider(assigns) do
     axis = assigns.props["axis"] || "horizontal"
-    assigns = assign(assigns, axis: axis)
+    thickness = assigns.props["thickness"]
+    color = assigns.props["color"]
+    assigns = assign(assigns, axis: axis, thickness: thickness, color: color)
 
     ~H"""
-    <div style={divider_style(@axis)} />
+    <div style={divider_style(@axis, @thickness, @color)} />
     """
   end
 
@@ -1282,11 +1284,39 @@ defmodule A2UI.Catalog.Standard do
   defp text_style("body"), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
   defp text_style(_), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
 
-  defp divider_style("vertical"),
-    do: "height: 100%; min-height: 2rem; width: 2px; background-color: #a1a1aa;"
+  defp divider_style(axis, thickness, color) do
+    thickness_px = parse_thickness(thickness)
+    bg_color = parse_color(color) || "#a1a1aa"
 
-  defp divider_style(_),
-    do: "height: 2px; width: 100%; background-color: #a1a1aa; margin: 0.75rem 0;"
+    case axis do
+      "vertical" ->
+        "height: 100%; min-height: 2rem; width: #{thickness_px}px; background-color: #{bg_color};"
+
+      _ ->
+        "height: #{thickness_px}px; width: 100%; background-color: #{bg_color}; margin: 0.75rem 0;"
+    end
+  end
+
+  defp parse_thickness(nil), do: 2
+  defp parse_thickness(n) when is_number(n), do: max(1, n)
+  defp parse_thickness(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, _} -> max(1, n)
+      :error -> 2
+    end
+  end
+  defp parse_thickness(_), do: 2
+
+  # Only allow safe hex colors
+  defp parse_color(nil), do: nil
+  defp parse_color(<<"#", rest::binary>> = color) when byte_size(rest) in [3, 6] do
+    if String.match?(rest, ~r/^[0-9a-fA-F]+$/) do
+      color
+    else
+      nil
+    end
+  end
+  defp parse_color(_), do: nil
 
   defp button_classes(true) do
     "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition"

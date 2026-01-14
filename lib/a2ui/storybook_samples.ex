@@ -14,8 +14,10 @@ defmodule A2UI.StorybookSamples do
       # Layout Components
       {"Layout", "Column - Basic", "column-basic", column_basic()},
       {"Layout", "Column - Distributions", "column-dist", column_distributions()},
+      {"Layout", "Column - Alignments", "column-align", column_alignments()},
       {"Layout", "Row - Basic", "row-basic", row_basic()},
       {"Layout", "Row - Alignments", "row-align", row_alignments()},
+      {"Layout", "Row - Distributions", "row-dist", row_distributions()},
       {"Layout", "Card", "card-basic", card_basic()},
       {"Layout", "List - Vertical", "list-vert", list_vertical()},
       {"Layout", "List - Horizontal", "list-horiz", list_horizontal()},
@@ -23,7 +25,8 @@ defmodule A2UI.StorybookSamples do
       # Display Components
       {"Display", "Text - Headings", "text-headings", text_headings()},
       {"Display", "Text - Body & Caption", "text-body", text_body()},
-      {"Display", "Divider", "divider", divider()},
+      {"Display", "Divider - Basic", "divider", divider()},
+      {"Display", "Divider - Variants", "divider-variants", divider_variants()},
       {"Display", "Icon - Common", "icon-common", icon_common()},
       {"Display", "Icon - All Standard", "icon-all", icon_all()},
       {"Display", "Image - Fit Modes", "image-fit", image_fit()},
@@ -157,6 +160,20 @@ defmodule A2UI.StorybookSamples do
     ]
   end
 
+  defp row_distributions do
+    [
+      ~S|{"surfaceUpdate":{"surfaceId":"row-dist","components":[{"id":"root","component":{"Column":{"children":{"explicitList":["label1","r1","label2","r2","label3","r3","label4","r4","label5","r5","label6","r6"]}}}},{"id":"label1","component":{"Text":{"text":{"literalString":"distribution: start (default)"},"usageHint":"caption"}}},{"id":"r1","component":{"Row":{"children":{"explicitList":["b1a","b1b","b1c"]},"distribution":"start"}}},{"id":"label2","component":{"Text":{"text":{"literalString":"distribution: center"},"usageHint":"caption"}}},{"id":"r2","component":{"Row":{"children":{"explicitList":["b2a","b2b","b2c"]},"distribution":"center"}}},{"id":"label3","component":{"Text":{"text":{"literalString":"distribution: end"},"usageHint":"caption"}}},{"id":"r3","component":{"Row":{"children":{"explicitList":["b3a","b3b","b3c"]},"distribution":"end"}}},{"id":"label4","component":{"Text":{"text":{"literalString":"distribution: spaceBetween"},"usageHint":"caption"}}},{"id":"r4","component":{"Row":{"children":{"explicitList":["b4a","b4b","b4c"]},"distribution":"spaceBetween"}}},{"id":"label5","component":{"Text":{"text":{"literalString":"distribution: spaceAround"},"usageHint":"caption"}}},{"id":"r5","component":{"Row":{"children":{"explicitList":["b5a","b5b","b5c"]},"distribution":"spaceAround"}}},{"id":"label6","component":{"Text":{"text":{"literalString":"distribution: spaceEvenly"},"usageHint":"caption"}}},{"id":"r6","component":{"Row":{"children":{"explicitList":["b6a","b6b","b6c"]},"distribution":"spaceEvenly"}}},{"id":"b1a","component":{"Button":{"child":"t1a"}}},{"id":"t1a","component":{"Text":{"text":{"literalString":"A"}}}},{"id":"b1b","component":{"Button":{"child":"t1b"}}},{"id":"t1b","component":{"Text":{"text":{"literalString":"B"}}}},{"id":"b1c","component":{"Button":{"child":"t1c"}}},{"id":"t1c","component":{"Text":{"text":{"literalString":"C"}}}},{"id":"b2a","component":{"Button":{"child":"t2a"}}},{"id":"t2a","component":{"Text":{"text":{"literalString":"A"}}}},{"id":"b2b","component":{"Button":{"child":"t2b"}}},{"id":"t2b","component":{"Text":{"text":{"literalString":"B"}}}},{"id":"b2c","component":{"Button":{"child":"t2c"}}},{"id":"t2c","component":{"Text":{"text":{"literalString":"C"}}}},{"id":"b3a","component":{"Button":{"child":"t3a"}}},{"id":"t3a","component":{"Text":{"text":{"literalString":"A"}}}},{"id":"b3b","component":{"Button":{"child":"t3b"}}},{"id":"t3b","component":{"Text":{"text":{"literalString":"B"}}}},{"id":"b3c","component":{"Button":{"child":"t3c"}}},{"id":"t3c","component":{"Text":{"text":{"literalString":"C"}}}},{"id":"b4a","component":{"Button":{"child":"t4a"}}},{"id":"t4a","component":{"Text":{"text":{"literalString":"A"}}}},{"id":"b4b","component":{"Button":{"child":"t4b"}}},{"id":"t4b","component":{"Text":{"text":{"literalString":"B"}}}},{"id":"b4c","component":{"Button":{"child":"t4c"}}},{"id":"t4c","component":{"Text":{"text":{"literalString":"C"}}}},{"id":"b5a","component":{"Button":{"child":"t5a"}}},{"id":"t5a","component":{"Text":{"text":{"literalString":"A"}}}},{"id":"b5b","component":{"Button":{"child":"t5b"}}},{"id":"t5b","component":{"Text":{"text":{"literalString":"B"}}}},{"id":"b5c","component":{"Button":{"child":"t5c"}}},{"id":"t5c","component":{"Text":{"text":{"literalString":"C"}}}},{"id":"b6a","component":{"Button":{"child":"t6a"}}},{"id":"t6a","component":{"Text":{"text":{"literalString":"A"}}}},{"id":"b6b","component":{"Button":{"child":"t6b"}}},{"id":"t6b","component":{"Text":{"text":{"literalString":"B"}}}},{"id":"b6c","component":{"Button":{"child":"t6c"}}},{"id":"t6c","component":{"Text":{"text":{"literalString":"C"}}}}]}}|,
+      ~s({"beginRendering":{"surfaceId":"row-dist","root":"root"}})
+    ]
+  end
+
+  defp column_alignments do
+    [
+      ~S|{"surfaceUpdate":{"surfaceId":"column-align","components":[{"id":"root","component":{"Row":{"children":{"explicitList":["c1","c2","c3","c4"]},"distribution":"spaceEvenly"}}},{"id":"c1","component":{"Column":{"children":{"explicitList":["l1","card1"]},"alignment":"start"}}},{"id":"c2","component":{"Column":{"children":{"explicitList":["l2","card2"]},"alignment":"center"}}},{"id":"c3","component":{"Column":{"children":{"explicitList":["l3","card3"]},"alignment":"end"}}},{"id":"c4","component":{"Column":{"children":{"explicitList":["l4","card4"]},"alignment":"stretch"}}},{"id":"l1","component":{"Text":{"text":{"literalString":"start"},"usageHint":"caption"}}},{"id":"l2","component":{"Text":{"text":{"literalString":"center"},"usageHint":"caption"}}},{"id":"l3","component":{"Text":{"text":{"literalString":"end"},"usageHint":"caption"}}},{"id":"l4","component":{"Text":{"text":{"literalString":"stretch"},"usageHint":"caption"}}},{"id":"card1","component":{"Card":{"child":"ct1"}}},{"id":"ct1","component":{"Text":{"text":{"literalString":"Card"}}}},{"id":"card2","component":{"Card":{"child":"ct2"}}},{"id":"ct2","component":{"Text":{"text":{"literalString":"Card"}}}},{"id":"card3","component":{"Card":{"child":"ct3"}}},{"id":"ct3","component":{"Text":{"text":{"literalString":"Card"}}}},{"id":"card4","component":{"Card":{"child":"ct4"}}},{"id":"ct4","component":{"Text":{"text":{"literalString":"Card"}}}}]}}|,
+      ~s({"beginRendering":{"surfaceId":"column-align","root":"root"}})
+    ]
+  end
+
   defp card_basic do
     [
       ~s({"surfaceUpdate":{"surfaceId":"card-basic","components":[
@@ -237,6 +254,13 @@ defmodule A2UI.StorybookSamples do
         {"id":"right","component":{"Text":{"text":{"literalString":"Right"}}}}
       ]}}),
       ~s({"beginRendering":{"surfaceId":"divider","root":"root"}})
+    ]
+  end
+
+  defp divider_variants do
+    [
+      ~S|{"surfaceUpdate":{"surfaceId":"divider-variants","components":[{"id":"root","component":{"Column":{"children":{"explicitList":["t1","d1","t2","d2","t3","d3","t4","d4","t5","color-row"]}}}},{"id":"t1","component":{"Text":{"text":{"literalString":"Default thickness (2px)"},"usageHint":"caption"}}},{"id":"d1","component":{"Divider":{}}},{"id":"t2","component":{"Text":{"text":{"literalString":"Thickness: 1px"},"usageHint":"caption"}}},{"id":"d2","component":{"Divider":{"thickness":1}}},{"id":"t3","component":{"Text":{"text":{"literalString":"Thickness: 4px"},"usageHint":"caption"}}},{"id":"d3","component":{"Divider":{"thickness":4}}},{"id":"t4","component":{"Text":{"text":{"literalString":"Thickness: 8px"},"usageHint":"caption"}}},{"id":"d4","component":{"Divider":{"thickness":8}}},{"id":"t5","component":{"Text":{"text":{"literalString":"With colors:"},"usageHint":"caption"}}},{"id":"color-row","component":{"Column":{"children":{"explicitList":["dc1","dc2","dc3","dc4"]}}}},{"id":"dc1","component":{"Divider":{"thickness":4,"color":"#ef4444"}}},{"id":"dc2","component":{"Divider":{"thickness":4,"color":"#22c55e"}}},{"id":"dc3","component":{"Divider":{"thickness":4,"color":"#3b82f6"}}},{"id":"dc4","component":{"Divider":{"thickness":4,"color":"#a855f7"}}}]}}|,
+      ~s({"beginRendering":{"surfaceId":"divider-variants","root":"root"}})
     ]
   end
 
