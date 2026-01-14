@@ -93,11 +93,11 @@ defmodule A2UI.ComponentTest do
       assert comp.props["text"] == %{"path" => "/form/email"}
     end
 
-    test "parses Checkbox component" do
+    test "parses CheckBox component" do
       data = %{
         "id" => "subscribe",
         "component" => %{
-          "Checkbox" => %{
+          "CheckBox" => %{
             "label" => %{"literalString" => "Subscribe to updates"},
             "value" => %{"path" => "/form/subscribe"}
           }
@@ -106,7 +106,7 @@ defmodule A2UI.ComponentTest do
 
       comp = Component.from_map(data)
       assert comp.id == "subscribe"
-      assert comp.type == "Checkbox"
+      assert comp.type == "CheckBox"
     end
 
     test "parses Card component" do

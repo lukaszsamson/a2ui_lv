@@ -111,6 +111,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def render_component(assigns) do
     component = assigns.surface.components[assigns.id]
@@ -137,6 +138,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% "Row" -> %>
               <.a2ui_row
@@ -144,6 +146,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% "Card" -> %>
               <.a2ui_card
@@ -152,6 +155,7 @@ defmodule A2UI.Catalog.Standard do
                 scope_path={@scope_path}
                 id={@id}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% "Text" -> %>
               <.a2ui_text props={@component.props} surface={@surface} scope_path={@scope_path} />
@@ -164,6 +168,7 @@ defmodule A2UI.Catalog.Standard do
                 scope_path={@scope_path}
                 id={@id}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% "TextField" -> %>
               <.a2ui_text_field
@@ -171,13 +176,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 id={@id}
-              />
-            <% "Checkbox" -> %>
-              <.a2ui_checkbox
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
+                suppress_events={@suppress_events}
               />
             <% "CheckBox" -> %>
               <.a2ui_checkbox
@@ -185,6 +184,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 id={@id}
+                suppress_events={@suppress_events}
               />
             <% "Icon" -> %>
               <.a2ui_icon props={@component.props} surface={@surface} scope_path={@scope_path} />
@@ -204,6 +204,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 id={@id}
+                suppress_events={@suppress_events}
               />
             <% "DateTimeInput" -> %>
               <.a2ui_datetime_input
@@ -211,6 +212,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 id={@id}
+                suppress_events={@suppress_events}
               />
             <% "MultipleChoice" -> %>
               <.a2ui_multiple_choice
@@ -218,6 +220,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 id={@id}
+                suppress_events={@suppress_events}
               />
             <% "List" -> %>
               <.a2ui_list
@@ -225,6 +228,7 @@ defmodule A2UI.Catalog.Standard do
                 surface={@surface}
                 scope_path={@scope_path}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% "Tabs" -> %>
               <.a2ui_tabs
@@ -233,6 +237,7 @@ defmodule A2UI.Catalog.Standard do
                 scope_path={@scope_path}
                 id={@id}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% "Modal" -> %>
               <.a2ui_modal
@@ -241,6 +246,7 @@ defmodule A2UI.Catalog.Standard do
                 scope_path={@scope_path}
                 id={@id}
                 depth={@depth}
+                suppress_events={@suppress_events}
               />
             <% unknown -> %>
               <.a2ui_unknown type={unknown} />
@@ -265,21 +271,17 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_column(assigns) do
     distribution = assigns.props["distribution"] || "start"
     alignment = assigns.props["alignment"] || "stretch"
-    min_height = assigns.props["minHeight"]
-
-    min_height_style = if min_height, do: "min-height: #{min_height};", else: ""
-
-    assigns =
-      assign(assigns, distribution: distribution, alignment: alignment, min_height_style: min_height_style)
+    assigns = assign(assigns, distribution: distribution, alignment: alignment)
 
     ~H"""
     <div
       class="a2ui-column"
-      style={"display: flex; flex-direction: column; gap: 0.5rem; width: 100%; #{flex_style(@distribution, @alignment)} #{@min_height_style}"}
+      style={"display: flex; flex-direction: column; gap: 0.5rem; width: 100%; #{flex_style(@distribution, @alignment)}"}
     >
       <.render_children
         props={@props}
@@ -287,6 +289,7 @@ defmodule A2UI.Catalog.Standard do
         scope_path={@scope_path}
         depth={@depth}
         apply_weight={true}
+        suppress_events={@suppress_events}
       />
     </div>
     """
@@ -296,6 +299,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_row(assigns) do
     distribution = assigns.props["distribution"] || "start"
@@ -313,6 +317,7 @@ defmodule A2UI.Catalog.Standard do
         scope_path={@scope_path}
         depth={@depth}
         apply_weight={true}
+        suppress_events={@suppress_events}
       />
     </div>
     """
@@ -323,6 +328,7 @@ defmodule A2UI.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_card(assigns) do
     ~H"""
@@ -333,6 +339,7 @@ defmodule A2UI.Catalog.Standard do
         surface={@surface}
         scope_path={@scope_path}
         depth={@depth + 1}
+        suppress_events={@suppress_events}
       />
     </div>
     """
@@ -383,14 +390,16 @@ defmodule A2UI.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_button(assigns) do
     primary = assigns.props["primary"] || false
-    has_action = assigns.props["action"] != nil
+    has_action = assigns.props["action"] != nil and not assigns.suppress_events
     assigns = assign(assigns, primary: primary, has_action: has_action)
 
     ~H"""
     <button
+      type="button"
       class={button_classes(@primary)}
       phx-click={@has_action && "a2ui:action"}
       phx-value-surface-id={@has_action && @surface.id}
@@ -403,6 +412,7 @@ defmodule A2UI.Catalog.Standard do
         surface={@surface}
         scope_path={@scope_path}
         depth={@depth + 1}
+        suppress_events={@suppress_events}
       />
     </button>
     """
@@ -419,16 +429,15 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_text_field(assigns) do
     label =
       Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
 
-    # v0.8 uses "text", v0.9 uses "value"
-    text_prop = assigns.props["text"] || assigns.props["value"]
+    text_prop = assigns.props["text"]
     text = Binding.resolve(text_prop, assigns.surface.data_model, assigns.scope_path)
-    # v0.8 uses "textFieldType", v0.9 uses "variant"
-    field_type = assigns.props["textFieldType"] || assigns.props["variant"] || "shortText"
+    field_type = assigns.props["textFieldType"] || "shortText"
 
     # Get absolute path for binding (expand if relative)
     raw_path = Binding.get_path(text_prop)
@@ -452,7 +461,7 @@ defmodule A2UI.Catalog.Standard do
     <.form
       for={%{}}
       as={:a2ui_input}
-      phx-change="a2ui:input"
+      phx-change={!@suppress_events && "a2ui:input"}
       class="a2ui-text-field"
       id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
@@ -465,6 +474,7 @@ defmodule A2UI.Catalog.Standard do
         value={@text}
         type={input_type(@field_type)}
         phx-debounce="300"
+        disabled={@suppress_events}
         errors={if @has_validation && !@is_valid && @text != "", do: ["Invalid format"], else: []}
       />
     </.form>
@@ -472,12 +482,13 @@ defmodule A2UI.Catalog.Standard do
   end
 
   @doc """
-  Checkbox - boolean toggle with two-way binding.
+  CheckBox - boolean toggle with two-way binding.
   """
   attr :props, :map, required: true
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_checkbox(assigns) do
     label =
@@ -496,7 +507,7 @@ defmodule A2UI.Catalog.Standard do
     <.form
       for={%{}}
       as={:a2ui_input}
-      phx-change="a2ui:toggle"
+      phx-change={!@suppress_events && "a2ui:toggle"}
       id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
       <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
@@ -508,6 +519,7 @@ defmodule A2UI.Catalog.Standard do
         label={@label}
         value={@value}
         checked={@value}
+        disabled={@suppress_events}
       />
     </.form>
     """
@@ -547,11 +559,16 @@ defmodule A2UI.Catalog.Standard do
     fit = assigns.props["fit"] || "contain"
     hint = assigns.props["usageHint"] || "mediumFeature"
     {wrapper_style, extra_class} = image_size_style(hint)
-    assigns = assign(assigns, url: url, fit: fit, wrapper_style: wrapper_style, extra_class: extra_class)
+
+    assigns =
+      assign(assigns, url: url, fit: fit, wrapper_style: wrapper_style, extra_class: extra_class)
 
     ~H"""
     <div
-      class={["a2ui-image-wrapper overflow-hidden bg-zinc-200 dark:bg-zinc-700 shrink-0", @extra_class]}
+      class={[
+        "a2ui-image-wrapper overflow-hidden bg-zinc-200 dark:bg-zinc-700 shrink-0",
+        @extra_class
+      ]}
       style={@wrapper_style}
     >
       <img
@@ -575,7 +592,11 @@ defmodule A2UI.Catalog.Standard do
     url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
 
     description =
-      Binding.resolve(assigns.props["description"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(
+        assigns.props["description"],
+        assigns.surface.data_model,
+        assigns.scope_path
+      )
 
     assigns = assign(assigns, url: url, description: description)
 
@@ -583,8 +604,7 @@ defmodule A2UI.Catalog.Standard do
     <div class="a2ui-audio-player">
       <p :if={@description} class="mb-2 text-sm text-zinc-600 dark:text-zinc-400">{@description}</p>
       <audio controls class="w-full">
-        <source src={@url} />
-        Your browser does not support the audio element.
+        <source src={@url} /> Your browser does not support the audio element.
       </audio>
     </div>
     """
@@ -603,8 +623,7 @@ defmodule A2UI.Catalog.Standard do
 
     ~H"""
     <video controls class="a2ui-video w-full rounded-lg">
-      <source src={@url} />
-      Your browser does not support the video element.
+      <source src={@url} /> Your browser does not support the video element.
     </video>
     """
   end
@@ -620,6 +639,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_slider(assigns) do
     value =
@@ -639,7 +659,7 @@ defmodule A2UI.Catalog.Standard do
     <.form
       for={%{}}
       as={:a2ui_input}
-      phx-change="a2ui:slider"
+      phx-change={!@suppress_events && "a2ui:slider"}
       class="a2ui-slider"
       id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
@@ -653,6 +673,7 @@ defmodule A2UI.Catalog.Standard do
           value={@value}
           min={@min_val}
           max={@max_val}
+          disabled={@suppress_events}
           class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 dark:bg-zinc-700"
         />
         <span class="min-w-[3rem] text-sm text-zinc-600 dark:text-zinc-400">{@value}</span>
@@ -668,6 +689,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_datetime_input(assigns) do
     value =
@@ -688,17 +710,25 @@ defmodule A2UI.Catalog.Standard do
     # Convert ISO 8601 to HTML input format
     html_value = iso8601_to_html_datetime(value, input_type)
 
+    step =
+      case input_type do
+        "time" -> "1"
+        "datetime-local" -> "1"
+        _ -> nil
+      end
+
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
 
-    assigns = assign(assigns, html_value: html_value, input_type: input_type, path: path)
+    assigns =
+      assign(assigns, html_value: html_value, input_type: input_type, path: path, step: step)
 
     ~H"""
     <.form
       for={%{}}
       as={:a2ui_input}
-      phx-change="a2ui:datetime"
+      phx-change={!@suppress_events && "a2ui:datetime"}
       class="a2ui-datetime-input"
       id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
@@ -710,7 +740,9 @@ defmodule A2UI.Catalog.Standard do
         name="a2ui_input[value]"
         id={component_dom_id(@surface.id, @id, @scope_path, "input")}
         value={@html_value}
-        class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+        step={@step}
+        disabled={@suppress_events}
+        class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
       />
     </.form>
     """
@@ -723,6 +755,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_multiple_choice(assigns) do
     raw_selections =
@@ -764,7 +797,7 @@ defmodule A2UI.Catalog.Standard do
     <.form
       for={%{}}
       as={:a2ui_input}
-      phx-change="a2ui:choice"
+      phx-change={!@suppress_events && "a2ui:choice"}
       class="a2ui-multiple-choice"
       id={component_dom_id(@surface.id, @id, @scope_path, "form")}
     >
@@ -776,21 +809,23 @@ defmodule A2UI.Catalog.Standard do
       <input type="hidden" name="a2ui_input[values][]" value="" />
       <div class="space-y-2">
         <%= for option <- @options do %>
-          <%
-            opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path)
-            opt_value = Binding.resolve(option["value"], @surface.data_model, @scope_path)
-            is_selected = opt_value in @selections
-            # Disable if max reached and not already selected
-            is_disabled = @max_reached and not is_selected
-          %>
-          <label class={["flex items-center gap-2", if(is_disabled, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")]}>
+          <% opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path)
+          opt_value = option["value"]
+          is_selected = opt_value in @selections
+          # Disable if max reached and not already selected
+          is_disabled = @suppress_events or (@max_reached and not is_selected) %>
+          <label class={[
+            "flex items-center gap-2",
+            if(is_disabled, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")
+          ]}>
             <%= if @is_single_select do %>
               <input
                 type="radio"
                 name="a2ui_input[values][]"
                 value={opt_value}
                 checked={is_selected}
-                class="size-4 border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                disabled={is_disabled}
+                class="size-4 border-zinc-300"
               />
             <% else %>
               <input
@@ -799,7 +834,7 @@ defmodule A2UI.Catalog.Standard do
                 value={opt_value}
                 checked={is_selected}
                 disabled={is_disabled}
-                class="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
+                class="size-4 rounded border-zinc-300 disabled:opacity-50"
               />
             <% end %>
             <span class="text-sm text-zinc-900 dark:text-zinc-50">{opt_label}</span>
@@ -822,6 +857,7 @@ defmodule A2UI.Catalog.Standard do
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_list(assigns) do
     direction = assigns.props["direction"] || "vertical"
@@ -833,7 +869,13 @@ defmodule A2UI.Catalog.Standard do
       class="a2ui-list"
       style={"display: flex; flex-direction: #{list_flex_direction(@direction)}; gap: 0.5rem; #{list_alignment_style(@alignment)}"}
     >
-      <.render_children props={@props} surface={@surface} scope_path={@scope_path} depth={@depth} />
+      <.render_children
+        props={@props}
+        surface={@surface}
+        scope_path={@scope_path}
+        depth={@depth}
+        suppress_events={@suppress_events}
+      />
     </div>
     """
   end
@@ -847,6 +889,7 @@ defmodule A2UI.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_tabs(assigns) do
     tab_items = assigns.props["tabItems"] || []
@@ -861,35 +904,26 @@ defmodule A2UI.Catalog.Standard do
           <button
             type="button"
             phx-click={
-              Phoenix.LiveView.JS.hide(to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-content")
+              Phoenix.LiveView.JS.hide(
+                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-content"
+              )
               |> Phoenix.LiveView.JS.show(
                 to: "##{component_dom_id(@surface.id, @id, @scope_path, "tab-#{idx}")}"
               )
               |> Phoenix.LiveView.JS.remove_class(
-                "border-indigo-500 text-indigo-600",
+                "a2ui-tab-active",
                 to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-btn"
               )
               |> Phoenix.LiveView.JS.add_class(
-                "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700",
-                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tabs")} .a2ui-tab-btn"
-              )
-              |> Phoenix.LiveView.JS.remove_class(
-                "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700",
-                to: "##{component_dom_id(@surface.id, @id, @scope_path, "tab-btn-#{idx}")}"
-              )
-              |> Phoenix.LiveView.JS.add_class(
-                "border-indigo-500 text-indigo-600",
+                "a2ui-tab-active",
                 to: "##{component_dom_id(@surface.id, @id, @scope_path, "tab-btn-#{idx}")}"
               )
             }
             id={component_dom_id(@surface.id, @id, @scope_path, "tab-btn-#{idx}")}
             class={[
               "a2ui-tab-btn -mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-              if(idx == 0,
-                do: "border-indigo-500 text-indigo-600",
-                else:
-                  "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
-              )
+              "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300",
+              idx == 0 && "a2ui-tab-active"
             ]}
           >
             {title}
@@ -909,6 +943,7 @@ defmodule A2UI.Catalog.Standard do
               surface={@surface}
               scope_path={@scope_path}
               depth={@depth + 1}
+              suppress_events={@suppress_events}
             />
           </div>
         <% end %>
@@ -926,6 +961,7 @@ defmodule A2UI.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
+  attr :suppress_events, :boolean, default: false
 
   def a2ui_modal(assigns) do
     entry_point_child = assigns.props["entryPointChild"]
@@ -965,6 +1001,7 @@ defmodule A2UI.Catalog.Standard do
           surface={@surface}
           scope_path={@scope_path}
           depth={@depth + 1}
+          suppress_events={true}
         />
       </div>
       <%!-- Modal Dialog --%>
@@ -997,6 +1034,7 @@ defmodule A2UI.Catalog.Standard do
               surface={@surface}
               scope_path={@scope_path}
               depth={@depth + 1}
+              suppress_events={@suppress_events}
             />
           </div>
         </div>
@@ -1021,6 +1059,7 @@ defmodule A2UI.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
   attr :apply_weight, :boolean, default: false
+  attr :suppress_events, :boolean, default: false
 
   def render_children(assigns) do
     children_spec = assigns.props["children"]
@@ -1040,12 +1079,16 @@ defmodule A2UI.Catalog.Standard do
         ~H"""
         <%= for {child_id, weight} <- @child_entries do %>
           <%= if is_number(weight) do %>
-            <div class="a2ui-weighted" style={"flex: #{weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}>
+            <div
+              class="a2ui-weighted"
+              style={"flex: #{weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
+            >
               <.render_component
                 id={child_id}
                 surface={@surface}
                 scope_path={@scope_path}
                 depth={@depth + 1}
+                suppress_events={@suppress_events}
               />
             </div>
           <% else %>
@@ -1054,6 +1097,7 @@ defmodule A2UI.Catalog.Standard do
               surface={@surface}
               scope_path={@scope_path}
               depth={@depth + 1}
+              suppress_events={@suppress_events}
             />
           <% end %>
         <% end %>
@@ -1099,6 +1143,7 @@ defmodule A2UI.Catalog.Standard do
                     surface={@surface}
                     scope_path={Binding.append_pointer_segment(@base_path, key)}
                     depth={@depth + 1}
+                    suppress_events={@suppress_events}
                   />
                 </div>
               <% else %>
@@ -1107,6 +1152,7 @@ defmodule A2UI.Catalog.Standard do
                   surface={@surface}
                   scope_path={Binding.append_pointer_segment(@base_path, key)}
                   depth={@depth + 1}
+                  suppress_events={@suppress_events}
                 />
               <% end %>
             <% end %>
@@ -1136,6 +1182,7 @@ defmodule A2UI.Catalog.Standard do
                     surface={@surface}
                     scope_path={Binding.append_pointer_segment(@base_path, Integer.to_string(idx))}
                     depth={@depth + 1}
+                    suppress_events={@suppress_events}
                   />
                 </div>
               <% else %>
@@ -1144,6 +1191,7 @@ defmodule A2UI.Catalog.Standard do
                   surface={@surface}
                   scope_path={Binding.append_pointer_segment(@base_path, Integer.to_string(idx))}
                   depth={@depth + 1}
+                  suppress_events={@suppress_events}
                 />
               <% end %>
             <% end %>
@@ -1224,7 +1272,7 @@ defmodule A2UI.Catalog.Standard do
   end
 
   defp button_classes(false) do
-    "inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 transition hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-50 dark:ring-zinc-800 dark:hover:bg-zinc-800"
+    "a2ui-button-secondary inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 transition hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-50 dark:ring-zinc-800 dark:hover:bg-zinc-800"
   end
 
   defp input_type("number"), do: "number"
@@ -1243,7 +1291,6 @@ defmodule A2UI.Catalog.Standard do
   defp image_size_style("mediumFeature"), do: {"width: 256px; height: 192px;", ""}
   defp image_size_style("largeFeature"), do: {"width: 384px; height: 288px;", ""}
   defp image_size_style("header"), do: {"width: 100%; height: 128px;", ""}
-  defp image_size_style("squareDemo"), do: {"width: 192px; height: 192px;", ""}
   defp image_size_style(_), do: {"width: 256px; height: 192px;", ""}
 
   # List component helpers
@@ -1259,30 +1306,43 @@ defmodule A2UI.Catalog.Standard do
   defp iso8601_to_html_datetime(nil, _type), do: ""
   defp iso8601_to_html_datetime("", _type), do: ""
 
-  defp iso8601_to_html_datetime(iso_string, "datetime-local") when is_binary(iso_string) do
-    # ISO 8601: "2024-01-15T10:30:00Z" → HTML: "2024-01-15T10:30"
-    iso_string
-    |> String.replace(~r/Z$/, "")
-    |> String.replace(~r/[+-]\d{2}:\d{2}$/, "")
-    |> String.slice(0, 16)
-  end
-
   defp iso8601_to_html_datetime(iso_string, "date") when is_binary(iso_string) do
-    # ISO 8601: "2024-01-15T10:30:00Z" → HTML: "2024-01-15"
-    String.slice(iso_string, 0, 10)
+    maybe_date = String.slice(iso_string, 0, 10)
+
+    case Date.from_iso8601(maybe_date) do
+      {:ok, _} -> maybe_date
+      _ -> ""
+    end
   end
 
   defp iso8601_to_html_datetime(iso_string, "time") when is_binary(iso_string) do
-    # ISO 8601: "2024-01-15T10:30:00Z" → HTML: "10:30"
-    case String.split(iso_string, "T") do
-      [_, time_part] ->
-        time_part
-        |> String.replace(~r/Z$/, "")
-        |> String.replace(~r/[+-]\d{2}:\d{2}$/, "")
-        |> String.slice(0, 5)
+    time_part =
+      case String.split(iso_string, "T", parts: 2) do
+        [_, t] -> t
+        _ -> iso_string
+      end
 
-      _ ->
-        ""
+    time_part =
+      time_part
+      |> String.replace(~r/Z$/, "")
+      |> String.replace(~r/[+-]\d{2}:\d{2}$/, "")
+
+    case Regex.run(~r/^(\d{2}):(\d{2})(?::(\d{2}))?/, time_part) do
+      [_, h, m, s] when is_binary(s) -> "#{h}:#{m}:#{s}"
+      [_, h, m] -> "#{h}:#{m}"
+      _ -> ""
+    end
+  end
+
+  defp iso8601_to_html_datetime(iso_string, "datetime-local") when is_binary(iso_string) do
+    naive =
+      iso_string
+      |> String.replace(~r/Z$/, "")
+      |> String.replace(~r/[+-]\d{2}:\d{2}$/, "")
+
+    case Regex.run(~r/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}(?::\d{2})?)/, naive) do
+      [_, date, time] -> "#{date}T#{time}"
+      _ -> ""
     end
   end
 

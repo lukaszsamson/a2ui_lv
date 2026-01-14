@@ -92,7 +92,7 @@ defmodule A2UI.Live do
 
   - `"a2ui:action"` - Button clicks, triggers action callback with resolved context
   - `"a2ui:input"` - TextField changes, updates data model
-  - `"a2ui:toggle"` - Checkbox changes, updates data model
+  - `"a2ui:toggle"` - CheckBox changes, updates data model
 
   ## Example
 
@@ -202,7 +202,9 @@ defmodule A2UI.Live do
     # Parse as number (integer or float)
     value =
       case Integer.parse(value_str) do
-        {int_val, ""} -> int_val
+        {int_val, ""} ->
+          int_val
+
         _ ->
           case Float.parse(value_str) do
             {float_val, _} -> float_val
@@ -269,21 +271,64 @@ defmodule A2UI.Live do
   defp html_datetime_to_iso8601(nil, _type), do: ""
 
   defp html_datetime_to_iso8601(value, "datetime-local") do
-    # HTML: "2024-01-15T10:30" → ISO 8601: "2024-01-15T10:30:00Z"
-    value <> ":00Z"
+    with [date, time_raw] <- String.split(value, "T", parts: 2),
+         {:ok, _} <- Date.from_iso8601(date),
+         {:ok, time} <- normalize_html_time(time_raw) do
+      "#{date}T#{time}Z"
+    else
+      _ -> ""
+    end
   end
 
   defp html_datetime_to_iso8601(value, "date") do
-    # HTML: "2024-01-15" → ISO 8601: "2024-01-15T00:00:00Z"
-    value <> "T00:00:00Z"
+    case Date.from_iso8601(value) do
+      {:ok, _} -> value
+      _ -> ""
+    end
   end
 
   defp html_datetime_to_iso8601(value, "time") do
-    # HTML: "10:30" → ISO 8601: "1970-01-01T10:30:00Z"
-    "1970-01-01T" <> value <> ":00Z"
+    case normalize_html_time(value) do
+      {:ok, time} -> time
+      _ -> ""
+    end
   end
 
   defp html_datetime_to_iso8601(value, _), do: value
+
+  defp normalize_html_time(value) when is_binary(value) do
+    case Regex.run(~r/^(\d{2}):(\d{2})(?::(\d{2}))?/, value) do
+      [_, hh, mm, ss] ->
+        normalize_html_time_parts(hh, mm, ss)
+
+      [_, hh, mm] ->
+        normalize_html_time_parts(hh, mm, "00")
+
+      _ ->
+        {:error, :invalid_time}
+    end
+  end
+
+  defp normalize_html_time(_), do: {:error, :invalid_time}
+
+  defp normalize_html_time_parts(hh, mm, ss) do
+    with {h, ""} <- Integer.parse(hh),
+         {m, ""} <- Integer.parse(mm),
+         {s, ""} <- Integer.parse(ss),
+         true <- h in 0..23,
+         true <- m in 0..59,
+         true <- s in 0..59 do
+      {:ok, "#{pad2(h)}:#{pad2(m)}:#{pad2(s)}"}
+    else
+      _ -> {:error, :invalid_time}
+    end
+  end
+
+  defp pad2(int) when is_integer(int) do
+    int
+    |> Integer.to_string()
+    |> String.pad_leading(2, "0")
+  end
 
   defp parse_max_allowed(""), do: nil
   defp parse_max_allowed(nil), do: nil

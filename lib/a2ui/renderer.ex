@@ -42,13 +42,12 @@ defmodule A2UI.Renderer do
   end
 
   defp surface_style(%{styles: styles}) when is_map(styles) do
+    primary = Map.get(styles, "primaryColor")
+
     []
     |> maybe_put_css_var("--a2ui-font", Map.get(styles, "font"), &valid_font_value?/1)
-    |> maybe_put_css_var(
-      "--a2ui-primary-color",
-      Map.get(styles, "primaryColor"),
-      &valid_hex_color?/1
-    )
+    |> maybe_put_css_var("--a2ui-primary-color", primary, &valid_hex_color?/1)
+    |> maybe_put_css_var("--a2ui-primary-rgb", hex_to_rgb_triplet(primary), &valid_rgb_triplet?/1)
     |> Enum.join(" ")
   end
 
@@ -71,6 +70,26 @@ defmodule A2UI.Renderer do
   end
 
   defp valid_hex_color?(_), do: false
+
+  defp hex_to_rgb_triplet(hex) when is_binary(hex) do
+    if valid_hex_color?(hex) do
+      <<?#, r1, r2, g1, g2, b1, b2>> = hex
+      {r, ""} = Integer.parse(<<r1, r2>>, 16)
+      {g, ""} = Integer.parse(<<g1, g2>>, 16)
+      {b, ""} = Integer.parse(<<b1, b2>>, 16)
+      "#{r} #{g} #{b}"
+    else
+      nil
+    end
+  end
+
+  defp hex_to_rgb_triplet(_), do: nil
+
+  defp valid_rgb_triplet?(value) when is_binary(value) do
+    String.match?(value, ~r/^\d{1,3}\s+\d{1,3}\s+\d{1,3}$/)
+  end
+
+  defp valid_rgb_triplet?(_), do: false
 
   defp valid_font_value?(font) do
     String.match?(font, ~r/^[a-zA-Z0-9 ,"'_-]+$/)

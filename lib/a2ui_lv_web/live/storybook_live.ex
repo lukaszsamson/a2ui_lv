@@ -175,7 +175,8 @@ defmodule A2uiLvWeb.StorybookLive do
         <%!-- Main Content --%>
         <main class="flex-1 p-6">
           <%= if @selected_sample do %>
-            <% {_cat, title, _sid, messages} = Enum.find(@samples, fn {_, _, sid, _} -> sid == @selected_sample end) %>
+            <% {_cat, title, _sid, messages} =
+              Enum.find(@samples, fn {_, _, sid, _} -> sid == @selected_sample end) %>
 
             <div class="mb-6 flex items-center justify-between">
               <h1 class="text-2xl font-semibold text-zinc-950 dark:text-zinc-50">

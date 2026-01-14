@@ -16,7 +16,7 @@ defmodule A2UI.Validator do
 
   # All 18 standard catalog components (v0.8)
   @allowed_types ~w(
-    Column Row Card Text Divider Button TextField Checkbox CheckBox
+    Column Row Card Text Divider Button TextField CheckBox
     Icon Image AudioPlayer Video Slider DateTimeInput MultipleChoice List Tabs Modal
   )
 

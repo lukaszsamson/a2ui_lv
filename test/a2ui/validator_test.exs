@@ -15,7 +15,7 @@ defmodule A2UI.ValidatorTest do
     end
 
     test "accepts all allowed component types" do
-      types = ~w(Column Row Card Text Divider Button TextField Checkbox CheckBox)
+      types = Validator.allowed_types()
 
       components =
         Enum.with_index(types)

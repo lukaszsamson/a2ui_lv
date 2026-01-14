@@ -42,7 +42,7 @@ defmodule A2UI.MockAgent do
       ~s({"id":"name_field","component":{"TextField":{"label":{"literalString":"Name"},"text":{"path":"/form/name"},"textFieldType":"shortText"}}},) <>
       ~s({"id":"email_field","component":{"TextField":{"label":{"literalString":"Email"},"text":{"path":"/form/email"},"textFieldType":"shortText"}}},) <>
       ~s({"id":"message_field","component":{"TextField":{"label":{"literalString":"Message"},"text":{"path":"/form/message"},"textFieldType":"longText"}}},) <>
-      ~s({"id":"subscribe","component":{"Checkbox":{"label":{"literalString":"Subscribe to updates"},"value":{"path":"/form/subscribe"}}}},) <>
+      ~s({"id":"subscribe","component":{"CheckBox":{"label":{"literalString":"Subscribe to updates"},"value":{"path":"/form/subscribe"}}}},) <>
       ~s({"id":"actions","component":{"Row":{"children":{"explicitList":["reset_btn","submit_btn"]},"distribution":"end"}}},) <>
       ~s({"id":"reset_btn","component":{"Button":{"child":"reset_text","primary":false,"action":{"name":"reset_form"}}}},) <>
       ~s({"id":"reset_text","component":{"Text":{"text":{"literalString":"Reset"}}}},) <>

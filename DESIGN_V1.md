@@ -96,10 +96,10 @@ For the PoC, we implement **8 core components** from the [standard catalog](http
 |-----------|---------|----------------|
 | `Button` | Clickable action trigger | `child`, `action`, `primary` |
 | `TextField` | Text input with label | `label`, `text`, `textFieldType` |
-| `Checkbox` | Boolean toggle | `label`, `value` |
+| `CheckBox` | Boolean toggle | `label`, `value` |
 
 Notes:
-- The A2UI component reference uses the type name `Checkbox` (not `CheckBox`). For renderer robustness, accept both spellings and normalize internally.
+- The v0.8 standard catalog type name is `CheckBox` (capital B).
 
 This subset enables building meaningful forms, layouts, and interactive flows.
 
@@ -173,7 +173,7 @@ In v0.8 docs, scoped bindings inside templates still appear as JSON Pointer stri
 
 From the documentation: "Interactive components update the data model bidirectionally":
 - **TextField**: User types → updates bound path in data model
-- **Checkbox**: User toggles → updates bound boolean path
+- **CheckBox**: User toggles → updates bound boolean path
 - Updates happen locally in the **renderer’s data model** (the “client-side” model in A2UI terms)
 - In this PoC, the renderer lives in the LiveView process, so input events still travel over the LiveView socket; the key constraint is: **no agent round-trip is required** until an explicit action (`userAction`)
 
@@ -855,7 +855,7 @@ defmodule A2UI.Catalog.Standard do
             <.a2ui_button props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
           <% "TextField" -> %>
             <.a2ui_text_field props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
-          <% "Checkbox" -> %>
+          <% "CheckBox" -> %>
             <.a2ui_checkbox props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
           <% "CheckBox" -> %>
             <.a2ui_checkbox props={@component.props} surface={@surface} scope_path={@scope_path} id={@id} />
@@ -1564,7 +1564,7 @@ defmodule A2UI.MockAgent do
       {"id":"name_field","component":{"TextField":{"label":{"literalString":"Name"},"text":{"path":"/form/name"},"textFieldType":"shortText"}}},
       {"id":"email_field","component":{"TextField":{"label":{"literalString":"Email"},"text":{"path":"/form/email"},"textFieldType":"shortText"}}},
       {"id":"message_field","component":{"TextField":{"label":{"literalString":"Message"},"text":{"path":"/form/message"},"textFieldType":"longText"}}},
-      {"id":"subscribe","component":{"Checkbox":{"label":{"literalString":"Subscribe to updates"},"value":{"path":"/form/subscribe"}}}},
+      {"id":"subscribe","component":{"CheckBox":{"label":{"literalString":"Subscribe to updates"},"value":{"path":"/form/subscribe"}}}},
       {"id":"actions","component":{"Row":{"children":{"explicitList":["reset_btn","submit_btn"]},"distribution":"end"}}},
       {"id":"reset_btn","component":{"Button":{"child":"reset_text","primary":false,"action":{"name":"reset_form"}}}},
       {"id":"reset_text","component":{"Text":{"text":{"literalString":"Reset"}}}},
@@ -1639,7 +1639,7 @@ test/
 ### Phase 2: Component Catalog
 1. Layout components (Column, Row, Card)
 2. Display components (Text, Divider)
-3. Interactive components (Button, TextField, Checkbox)
+3. Interactive components (Button, TextField, CheckBox)
 4. Children rendering (explicitList, template)
 
 ### Phase 3: LiveView Integration
@@ -1704,7 +1704,7 @@ Target v0.8 for PoC but structure code to support v0.9:
 defmodule A2UI.Validator do
   @max_components 1000
   @max_depth 30
-  @allowed_types ~w(Column Row Card Text Divider Button TextField Checkbox CheckBox)
+  @allowed_types ~w(Column Row Card Text Divider Button TextField CheckBox)
 
   def validate_surface_update(%{components: components}) do
     with :ok <- validate_count(components),

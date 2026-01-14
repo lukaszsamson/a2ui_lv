@@ -173,7 +173,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
       send(view.pid, {:a2ui, ~s({"beginRendering":{"surfaceId":"weighted","root":"root"}})})
 
       html = render(view)
-      assert html =~ "flex-grow: 2"
+      assert html =~ "flex: 2 1 0%"
     end
   end
 

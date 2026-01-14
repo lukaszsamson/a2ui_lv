@@ -23,6 +23,7 @@
 /* A2UI */
 .a2ui-surface {
   font-family: var(--a2ui-font, ui-sans-serif, system-ui, sans-serif);
+  --a2ui-primary-rgb: 79 70 229;
 }
 
 .a2ui-button-primary {
@@ -40,4 +41,30 @@
 .a2ui-button-primary:focus-visible {
   outline: 2px solid var(--a2ui-primary-color, #4f46e5);
   outline-offset: 2px;
+}
+
+.a2ui-button-secondary:focus-visible {
+  outline: 2px solid var(--a2ui-primary-color, #4f46e5);
+  outline-offset: 2px;
+}
+
+.a2ui-surface :is(input, textarea, select):focus {
+  border-color: var(--a2ui-primary-color, #4f46e5) !important;
+  --tw-ring-color: rgba(var(--a2ui-primary-rgb, 79 70 229), 0.2) !important;
+}
+
+.a2ui-surface :is(input, textarea, select):focus-visible {
+  border-color: var(--a2ui-primary-color, #4f46e5) !important;
+  --tw-ring-color: rgba(var(--a2ui-primary-rgb, 79 70 229), 0.2) !important;
+}
+
+.a2ui-surface input[type="checkbox"],
+.a2ui-surface input[type="radio"],
+.a2ui-surface input[type="range"] {
+  accent-color: var(--a2ui-primary-color, #4f46e5);
+}
+
+.a2ui-surface .a2ui-tab-active {
+  border-bottom-color: var(--a2ui-primary-color, #4f46e5) !important;
+  color: var(--a2ui-primary-color, #4f46e5) !important;
 }

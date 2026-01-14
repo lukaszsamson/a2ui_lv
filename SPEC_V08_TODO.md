@@ -38,7 +38,7 @@ The v0.8 standard catalog defines **18** component types. **All 18 are now imple
 **Interactive Components:**
 - ✅ `Button`
 - ✅ `TextField` (with `validationRegexp` support)
-- ✅ `CheckBox` (PoC also accepts non-spec alias `Checkbox`)
+- ✅ `CheckBox`
 - ✅ `Slider` (value, minValue, maxValue)
 - ✅ `DateTimeInput` (value, enableDate, enableTime)
 - ✅ `MultipleChoice` (selections, options, maxAllowedSelections)
@@ -49,7 +49,7 @@ The v0.8 standard catalog defines **18** component types. **All 18 are now imple
 
 ### Remaining gaps in implemented components
 
-- `Row`/`Column` template expansion currently assumes the bound collection is a **list**; the standard catalog defines template `dataBinding` as a path to a **map** ("values in the map define the list of children"). This is a spec-level mismatch that blocks full conformance for dynamic lists (§4).
+- `Row`/`Column` template expansion supports the v0.8 **map** semantics; it also includes a non-spec **list fallback** for robustness when agents send arrays.
 
 ---
 
@@ -268,5 +268,17 @@ Missing tests for full v0.8 conformance:
 | Server→client message envelopes | 4/4 parsed/handled (`surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`) |
 | Client→server envelopes | `userAction` constructed but not transported; `error` not implemented |
 | Catalog negotiation | catalogId parsed only; no negotiation/selection/validation |
-| Styles | parsed only; not stored/applied |
+| Styles | stored + applied via CSS vars (`--a2ui-font`, `--a2ui-primary-color`, `--a2ui-primary-rgb`) |
 | Key conformance blockers | ~~weight~~, ~~root replace~~, ~~template maps~~, ~~valueArray~~ — **All P0 resolved** |
+
+
+
+Component todo:
+  Top issues / mismatches vs the v0.8 standard catalog (and/or expected behavior)
+
+  - DateTimeInput timezone semantics are still a design choice: `datetime-local` inputs are stored as `...Z` (treated as UTC) for stable round-tripping; this does not convert offsets/timezones.
+
+  Guideline notes (not spec, but project rules)
+
+  - Slider, DateTimeInput, and MultipleChoice use raw <input>s instead of <.input> (lib/a2ui/catalog/standard.ex:648, lib/a2ui/catalog/standard.ex:708, lib/a2ui/catalog/standard.ex:788). If you want, I can
+    refactor those to <.input> while keeping the UX.
