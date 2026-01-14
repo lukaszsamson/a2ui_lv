@@ -269,12 +269,17 @@ defmodule A2UI.Catalog.Standard do
   def a2ui_column(assigns) do
     distribution = assigns.props["distribution"] || "start"
     alignment = assigns.props["alignment"] || "stretch"
-    assigns = assign(assigns, distribution: distribution, alignment: alignment)
+    min_height = assigns.props["minHeight"]
+
+    min_height_style = if min_height, do: "min-height: #{min_height};", else: ""
+
+    assigns =
+      assign(assigns, distribution: distribution, alignment: alignment, min_height_style: min_height_style)
 
     ~H"""
     <div
       class="a2ui-column"
-      style={"display: flex; flex-direction: column; gap: 0.5rem; #{flex_style(@distribution, @alignment)}"}
+      style={"display: flex; flex-direction: column; gap: 0.5rem; width: 100%; #{flex_style(@distribution, @alignment)} #{@min_height_style}"}
     >
       <.render_children
         props={@props}
@@ -300,7 +305,7 @@ defmodule A2UI.Catalog.Standard do
     ~H"""
     <div
       class="a2ui-row"
-      style={"display: flex; flex-direction: row; gap: 0.5rem; #{flex_style(@distribution, @alignment)}"}
+      style={"display: flex; flex-direction: row; gap: 0.5rem; width: 100%; #{flex_style(@distribution, @alignment)}"}
     >
       <.render_children
         props={@props}
@@ -321,7 +326,7 @@ defmodule A2UI.Catalog.Standard do
 
   def a2ui_card(assigns) do
     ~H"""
-    <div class="a2ui-card rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div class="a2ui-card flex h-full w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
       <.render_component
         :if={@props["child"]}
         id={@props["child"]}
@@ -358,7 +363,7 @@ defmodule A2UI.Catalog.Standard do
     assigns = assign(assigns, axis: axis)
 
     ~H"""
-    <div class={divider_classes(@axis)} />
+    <div style={divider_style(@axis)} />
     """
   end
 
@@ -381,15 +386,16 @@ defmodule A2UI.Catalog.Standard do
 
   def a2ui_button(assigns) do
     primary = assigns.props["primary"] || false
-    assigns = assign(assigns, primary: primary)
+    has_action = assigns.props["action"] != nil
+    assigns = assign(assigns, primary: primary, has_action: has_action)
 
     ~H"""
     <button
       class={button_classes(@primary)}
-      phx-click="a2ui:action"
-      phx-value-surface-id={@surface.id}
-      phx-value-component-id={@id}
-      phx-value-scope-path={@scope_path || ""}
+      phx-click={@has_action && "a2ui:action"}
+      phx-value-surface-id={@has_action && @surface.id}
+      phx-value-component-id={@has_action && @id}
+      phx-value-scope-path={@has_action && (@scope_path || "")}
     >
       <.render_component
         :if={@props["child"]}
@@ -540,15 +546,21 @@ defmodule A2UI.Catalog.Standard do
     url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
     fit = assigns.props["fit"] || "contain"
     hint = assigns.props["usageHint"] || "mediumFeature"
-    assigns = assign(assigns, url: url, fit: fit, hint: hint)
+    {wrapper_style, extra_class} = image_size_style(hint)
+    assigns = assign(assigns, url: url, fit: fit, wrapper_style: wrapper_style, extra_class: extra_class)
 
     ~H"""
-    <img
-      src={@url}
-      class={["a2ui-image", image_classes(@hint)]}
-      style={"object-fit: #{@fit};"}
-      loading="lazy"
-    />
+    <div
+      class={["a2ui-image-wrapper overflow-hidden bg-zinc-200 dark:bg-zinc-700 shrink-0", @extra_class]}
+      style={@wrapper_style}
+    >
+      <img
+        src={@url}
+        class="a2ui-image"
+        style={"width: 100%; height: 100%; object-fit: #{@fit};"}
+        loading="lazy"
+      />
+    </div>
     """
   end
 
@@ -713,9 +725,16 @@ defmodule A2UI.Catalog.Standard do
   attr :id, :string, required: true
 
   def a2ui_multiple_choice(assigns) do
+    raw_selections =
+      Binding.resolve(assigns.props["selections"], assigns.surface.data_model, assigns.scope_path)
+
+    # Ensure selections is a list (it might come as a map or nil)
     selections =
-      Binding.resolve(assigns.props["selections"], assigns.surface.data_model, assigns.scope_path) ||
-        []
+      cond do
+        is_list(raw_selections) -> raw_selections
+        is_map(raw_selections) -> Map.values(raw_selections)
+        true -> []
+      end
 
     options = assigns.props["options"] || []
     max_allowed = assigns.props["maxAllowedSelections"]
@@ -727,13 +746,18 @@ defmodule A2UI.Catalog.Standard do
     # Determine if this should be radio (single select) or checkbox (multi select)
     is_single_select = max_allowed == 1
 
+    # Check if max selections reached (for disabling unchecked boxes)
+    current_count = length(selections)
+    max_reached = is_integer(max_allowed) and max_allowed > 1 and current_count >= max_allowed
+
     assigns =
       assign(assigns,
         selections: selections,
         options: options,
         max_allowed: max_allowed,
         path: path,
-        is_single_select: is_single_select
+        is_single_select: is_single_select,
+        max_reached: max_reached
       )
 
     ~H"""
@@ -756,8 +780,10 @@ defmodule A2UI.Catalog.Standard do
             opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path)
             opt_value = Binding.resolve(option["value"], @surface.data_model, @scope_path)
             is_selected = opt_value in @selections
+            # Disable if max reached and not already selected
+            is_disabled = @max_reached and not is_selected
           %>
-          <label class="flex cursor-pointer items-center gap-2">
+          <label class={["flex items-center gap-2", if(is_disabled, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")]}>
             <%= if @is_single_select do %>
               <input
                 type="radio"
@@ -772,7 +798,8 @@ defmodule A2UI.Catalog.Standard do
                 name="a2ui_input[values][]"
                 value={opt_value}
                 checked={is_selected}
-                class="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500"
+                disabled={is_disabled}
+                class="size-4 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50"
               />
             <% end %>
             <span class="text-sm text-zinc-900 dark:text-zinc-50">{opt_label}</span>
@@ -903,20 +930,35 @@ defmodule A2UI.Catalog.Standard do
   def a2ui_modal(assigns) do
     entry_point_child = assigns.props["entryPointChild"]
     content_child = assigns.props["contentChild"]
-    assigns = assign(assigns, entry_point_child: entry_point_child, content_child: content_child)
+    dialog_id = component_dom_id(assigns.surface.id, assigns.id, assigns.scope_path, "dialog")
+
+    # Build the JS commands for opening/closing the modal
+    open_js =
+      Phoenix.LiveView.JS.show(
+        to: "##{dialog_id}",
+        transition: {"ease-out duration-200", "opacity-0", "opacity-100"}
+      )
+      |> Phoenix.LiveView.JS.focus(to: "##{dialog_id}")
+
+    close_js =
+      Phoenix.LiveView.JS.hide(
+        to: "##{dialog_id}",
+        transition: {"ease-in duration-150", "opacity-100", "opacity-0"}
+      )
+
+    assigns =
+      assign(assigns,
+        entry_point_child: entry_point_child,
+        content_child: content_child,
+        dialog_id: dialog_id,
+        open_js: open_js,
+        close_js: close_js
+      )
 
     ~H"""
     <div class="a2ui-modal">
       <%!-- Entry Point (trigger) --%>
-      <div
-        phx-click={
-          Phoenix.LiveView.JS.show(
-            to: "##{component_dom_id(@surface.id, @id, @scope_path, "dialog")}",
-            transition: {"ease-out duration-200", "opacity-0", "opacity-100"}
-          )
-        }
-        class="cursor-pointer"
-      >
+      <div phx-click={@open_js} class="cursor-pointer">
         <.render_component
           :if={@entry_point_child}
           id={@entry_point_child}
@@ -927,22 +969,16 @@ defmodule A2UI.Catalog.Standard do
       </div>
       <%!-- Modal Dialog --%>
       <div
-        id={component_dom_id(@surface.id, @id, @scope_path, "dialog")}
-        class="fixed inset-0 z-50 hidden overflow-y-auto"
+        id={@dialog_id}
+        class="fixed inset-0 z-50 hidden overflow-y-auto outline-none"
         role="dialog"
         aria-modal="true"
+        tabindex="-1"
+        phx-window-keydown={@close_js}
+        phx-key="Escape"
       >
         <%!-- Backdrop --%>
-        <div
-          class="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm"
-          phx-click={
-            Phoenix.LiveView.JS.hide(
-              to: "##{component_dom_id(@surface.id, @id, @scope_path, "dialog")}",
-              transition: {"ease-in duration-150", "opacity-100", "opacity-0"}
-            )
-          }
-        >
-        </div>
+        <div class="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm" phx-click={@close_js} />
         <%!-- Content Container --%>
         <div class="flex min-h-full items-center justify-center p-4">
           <div class="relative w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900">
@@ -950,12 +986,7 @@ defmodule A2UI.Catalog.Standard do
             <button
               type="button"
               class="absolute right-4 top-4 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-              phx-click={
-                Phoenix.LiveView.JS.hide(
-                  to: "##{component_dom_id(@surface.id, @id, @scope_path, "dialog")}",
-                  transition: {"ease-in duration-150", "opacity-100", "opacity-0"}
-                )
-              }
+              phx-click={@close_js}
             >
               <.icon name="hero-x-mark" class="size-5" />
             </button>
@@ -1009,7 +1040,7 @@ defmodule A2UI.Catalog.Standard do
         ~H"""
         <%= for {child_id, weight} <- @child_entries do %>
           <%= if is_number(weight) do %>
-            <div class="a2ui-weighted" style={"flex-grow: #{weight}; flex-shrink: 1; min-width: 0;"}>
+            <div class="a2ui-weighted" style={"flex: #{weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}>
               <.render_component
                 id={child_id}
                 surface={@surface}
@@ -1061,7 +1092,7 @@ defmodule A2UI.Catalog.Standard do
               <%= if is_number(@template_weight) do %>
                 <div
                   class="a2ui-weighted"
-                  style={"flex-grow: #{@template_weight}; flex-shrink: 1; min-width: 0;"}
+                  style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
                 >
                   <.render_component
                     id={@template_id}
@@ -1098,7 +1129,7 @@ defmodule A2UI.Catalog.Standard do
               <%= if is_number(@template_weight) do %>
                 <div
                   class="a2ui-weighted"
-                  style={"flex-grow: #{@template_weight}; flex-shrink: 1; min-width: 0;"}
+                  style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
                 >
                   <.render_component
                     id={@template_id}
@@ -1182,8 +1213,11 @@ defmodule A2UI.Catalog.Standard do
     end
   end
 
-  defp divider_classes("vertical"), do: "h-full w-px bg-zinc-200 dark:bg-zinc-800"
-  defp divider_classes(_), do: "h-px w-full bg-zinc-200 dark:bg-zinc-800"
+  defp divider_style("vertical"),
+    do: "height: 100%; min-height: 2rem; width: 2px; background-color: #a1a1aa;"
+
+  defp divider_style(_),
+    do: "height: 2px; width: 100%; background-color: #a1a1aa; margin: 0.75rem 0;"
 
   defp button_classes(true) do
     "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition"
@@ -1200,13 +1234,17 @@ defmodule A2UI.Catalog.Standard do
   defp input_type(_), do: "text"
 
   # Image sizing classes based on usageHint
-  defp image_classes("icon"), do: "size-6"
-  defp image_classes("avatar"), do: "size-10 rounded-full"
-  defp image_classes("smallFeature"), do: "h-24 w-auto"
-  defp image_classes("mediumFeature"), do: "h-48 w-auto"
-  defp image_classes("largeFeature"), do: "h-72 w-auto"
-  defp image_classes("header"), do: "h-32 w-full"
-  defp image_classes(_), do: "h-48 w-auto"
+  # Using fixed width AND height so object-fit differences are visible
+  # Returns {inline_style, extra_classes} for image wrapper sizing
+  # Using inline styles to prevent flex containers from overriding dimensions
+  defp image_size_style("icon"), do: {"width: 24px; height: 24px;", ""}
+  defp image_size_style("avatar"), do: {"width: 40px; height: 40px;", "rounded-full"}
+  defp image_size_style("smallFeature"), do: {"width: 128px; height: 96px;", ""}
+  defp image_size_style("mediumFeature"), do: {"width: 256px; height: 192px;", ""}
+  defp image_size_style("largeFeature"), do: {"width: 384px; height: 288px;", ""}
+  defp image_size_style("header"), do: {"width: 100%; height: 128px;", ""}
+  defp image_size_style("squareDemo"), do: {"width: 192px; height: 192px;", ""}
+  defp image_size_style(_), do: {"width: 256px; height: 192px;", ""}
 
   # List component helpers
   defp list_flex_direction("horizontal"), do: "row"

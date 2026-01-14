@@ -19,6 +19,7 @@ defmodule A2uiLvWeb.Router do
 
     get "/", PageController, :home
     live "/demo", DemoLive
+    live "/storybook", StorybookLive
   end
 
   # Other scopes may use custom stacks.

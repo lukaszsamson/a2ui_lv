@@ -183,9 +183,10 @@ defmodule A2UI.Surface do
 
   defp decode_entry(_), do: {:error, :invalid_entry}
 
+  # Recursive valueMap decoding to support nested structures
   defp decode_value_map(entries) when is_list(entries) do
     Enum.reduce(entries, %{}, fn entry, acc ->
-      case decode_entry_shallow(entry) do
+      case decode_nested_entry(entry) do
         {:ok, {key, value}} -> Map.put(acc, key, value)
         {:error, _reason} -> acc
       end
@@ -194,9 +195,10 @@ defmodule A2UI.Surface do
 
   defp decode_value_map(_), do: %{}
 
-  defp decode_entry_shallow(%{"key" => key} = entry) when is_binary(key) do
+  # Recursive entry decoder that supports nested valueMap
+  defp decode_nested_entry(%{"key" => key} = entry) when is_binary(key) do
     value_keys =
-      ["valueString", "valueNumber", "valueBoolean"]
+      ["valueString", "valueNumber", "valueBoolean", "valueMap"]
       |> Enum.filter(&Map.has_key?(entry, &1))
 
     case value_keys do
@@ -227,6 +229,10 @@ defmodule A2UI.Surface do
           {:error, {:invalid_value, key}}
         end
 
+      ["valueMap"] ->
+        # Recursive call to decode nested maps
+        {:ok, {key, decode_value_map(entry["valueMap"])}}
+
       [] ->
         {:error, {:missing_value, key}}
 
@@ -235,5 +241,5 @@ defmodule A2UI.Surface do
     end
   end
 
-  defp decode_entry_shallow(_), do: {:error, :invalid_entry}
+  defp decode_nested_entry(_), do: {:error, :invalid_entry}
 end
