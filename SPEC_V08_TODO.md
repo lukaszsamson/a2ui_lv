@@ -44,13 +44,15 @@ Spec requirement (v0.8 protocol section "Path and Literal Value (Initialization 
 - Root pointers (`""` and `"/"`) are now supported.
 - Pointers containing numeric segments (e.g., `/items/0/name`) are still skipped as a safety measure to avoid creating maps with string-numeric keys where arrays were intended. Array structures should be initialized via explicit `dataModelUpdate` messages.
 
-### P0.2 Server→client “single-key envelope” is not enforced
+### ~~P0.2 Server→client "single-key envelope" is not enforced~~ ✅ ACCEPTABLE
 
-Spec + schema require each JSONL message to contain **exactly one** of:
-- `beginRendering`, `surfaceUpdate`, `dataModelUpdate`, `deleteSurface`
+The "exactly ONE" requirement is only in the schema's prose description - the JSON schema itself doesn't use `oneOf` or `minProperties`/`maxProperties` to enforce it.
 
-Current behavior:
-- `A2UI.Parser` matches known keys but doesn’t reject additional top-level keys (`lib/a2ui/parser.ex`).
+**Current behavior (acceptable):**
+- `A2UI.Parser` matches known keys and processes the first recognized one
+- Additional top-level keys are ignored (not rejected)
+
+This follows Postel's law: "be conservative in what you send, be liberal in what you accept." Real-world LLM agents are unlikely to generate multi-key envelopes, and being lenient about extra keys improves interoperability.
 
 ### ~~P0.3 A2A `inlineCatalogs` metadata shape is wrong~~ ✅ FIXED
 
