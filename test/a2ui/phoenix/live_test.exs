@@ -1,4 +1,4 @@
-defmodule A2UI.LiveErrorTest do
+defmodule A2UI.Phoenix.LiveTest do
   use A2uiLvWeb.ConnCase, async: true
   import Phoenix.LiveViewTest
 

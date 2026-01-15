@@ -11,6 +11,11 @@ defmodule A2uiLv.Application do
       A2uiLvWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:a2ui_lv, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: A2uiLv.PubSub},
+      # A2UI Catalog Registry - must start before web endpoints
+      {A2UI.Catalog.Registry,
+       catalogs: %{
+         A2UI.V0_8.standard_catalog_id() => A2UI.Phoenix.Catalog.Standard
+       }},
       # Claude Agent SDK bridge client (ZMQ DEALER)
       A2uiLv.Demo.ClaudeClient,
       # Start to serve requests, typically the last entry

@@ -5,15 +5,28 @@ defmodule A2UI.Phoenix.Renderer do
   Per Renderer Development Guide:
   - Buffer updates without immediate rendering
   - beginRendering signals explicit render initiation
+
+  ## Catalog Selection
+
+  The renderer uses `A2UI.Catalog.Registry` to look up the appropriate catalog
+  module based on `surface.catalog_id`. If no catalog is registered for the
+  surface's catalog ID, it falls back to `A2UI.Phoenix.Catalog.Standard`.
+
+  To register custom catalogs:
+
+      A2UI.Catalog.Registry.register("https://example.com/my-catalog.json", MyApp.Catalog)
   """
 
   use Phoenix.Component
+  alias A2UI.Catalog.Registry
   alias A2UI.Phoenix.Catalog.Standard
 
   @doc """
   Renders an A2UI surface.
 
   Shows a loading state when the surface is not yet ready (before beginRendering).
+  Uses the catalog module registered for `surface.catalog_id`, falling back to
+  the standard catalog if not found.
   """
   attr :surface, :map, required: true
 
@@ -26,12 +39,7 @@ defmodule A2UI.Phoenix.Renderer do
       style={surface_style(@surface)}
     >
       <%= if @surface.ready? do %>
-        <%!-- TODO(v0.8): implement clientUiCapabilities + catalog negotiation and select a catalog based on @surface.catalog_id. --%>
-        <Standard.render_component
-          id={@surface.root_id}
-          surface={@surface}
-          depth={0}
-        />
+        <.render_with_catalog surface={@surface} />
       <% else %>
         <div class="a2ui-loading flex items-center justify-center gap-3 p-8 text-sm text-zinc-600 dark:text-zinc-300">
           <div class="size-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-700 dark:border-zinc-700 dark:border-t-zinc-200" />
@@ -40,6 +48,33 @@ defmodule A2UI.Phoenix.Renderer do
       <% end %>
     </div>
     """
+  end
+
+  # Looks up the catalog module and renders the root component
+  defp render_with_catalog(assigns) do
+    catalog_id = assigns.surface.catalog_id
+    catalog_module = Registry.lookup(catalog_id, Standard)
+    assigns = assign(assigns, :catalog_module, catalog_module)
+
+    ~H"""
+    <.dynamic_catalog_render
+      module={@catalog_module}
+      id={@surface.root_id}
+      surface={@surface}
+      depth={0}
+    />
+    """
+  end
+
+  # Dynamic dispatch to catalog module's render_component/1
+  attr :module, :atom, required: true
+  attr :id, :string, required: true
+  attr :surface, :map, required: true
+  attr :depth, :integer, required: true
+
+  defp dynamic_catalog_render(assigns) do
+    # Use apply/3 for dynamic module dispatch
+    assigns.module.render_component(assigns)
   end
 
   defp surface_style(%{styles: styles}) when is_map(styles) do
