@@ -1,289 +1,188 @@
 # A2UI v0.8 Spec Conformance TODO
 
-This document tracks what is still missing, stubbed, or non-conformant in the current Phoenix LiveView A2UI renderer PoC for full **A2UI protocol v0.8** conformance.
+Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.8** based on the local docs and schemas shipped in this repo.
 
 **Primary sources (v0.8):**
-- Spec & docs: https://a2ui.org/specification/v0.8-a2ui/ and https://a2ui.org/reference/messages/
-- Renderer guide: https://a2ui.org/guides/renderer-development/
-- Standard catalog definition (authoritative component list + props): https://raw.githubusercontent.com/google/A2UI/main/specification/v0_8/json/standard_catalog_definition.json
-- Wire schemas:
-  - Server→client: https://raw.githubusercontent.com/google/A2UI/main/specification/v0_8/json/server_to_client.json
-  - Client→server: https://raw.githubusercontent.com/google/A2UI/main/specification/v0_8/json/client_to_server.json
-- A2A extension: https://a2ui.org/specification/v0.8-a2a-extension/
+- Protocol spec: `docs/A2UI/specification/v0_8/docs/a2ui_protocol.md`
+- A2A extension: `docs/A2UI/specification/v0_8/docs/a2ui_extension_specification.md`
+- Renderer guide: `docs/A2UI/docs/guides/renderer-development.md`
+- References: `docs/A2UI/docs/reference/messages.md`, `docs/A2UI/docs/reference/components.md`
+- Wire schemas: `docs/A2UI/specification/v0_8/json/server_to_client.json`, `docs/A2UI/specification/v0_8/json/client_to_server.json`
+- Standard catalog: `docs/A2UI/specification/v0_8/json/standard_catalog_definition.json`
 
 ---
 
-## 1. Standard Catalog Components (18 total)
+## Implementation snapshot (today)
 
-The v0.8 standard catalog defines **18** component types. **All 18 are now implemented.**
+**Renderer library:**
+- Session/state machine: `A2UI.Session`, `A2UI.Surface` (`lib/a2ui/session.ex`, `lib/a2ui/surface.ex`)
+- JSONL parsing: `A2UI.Parser` (`lib/a2ui/parser.ex`)
+- Binding: `A2UI.Binding` (`lib/a2ui/binding.ex`)
+- Phoenix adapter: `A2UI.Phoenix.Live`, `A2UI.Phoenix.Renderer` (`lib/a2ui/phoenix/*`)
+- Standard Phoenix catalog: `A2UI.Phoenix.Catalog.Standard` (all 18 v0.8 components) (`lib/a2ui/phoenix/catalog/standard.ex`)
+- Catalog registry: `A2UI.Catalog.Registry` (`lib/a2ui/catalog/registry.ex`)
+- Transport abstraction: `A2UI.Transport.UIStream`, `A2UI.Transport.Events` + in-process `A2UI.Transport.Local` (`lib/a2ui/transport/*`)
 
-### Implemented (18/18)
-
-**Layout Components:**
-- ✅ `Column` (partial; template semantics mismatch, see §4)
-- ✅ `Row` (partial; template semantics mismatch, see §4)
-- ✅ `Card`
-- ✅ `List` (direction, alignment)
-
-**Display Components:**
-- ✅ `Text`
-- ✅ `Divider`
-- ✅ `Icon` (mapped to Heroicons)
-- ✅ `Image` (fit, usageHint)
-
-**Media Components:**
-- ✅ `AudioPlayer` (url, description)
-- ✅ `Video` (url)
-
-**Interactive Components:**
-- ✅ `Button`
-- ✅ `TextField` (with `validationRegexp` support)
-- ✅ `CheckBox`
-- ✅ `Slider` (value, minValue, maxValue)
-- ✅ `DateTimeInput` (value, enableDate, enableTime)
-- ✅ `MultipleChoice` (selections, options, maxAllowedSelections)
-
-**Container Components:**
-- ✅ `Tabs` (tabItems with JS-based switching)
-- ✅ `Modal` (entryPointChild, contentChild with JS-based show/hide)
-
-### Remaining gaps in implemented components
-
-- `Row`/`Column` template expansion supports the v0.8 **map** semantics; it also includes a non-spec **list fallback** for robustness when agents send arrays.
+**What’s already covered well:**
+- ✅ 4/4 server→client envelopes: `surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`
+- ✅ progressive render gating: UI renders only after `beginRendering`
+- ✅ v0.8 `weight` application for Row/Column descendants
+- ✅ `beginRendering.styles` stored + applied as CSS vars (standard catalog `font`, `primaryColor`)
+- ✅ template expansion supports both map and list collections, with scoped JSON Pointer strings for bound values/events
 
 ---
 
-## 2. Server→Client Wire Schema Conformance Gaps
+## P0 — Spec violations / incorrect behavior
 
-### 2.1 `surfaceUpdate.components[].weight` ✅ IMPLEMENTED
+### P0.1 BoundValue “path + literal*” initialization shorthand is not spec-compliant
 
-The server→client schema includes optional `weight` alongside `id` and `component`:
-- It corresponds to CSS `flex-grow`.
-- It may only be set when the component is a direct descendant of a `Row` or `Column`.
+Spec requirement (v0.8 protocol section “Path and Literal Value (Initialization Shorthand)”):
+- Client MUST update the data model at `path` with the `literal*` value, then bind to that path.
 
-**Current state:** ✅ The Component struct stores `weight`, and `render_children` applies `flex-grow` via wrapper divs when `apply_weight=true` (used by Row/Column).
+Current behavior:
+- `A2UI.Initializers` only initializes when the current value at the pointer is `nil` and additionally skips:
+  - root pointers (`""` and `"/"`)
+  - pointers containing numeric segments
 
-### 2.2 `dataModelUpdate.path` root semantics ✅ IMPLEMENTED
+Notes:
+- This is a deliberate safety/convenience choice, but it is not what the spec text says.
+- Fix requires a versioned “initializer” semantics decision (always overwrite vs only-if-missing) and deterministic array creation when the path contains numeric segments.
 
-The server→client schema says:
-- If `path` is omitted **or** set to `/`, **the entire data model will be replaced**.
+### P0.2 Server→client “single-key envelope” is not enforced
 
-**Current state:** ✅ `Surface.apply_data_update/3` now replaces the entire data model when path is `nil` or `/`.
+Spec + schema require each JSONL message to contain **exactly one** of:
+- `beginRendering`, `surfaceUpdate`, `dataModelUpdate`, `deleteSurface`
 
-### 2.3 `dataModelUpdate.contents` value types ✅ IMPLEMENTED
+Current behavior:
+- `A2UI.Parser` matches known keys but doesn’t reject additional top-level keys (`lib/a2ui/parser.ex`).
 
-The server→client schema allows only:
-- `valueString`, `valueNumber`, `valueBoolean`, `valueMap`
+### P0.3 A2A `inlineCatalogs` metadata shape is wrong
 
-**Notably, the schema does not include `valueArray`.**
+Spec requirement (v0.8 protocol + A2A extension):
+- `metadata.a2uiClientCapabilities.inlineCatalogs` is an **array** of catalog definition documents.
 
-**Current state:** ✅ Strict v0.8 decoding in `Surface.decode_entry/1` only accepts the four allowed value types. Non-schema extensions like `valueArray` are rejected with `{:error, :ambiguous_value}` or ignored.
-
-### 2.4 `beginRendering.catalogId` default and catalog selection (missing)
-
-The schema indicates the client MUST default to a standard catalog if `catalogId` is omitted, but different v0.8 docs/schemas disagree on the exact identifier string (see §7.1).
-
-**Current state:**
-- `catalogId` is parsed/stored, but component dispatch is always hardcoded to the PoC’s standard catalog implementation.
-- No validation that the chosen `catalogId` is supported.
-- No inline catalog support.
-
-### 2.5 `beginRendering.styles` ✅ IMPLEMENTED
-
-The standard catalog defines global styles:
-- `font` (string)
-- `primaryColor` (hex color `^#[0-9a-fA-F]{6}$`)
-
-**Current state:** ✅ `styles` is stored in `Surface.styles` and applied by `Renderer.surface_style/1` as CSS custom properties (`--a2ui-font`, `--a2ui-primary-color`) with validation.
+Current behavior:
+- `A2UI.ClientCapabilities` stores `inline_catalogs` as a map and `to_a2a_metadata/1` emits a map (`lib/a2ui/client_capabilities.ex`).
 
 ---
 
-## 3. Client→Server Events (Wire-Level)
+## P1 — Missing end-to-end protocol behaviors (required by docs for a “renderer”)
 
-Per `client_to_server.json`, only two event envelopes exist:
-- `userAction`
-- `error`
+### P1.1 Client→server event sending (userAction + error)
 
-### 3.1 `userAction` (partially implemented)
+Docs require the client to send **single-event envelopes** back to the server:
+- `{"userAction": ...}` on action
+- `{"error": ...}` on client errors
 
-**Current state:**
-- The PoC constructs `userAction` with `name`, `surfaceId`, `sourceComponentId`, ISO8601 `timestamp`, and resolved `context`.
-- It is delivered to an application callback / stored in assigns, not sent over any standardized transport.
+Current behavior:
+- `A2UI.Phoenix.Live` constructs `userAction`, but only invokes a callback / stores it (`lib/a2ui/phoenix/live.ex`).
+- Errors are built and passed to `error_callback`, but not sent to the agent.
+- Transport behaviours exist, but LiveView is not wired to any `A2UI.Transport.Events` implementation.
 
-**Missing for conformance:**
-- A transport that serializes and sends this envelope to the agent/server as defined by the selected transport (A2A extension or otherwise).
+### P1.2 A2A extension packaging (mimeType + client capabilities)
 
-### 3.2 `error` (partially implemented)
+A2A extension spec requirements:
+- A2UI messages are A2A `DataPart` with `metadata.mimeType = "application/json+a2ui"`.
+- Every client→server A2A message must include `metadata.a2uiClientCapabilities`.
 
-`error` is allowed to be "flexible content" per schema.
+Current behavior:
+- No A2A transport implementation exists (only in-process `A2UI.Transport.Local`).
 
-**Current state:**
-- `A2UI.Error` module builds error messages with consistent structure (type, message, surfaceId, timestamp, details)
-- `A2UI.Live.init/2` accepts `:error_callback` option (same pattern as `:action_callback`)
-- Errors are emitted for: JSON parse failures, unknown message types, validation errors (component count, unknown types), data model size exceeded
-- Errors stored in `@a2ui_last_error` assign for debugging
+### P1.3 Streaming UI transport
 
-**Missing for conformance:**
-- A transport that serializes and sends this envelope to the agent/server as defined by the selected transport (A2A extension or otherwise).
+Docs describe:
+- one-way JSONL stream (often SSE/WebSocket/etc.) for UI updates
+- separate channel for events (often A2A)
 
----
-
-## 4. Data Binding + Templates (Core Behavior)
-
-### 4.1 BoundValue resolution (mostly implemented)
-
-Renderer guide rules include:
-- `literal*` used directly
-- `path` resolved via RFC6901 JSON Pointer
-- `path + literal*` should initialize data at `path` with the literal, then bind to `path`
-
-**Current state:** The PoC implements the “initializer pass” behavior for `path + literal*`.
-
-### 4.2 Template `dataBinding` collection type ✅ IMPLEMENTED
-
-Standard catalog template docs (for `Row`, `Column`, `List`) describe:
-- `template.dataBinding` points to a **map** in the data model, and "values in the map define the list of children".
-
-But A2UI conceptual docs also present examples using JSON **arrays** for lists.
-
-**Current state:** ✅ The `render_children/1` template expansion now supports both:
-- **Maps**: Uses `stable_template_keys/1` for deterministic ordering (numeric keys sorted numerically, others alphabetically)
-- **Lists**: Fallback support for array-indexed iteration
-
-Scope paths use the actual key/index: `"{base}/{key}"` for maps, `"{base}/{idx}"` for lists.
+Current behavior:
+- No concrete SSE/WebSocket transport implementation exists (only in-process transport).
 
 ---
 
-## 5. Catalog Negotiation + Capabilities (A2UI + A2A Extension)
+## P2 — Catalog negotiation and strict validation
 
-**Missing for conformance:**
-- Client capability reporting via `a2uiClientCapabilities` in A2A message metadata (required by the A2A extension spec and renderer guide).
-- Optional inline catalogs support:
-  - Only allowed if the agent declares `acceptsInlineCatalogs: true`.
-  - Spec guidance warns against downloading catalogs at runtime for safety/prompt-injection reasons; prefer compiled-in catalogs.
-- Multi-catalog dispatch:
-  - Registry of catalogs by `catalogId`.
-  - Surface-bound catalog selection based on `beginRendering.catalogId`.
-  - Validation of component types/properties against the active catalog schema.
+### P2.1 Catalog negotiation and compatibility checks are incomplete
 
----
+Docs specify:
+- Client advertises `supportedCatalogIds` (and optionally `inlineCatalogs`)
+- Server chooses a catalog and sends it in `beginRendering.catalogId`
+- Client must default to the standard catalog if omitted
 
-## 6. Transport (Protocol-Agnostic, but Required End-to-End)
+Current behavior:
+- Catalog dispatch exists (`A2UI.Catalog.Registry` + `A2UI.Phoenix.Renderer`), but there is no compatibility validation:
+  - no check that `beginRendering.catalogId` is supported by client capabilities
+  - no policy for unknown catalogId (warn vs error vs fallback)
+  - no inline catalog ingestion (likely intentionally disabled for safety; requires explicit policy)
 
-Per https://a2ui.org/transports/ the protocol is transport-agnostic; the docs list A2A as stable and other transports as proposed/planned.
+### P2.2 Standard catalog ID mismatch across v0.8 sources
 
-**Current state:** Only an in-process “mock agent” is implemented.
+Mismatch:
+- `docs/A2UI/specification/v0_8/json/server_to_client.json` says default is `a2ui.org:standard_catalog_0_8_0`
+- `docs/A2UI/specification/v0_8/docs/a2ui_protocol.md` uses the GitHub URL for the v0.8 standard catalog definition
+- implementation uses the GitHub URL (`lib/a2ui/v0_8.ex`)
 
-**Missing for conformance (practical):**
-- Implement at least one real transport end-to-end:
-  - **A2A extension** (recommended by docs): wrap A2UI messages into A2A `DataPart` with `mimeType: "application/json+a2ui"` and include `a2uiClientCapabilities` in metadata.
-  - Optional: JSONL over HTTP streaming / SSE if you want a browser-native path.
+Decision needed:
+- alias/normalize multiple known IDs to the same standard catalog module, or pick a canonical id and enforce it.
 
----
+### P2.3 Catalog-schema property validation is not implemented
 
-## 7. Spec Inconsistencies / Decisions Required
+Strict conformance implies validating incoming component instances against the active catalog schema:
+- required properties present
+- enums respected (e.g., distribution/alignment, `Icon.name`)
+- `additionalProperties: false` honored (reject unknown props)
+- component wrapper must have exactly one type key (v0.8)
 
-These must be resolved (and documented in code) to claim strict v0.8 conformance.
-
-### 7.1 “Standard catalog id” string inconsistency
-
-Different v0.8 sources disagree on the default/identifier for the standard catalog, for example:
-- v0.8 spec pages and A2A extension examples use a GitHub URL to `standard_catalog_definition.json`.
-- `server_to_client.json` mentions a short string identifier (`a2ui.org:standard_catalog_0_8_0`) as the default when `catalogId` is omitted.
-
-**Decision needed:** treat multiple known IDs as aliases for the same standard catalog, or pick one canonical form and normalize.
-
-### 7.2 Arrays vs maps in the data model
-
-The combination of:
-- template `dataBinding` described as a map of values, and
-- conceptual docs describing arrays,
-- plus the lack of `valueArray` in `server_to_client.json`,
-
-forces a renderer to pick an interpretation and enforce stable iteration/scoping rules.
-
-### 7.3 Depth/shape of `valueMap`
-
-The wire schema describes `valueMap` as an adjacency list of key/value entries, but the exact allowed nesting depth is not consistently captured across examples vs schema strictness.
-
-**Decision needed:** strict schema adherence (and require nested object updates via `path`) vs permissive recursive `valueMap` decoding.
+Current behavior:
+- only component type allowlist + global safety limits (count/depth/data size)
+- property-level validation is not enforced at parse/apply time
 
 ---
 
-## 8. Validation & Security (Beyond Current Limits)
+## P3 — Data model & template semantics (spec ambiguity)
 
-The PoC currently enforces only basic safety bounds (component count, render depth, template expansion limit, max data model size, and a component type allowlist).
+### P3.1 Arrays in templates vs v0.8 wire schema limitations
 
-Missing for conformance and safety:
-- Validate component properties against the active catalog schema:
-  - required props present
-  - enums respected (e.g., `Icon.name.literalString` allowed values)
-  - `additionalProperties: false` honored (reject unknown props if claiming strict conformance)
-- Validate `surfaceUpdate.components[].component` has exactly one key (one component type).
-- Validate and apply `weight` only where allowed (direct child of `Row`/`Column`).
-- Cycle detection in component graphs (depth limits prevent infinite recursion, but do not guarantee correctness).
-- URL safety rules for media components (`Image`, `Video`, `AudioPlayer`) before adding them.
+Docs describe template iteration over arrays and scoping like:
+- `/items/0/name` for item 0
 
----
+But v0.8 wire schema can only express:
+- scalar values
+- `valueMap` with scalar entries (and `valueMap` itself is non-recursive inside its entries)
+- no `valueList` / array type in `dataModelUpdate.contents`
 
-## 9. Testing Status (What’s Still Missing)
+Current behavior:
+- renderer can iterate both lists and maps in template expansion (`lib/a2ui/phoenix/catalog/standard.ex`)
+- strict v0.8 wire decoder (`lib/a2ui/surface.ex`) only builds maps (not lists) for agent-provided updates
 
-The repo now includes LiveView integration tests for:
-- progressive rendering / beginRendering gating
-- two-way binding for `TextField` and `CheckBox`
-- action dispatch for `Button`
-- `deleteSurface`
-- template expansion unique DOM ids
-
-Missing tests for full v0.8 conformance:
-- `surfaceUpdate.weight` application + validation (only allowed under `Row`/`Column`)
-- `beginRendering.styles` application (`font`, `primaryColor`)
-- catalog negotiation behavior (catalogId selection, supported catalogs, inline catalogs)
-- strict schema validation failures (unknown props, missing required props, invalid enums)
-- template `dataBinding` map semantics + stable ordering + scope path formation
-- error event emission (`{"error": {...}}`) for representative failure cases
+Design decision needed (documented + enforced):
+- “Strict wire” mode: nested structures built only via multiple `dataModelUpdate` messages with `path`, and define a canonical “array” encoding (e.g., numeric-key maps).
+- “Permissive” mode: allow recursive nested `valueMap` decoding (violates `server_to_client.json` but matches many examples).
+- Or: enhance pointer writes so numeric segments can create lists deterministically (so path-based updates can build arrays).
 
 ---
 
-## Priority Order (for strict v0.8 conformance)
+## P4 — Security and robustness improvements (not strictly required by schema, but required by docs/production)
 
-### P0 — Fix schema-level mismatches ✅ DONE
-1. ~~Implement `surfaceUpdate.components[].weight` end-to-end~~ ✅ (Component.weight + render_children flex-grow)
-2. ~~Make `dataModelUpdate` root updates replace (not merge) when `path` is omitted or `/`~~ ✅ (Surface.apply_data_update)
-3. ~~Resolve "list" representation and implement template `dataBinding` map semantics~~ ✅ (stable_template_keys handles maps)
-4. ~~Remove or formalize any out-of-schema `dataModelUpdate` extensions (`valueArray`, recursive valueMap) behind a compatibility mode~~ ✅ (strict v0.8 decoding only)
-5. ~~Store + apply `beginRendering.styles` per standard catalog (`font`, `primaryColor`)~~ ✅ (Surface.styles + Renderer CSS vars)
-
-### P1 — Complete the standard catalog ✅ DONE
-6. ~~Implement the remaining 10 standard catalog components~~ ✅
-7. ~~Implement missing props/behaviors in existing components (e.g., `TextField.validationRegexp`)~~ ✅
-
-### P2 — Protocol completeness
-8. Catalog negotiation: client capabilities, catalog selection, inline catalogs (if allowed)
-9. Real transport: A2A extension integration (or another transport) for both directions
-10. ~~Client→server `error` reporting strategy~~ ✅ (Error module + callback; transport pending)
+- cycle detection in component graph (depth limit mitigates but doesn’t guarantee correctness)
+- URL allowlist / scheme validation for media components (`Image`, `Video`, `AudioPlayer`)
+- decide when to emit `{"error": ...}` vs silently ignore invalid `dataModelUpdate` entries
+- “strict mode” toggle: reject vs warn+render for unknown props/enums/invalid children references
 
 ---
 
-## Summary (today)
+## Documentation mismatches to be aware of
 
-| Area | Status |
-|------|--------|
-| Standard catalog components | **18/18 implemented** |
-| Server→client message envelopes | 4/4 parsed/handled (`surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`) |
-| Client→server envelopes | `userAction` constructed + callback; `error` constructed + callback; transport not implemented |
-| Catalog negotiation | catalogId parsed only; no negotiation/selection/validation |
-| Styles | stored + applied via CSS vars (`--a2ui-font`, `--a2ui-primary-color`, `--a2ui-primary-rgb`) |
-| Key conformance blockers | ~~weight~~, ~~root replace~~, ~~template maps~~, ~~valueArray~~, ~~error reporting~~ — **All P0 resolved** |
+Some docs in `docs/A2UI/docs/*` appear out-of-sync with the authoritative v0.8 standard catalog:
+- `docs/A2UI/docs/reference/components.md` uses “Material icon” names like `check_circle`, but v0.8 catalog `Icon.name` enum uses `check`, `error`, etc.
+- `docs/A2UI/docs/reference/components.md` shows a `Checkbox` component name, but the v0.8 catalog uses `CheckBox`.
 
+Decision needed:
+- strict mode: follow `docs/A2UI/specification/v0_8/json/standard_catalog_definition.json` only
+- compatibility mode: accept common aliases (e.g., `Checkbox` → `CheckBox`, material icon aliases)
 
+---
 
-Component todo:
-  Top issues / mismatches vs the v0.8 standard catalog (and/or expected behavior)
+## Non-spec project guidelines (optional cleanup)
 
-  - DateTimeInput timezone semantics are still a design choice: `datetime-local` inputs are stored as `...Z` (treated as UTC) for stable round-tripping; this does not convert offsets/timezones.
-
-  Guideline notes (not spec, but project rules)
-
-  - Slider, DateTimeInput, and MultipleChoice use raw <input>s instead of <.input> (lib/a2ui/catalog/standard.ex:648, lib/a2ui/catalog/standard.ex:708, lib/a2ui/catalog/standard.ex:788). If you want, I can
-    refactor those to <.input> while keeping the UX.
+Not required for spec conformance, but useful for Phoenix consistency:
+- Use `<.input>` for all form inputs (Slider / DateTimeInput / MultipleChoice currently use raw `<input>`s).
