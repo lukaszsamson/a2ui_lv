@@ -4,7 +4,7 @@ defmodule A2UI.LiveErrorTest do
 
   describe "error callback" do
     test "emits error on JSON parse failure", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       # Send invalid JSON
       send(view.pid, {:a2ui, "not valid json"})
@@ -22,7 +22,7 @@ defmodule A2UI.LiveErrorTest do
     end
 
     test "emits error on unknown message type", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       # Send valid JSON but unknown message type
       send(view.pid, {:a2ui, ~s({"unknownMessageType": {}})})
@@ -35,7 +35,7 @@ defmodule A2UI.LiveErrorTest do
     end
 
     test "emits error on unknown component type", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       # Send surface update with unknown component type
       send(
@@ -54,7 +54,7 @@ defmodule A2UI.LiveErrorTest do
     end
 
     test "emits error on too many components", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       # Generate more than max_components (1000)
       components =
@@ -80,7 +80,7 @@ defmodule A2UI.LiveErrorTest do
     end
 
     test "does not emit error for valid messages", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       # Send valid surface update
       send(
@@ -96,7 +96,7 @@ defmodule A2UI.LiveErrorTest do
     end
 
     test "error includes timestamp in ISO 8601 format", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       send(view.pid, {:a2ui, "invalid"})
       render(view)

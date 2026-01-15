@@ -4,33 +4,28 @@ defmodule A2uiLvWeb.DemoLiveTest do
   import LazyHTML
 
   describe "demo page" do
-    test "renders loading state initially", %{conn: conn} do
-      {:ok, _view, html} = live(conn, "/demo")
-
-      assert html =~ "A2UI LiveView Renderer Demo"
-      assert html =~ "Rendered Surface"
+    test "redirects to basic scenario by default", %{conn: conn} do
+      {:error, {:live_redirect, %{to: "/demo?scenario=basic"}}} = live(conn, "/demo")
     end
 
-    test "renders surface after beginRendering", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+    test "renders basic scenario with form", %{conn: conn} do
+      {:ok, view, html} = live(conn, "/demo?scenario=basic")
 
-      load_form(view)
+      assert html =~ "A2UI v0.8 Communication Scenarios"
+      assert html =~ "Basic Form"
 
+      # Wait for form to load
+      sync(view)
       html = render(view)
       assert html =~ "Contact Form"
       assert html =~ "Name"
       assert html =~ "Email"
-      assert html =~ "Message"
-      assert html =~ "Subscribe to updates"
-      assert html =~ "Submit"
-      assert html =~ "--a2ui-primary-color: #4f46e5"
-      assert html =~ "a2ui-button-primary"
     end
 
     test "renders surface from manual messages", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
-      # Send a simple text component
+      # Send a simple text component to a new surface
       send(
         view.pid,
         {:a2ui,
@@ -44,17 +39,46 @@ defmodule A2uiLvWeb.DemoLiveTest do
     end
   end
 
+  describe "scenario navigation" do
+    test "switches between scenarios", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
+
+      # Navigate to dynamic scenario
+      view |> element("button", "Dynamic Updates") |> render_click()
+      html = render(view)
+      assert html =~ "Counter Demo"
+      assert html =~ "userAction"
+
+      # Navigate to multi_surface scenario
+      view |> element("button", "Multiple Surfaces") |> render_click()
+      html = render(view)
+      assert html =~ "Surface 1"
+      assert html =~ "Surface 2"
+    end
+
+    test "template list scenario loads products", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=template_list")
+
+      sync(view)
+      html = render(view)
+      assert html =~ "Product List"
+      assert html =~ "Widget A"
+      assert html =~ "Widget B"
+      assert html =~ "Widget C"
+    end
+  end
+
   describe "two-way binding" do
     test "updates data model on text input", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
-      load_form(view)
+      sync(view)
 
       # Find the name field form and submit a change
       view
-      |> form("#a2ui-main-name_field-form", %{
+      |> form("#a2ui-basic-name_field-form", %{
         "a2ui_input" => %{
-          "surface_id" => "main",
+          "surface_id" => "basic",
           "path" => "/form/name",
           "value" => "Alice"
         }
@@ -67,22 +91,19 @@ defmodule A2uiLvWeb.DemoLiveTest do
     end
 
     test "updates data model on checkbox toggle", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
-      load_form(view)
+      sync(view)
 
-      # Toggle the subscribe checkbox - send the event directly to avoid form complexity
+      # Toggle the subscribe checkbox
       render_change(view, "a2ui:toggle", %{
         "a2ui_input" => %{
-          "surface_id" => "main",
+          "surface_id" => "basic",
           "path" => "/form/subscribe",
           "value" => "true"
         }
       })
 
-      # Get the socket state to verify the data model was updated
-      # The data model should now show subscribe: true
-      # Check that the checkbox is now checked in the re-rendered form
       html = render(view)
       assert html =~ "checked"
     end
@@ -90,15 +111,15 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
   describe "button actions" do
     test "button click triggers action and updates last_action", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
-      load_form(view)
+      sync(view)
 
       # First fill in some form data
       view
-      |> form("#a2ui-main-name_field-form", %{
+      |> form("#a2ui-basic-name_field-form", %{
         "a2ui_input" => %{
-          "surface_id" => "main",
+          "surface_id" => "basic",
           "path" => "/form/name",
           "value" => "Bob"
         }
@@ -112,17 +133,16 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
       # Check that last action was captured
       html = render(view)
-      assert html =~ "Last Action"
+      assert html =~ "Last userAction"
       assert html =~ "submit_form"
       assert html =~ "formData"
     end
 
     test "reset button triggers reset_form action", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
-      load_form(view)
+      sync(view)
 
-      # Click the reset button
       view
       |> element("button[phx-value-component-id='reset_btn']")
       |> render_click()
@@ -132,33 +152,65 @@ defmodule A2uiLvWeb.DemoLiveTest do
     end
   end
 
+  describe "dynamic updates" do
+    test "counter buttons send userAction and update data model", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=dynamic")
+
+      wait_for_surfaces(view)
+
+      # Verify the counter UI is rendered
+      html = render(view)
+      assert html =~ "Counter Demo"
+
+      # Click increment button
+      view
+      |> element("button[phx-value-component-id='inc_btn']")
+      |> render_click()
+
+      # Verify the userAction was captured
+      html = render(view)
+      assert html =~ "Last userAction"
+      assert html =~ "increment"
+
+      # Wait for server response and verify data model update
+      Process.sleep(200)
+      wait_for_surfaces(view)
+      state = :sys.get_state(view.pid)
+      surface = state.socket.assigns.a2ui_surfaces["dynamic"]
+      assert surface.data_model["counter"] == 1
+    end
+  end
+
   describe "multiple surfaces" do
     test "renders multiple surfaces independently", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=multi_surface")
 
-      load_form(view)
+      sync(view)
+      html = render(view)
 
-      # Send messages for a second surface
-      send(
-        view.pid,
-        {:a2ui,
-         ~s({"surfaceUpdate":{"surfaceId":"second","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Second Surface"}}}}]}})}
-      )
+      assert html =~ "Surface 1: Counter"
+      assert html =~ "Surface 2: Status"
+      assert html =~ "42"
+      assert html =~ "Online"
+    end
 
-      send(view.pid, {:a2ui, ~s({"beginRendering":{"surfaceId":"second","root":"root"}})})
+    test "add surface creates new surface", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=multi_surface")
 
       sync(view)
 
+      # Click add surface button
+      view |> element("button", "+ Add Surface") |> render_click()
+
       html = render(view)
-      # Should have both the main form and the second surface
-      assert html =~ "Contact Form"
-      assert html =~ "Second Surface"
+      assert html =~ "New Surface"
+      assert html =~ "Created at"
     end
   end
 
   describe "surfaceUpdate weight" do
     test "applies weight as flex-grow for Row children", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=basic")
 
       send(
         view.pid,
@@ -179,18 +231,65 @@ defmodule A2uiLvWeb.DemoLiveTest do
 
   describe "deleteSurface" do
     test "removes surface on deleteSurface message", %{conn: conn} do
-      {:ok, view, _html} = live(conn, "/demo")
+      {:ok, view, _html} = live(conn, "/demo?scenario=delete_surface")
 
-      load_form(view)
+      sync(view)
+      html = render(view)
+      assert html =~ "Surface 1"
+      assert html =~ "Surface 2"
+      assert html =~ "Surface 3"
+
+      # Delete surface 1
+      send(view.pid, {:a2ui, ~s({"deleteSurface":{"surfaceId":"deletable-1"}})})
 
       html = render(view)
-      assert html =~ "Contact Form"
+      refute html =~ "deletable-1"
+      assert html =~ "deletable-2"
+      assert html =~ "deletable-3"
+    end
 
-      # Delete the surface
-      send(view.pid, {:a2ui, ~s({"deleteSurface":{"surfaceId":"main"}})})
+    test "delete button sends deleteSurface message", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=delete_surface")
+
+      sync(view)
+
+      # Click delete on first surface
+      view
+      |> element("button[phx-value-surface-id='deletable-1']", "Delete")
+      |> render_click()
 
       html = render(view)
-      refute html =~ "Contact Form"
+      refute html =~ "deletable-1"
+    end
+  end
+
+  describe "error handling" do
+    test "shows error on invalid JSON", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=error_handling")
+
+      sync(view)
+
+      # Trigger parse error
+      view |> element("button", "Trigger Parse Error") |> render_click()
+
+      html = render(view)
+      assert html =~ "Last Error"
+      assert html =~ "parse_error"
+      assert html =~ "JSON decode"
+    end
+
+    test "shows error on unknown component", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=error_handling")
+
+      sync(view)
+
+      # Trigger unknown component error
+      view |> element("button", "Unknown Component") |> render_click()
+
+      html = render(view)
+      assert html =~ "Last Error"
+      assert html =~ "unknown_component"
+      assert html =~ "UnknownWidget"
     end
   end
 
@@ -234,14 +333,73 @@ defmodule A2uiLvWeb.DemoLiveTest do
     end
   end
 
-  defp load_form(view) do
-    A2UI.MockAgent.send_sample_form(view.pid)
-    sync(view)
-    :ok
+  describe "streaming scenario" do
+    test "progressively renders components", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=streaming")
+
+      # Wait for all components to stream in (8 more messages at 400ms each = ~3200ms)
+      Process.sleep(4000)
+
+      html = render(view)
+      assert html =~ "Streaming Demo"
+      assert html =~ "First card loaded!"
+      assert html =~ "Second card loaded!"
+      assert html =~ "All done!"
+    end
+  end
+
+  describe "data binding scenario" do
+    test "shows all binding modes", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=data_binding")
+
+      sync(view)
+      html = render(view)
+
+      assert html =~ "Data Binding Modes"
+      assert html =~ "Literal only:"
+      assert html =~ "Static text (no binding)"
+      assert html =~ "Path only:"
+      assert html =~ "Value from data model"
+      assert html =~ "Two-way binding:"
+      assert html =~ "Edit me!"
+    end
+
+    test "two-way binding updates display", %{conn: conn} do
+      {:ok, view, _html} = live(conn, "/demo?scenario=data_binding")
+
+      sync(view)
+
+      # Type in the input field
+      render_change(view, "a2ui:input", %{
+        "a2ui_input" => %{
+          "surface_id" => "binding",
+          "path" => "/user_input",
+          "value" => "New value!"
+        }
+      })
+
+      html = render(view)
+      # Should appear both in the input and in the display text
+      assert html =~ "New value!"
+    end
   end
 
   defp sync(view) do
     _ = :sys.get_state(view.pid)
     :ok
+  end
+
+  # Wait for surfaces to be loaded (handles async message processing)
+  defp wait_for_surfaces(view, max_attempts \\ 20) do
+    Enum.reduce_while(1..max_attempts, nil, fn _, _ ->
+      Process.sleep(50)
+      state = :sys.get_state(view.pid)
+
+      if map_size(state.socket.assigns.a2ui_surfaces) > 0 do
+        {:halt, :ok}
+      else
+        {:cont, nil}
+      end
+    end)
   end
 end

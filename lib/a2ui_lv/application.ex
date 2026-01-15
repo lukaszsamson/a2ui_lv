@@ -11,8 +11,8 @@ defmodule A2uiLv.Application do
       A2uiLvWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:a2ui_lv, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: A2uiLv.PubSub},
-      # Start a worker by calling: A2uiLv.Worker.start_link(arg)
-      # {A2uiLv.Worker, arg},
+      # Claude Agent SDK bridge client (ZMQ DEALER)
+      A2UI.ClaudeClient,
       # Start to serve requests, typically the last entry
       A2uiLvWeb.Endpoint
     ]
