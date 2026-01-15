@@ -2,7 +2,7 @@ defmodule A2UI.Phoenix.Live do
   @moduledoc """
   LiveView behavior for A2UI rendering.
 
-  Handles:
+  This is a thin Phoenix adapter over `A2UI.Session`, providing:
   - Message ingestion via handle_info
   - User events via handle_event
   - Two-way binding for input components
@@ -14,8 +14,7 @@ defmodule A2UI.Phoenix.Live do
   - phx-value-* for passing data to server
   """
 
-  alias A2UI.{Parser, Surface, Binding, Validator, Error}
-  alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
+  alias A2UI.{Session, Binding}
 
   require Logger
 
@@ -29,6 +28,7 @@ defmodule A2UI.Phoenix.Live do
     Signature: `(user_action, socket) -> any()`
   - `:error_callback` - Function called when a client-side error occurs.
     Signature: `(error, socket) -> any()`
+  - `:client_capabilities` - Optional `A2UI.ClientCapabilities` struct
 
   ## Example
 
@@ -42,8 +42,11 @@ defmodule A2UI.Phoenix.Live do
   """
   @spec init(Phoenix.LiveView.Socket.t(), keyword()) :: Phoenix.LiveView.Socket.t()
   def init(socket, opts \\ []) do
+    session = Session.new(client_capabilities: opts[:client_capabilities])
+
     Phoenix.Component.assign(socket,
-      a2ui_surfaces: %{},
+      a2ui_session: session,
+      a2ui_surfaces: session.surfaces,
       a2ui_action_callback: opts[:action_callback],
       a2ui_error_callback: opts[:error_callback],
       a2ui_last_action: nil,
@@ -64,62 +67,15 @@ defmodule A2UI.Phoenix.Live do
   @spec handle_a2ui_message({:a2ui, String.t()}, Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_a2ui_message({:a2ui, json_line}, socket) do
-    case Parser.parse_line(json_line) do
-      {:surface_update, %SurfaceUpdate{surface_id: sid} = msg} ->
-        case Validator.validate_surface_update(msg) do
-          :ok ->
-            {:noreply, update_surface(socket, sid, msg)}
+    session = socket.assigns.a2ui_session
 
-          {:error, {:too_many_components, count, max}} ->
-            error =
-              Error.validation_error(
-                "Too many components: #{count} exceeds limit #{max}",
-                sid,
-                %{"count" => count, "limit" => max}
-              )
+    case Session.apply_json_line(session, json_line) do
+      {:ok, updated_session} ->
+        {:noreply, update_session(socket, updated_session)}
 
-            Logger.warning("A2UI surfaceUpdate rejected: too_many_components")
-            {:noreply, emit_error(socket, error)}
-
-          {:error, {:unknown_component_types, types}} ->
-            error = Error.unknown_component(types, sid)
-
-            Logger.warning(
-              "A2UI surfaceUpdate rejected: unknown_component_types #{inspect(types)}"
-            )
-
-            {:noreply, emit_error(socket, error)}
-
-          {:error, reason} ->
-            error = Error.validation_error("Validation failed: #{inspect(reason)}", sid)
-            Logger.warning("A2UI surfaceUpdate rejected: #{inspect(reason)}")
-            {:noreply, emit_error(socket, error)}
-        end
-
-      {:data_model_update, %DataModelUpdate{surface_id: sid} = msg} ->
-        {:noreply, update_surface(socket, sid, msg)}
-
-      {:begin_rendering, %BeginRendering{surface_id: sid} = msg} ->
-        {:noreply, update_surface(socket, sid, msg)}
-
-      {:delete_surface, %DeleteSurface{surface_id: sid}} ->
-        surfaces = Map.delete(socket.assigns.a2ui_surfaces, sid)
-        {:noreply, Phoenix.Component.assign(socket, :a2ui_surfaces, surfaces)}
-
-      {:error, {:json_decode, reason}} ->
-        error = Error.parse_error("JSON decode failed", reason)
-        Logger.warning("A2UI parse error: json_decode")
-        {:noreply, emit_error(socket, error)}
-
-      {:error, :unknown_message_type} ->
-        error = Error.parse_error("Unknown message type")
-        Logger.warning("A2UI parse error: unknown_message_type")
-        {:noreply, emit_error(socket, error)}
-
-      {:error, reason} ->
-        error = Error.parse_error("Parse failed", reason)
-        Logger.warning("A2UI parse error: #{inspect(reason)}")
-        {:noreply, emit_error(socket, error)}
+      {:error, error_map} ->
+        log_error(error_map)
+        {:noreply, emit_error(socket, error_map)}
     end
   end
 
@@ -311,6 +267,31 @@ defmodule A2UI.Phoenix.Live do
 
   # Private helpers
 
+  defp update_session(socket, session) do
+    Phoenix.Component.assign(socket,
+      a2ui_session: session,
+      a2ui_surfaces: session.surfaces
+    )
+  end
+
+  defp update_data_at_path(socket, surface_id, path, value) do
+    session = socket.assigns.a2ui_session
+
+    case Session.update_data_at_path(session, surface_id, path, value) do
+      {:ok, updated_session} ->
+        update_session(socket, updated_session)
+
+      {:error, error_map} ->
+        log_error(error_map)
+        emit_error(socket, error_map)
+    end
+  end
+
+  defp log_error(error_map) do
+    type = get_in(error_map, ["error", "type"]) || "unknown"
+    Logger.warning("A2UI #{type}: #{inspect(error_map)}")
+  end
+
   defp html_datetime_to_iso8601("", _type), do: ""
   defp html_datetime_to_iso8601(nil, _type), do: ""
 
@@ -386,67 +367,6 @@ defmodule A2UI.Phoenix.Live do
 
   defp parse_max_allowed(int) when is_integer(int), do: int
   defp parse_max_allowed(_), do: nil
-
-  defp update_surface(socket, surface_id, message) do
-    surfaces = socket.assigns.a2ui_surfaces
-    surface = Map.get(surfaces, surface_id) || Surface.new(surface_id)
-    updated = Surface.apply_message(surface, message)
-
-    case Validator.validate_data_model_size(updated.data_model) do
-      :ok ->
-        Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
-
-      {:error, {:data_model_too_large, size, max}} ->
-        error =
-          Error.validation_error(
-            "Data model too large: #{size} bytes exceeds #{max}",
-            surface_id,
-            %{"size" => size, "limit" => max}
-          )
-
-        Logger.warning("A2UI data model update rejected: data_model_too_large")
-        emit_error(socket, error)
-
-      {:error, reason} ->
-        error =
-          Error.validation_error("Data model validation failed: #{inspect(reason)}", surface_id)
-
-        Logger.warning("A2UI data model update rejected: #{inspect(reason)}")
-        emit_error(socket, error)
-    end
-  end
-
-  defp update_data_at_path(socket, surface_id, path, value) do
-    surfaces = socket.assigns.a2ui_surfaces
-    surface = surfaces[surface_id]
-
-    if surface do
-      updated = Surface.update_data_at_path(surface, path, value)
-
-      case Validator.validate_data_model_size(updated.data_model) do
-        :ok ->
-          Phoenix.Component.assign(socket, :a2ui_surfaces, Map.put(surfaces, surface_id, updated))
-
-        {:error, {:data_model_too_large, size, max}} ->
-          error =
-            Error.validation_error(
-              "Data model too large: #{size} bytes exceeds #{max}",
-              surface_id,
-              %{"size" => size, "limit" => max}
-            )
-
-          Logger.warning("A2UI local data model update rejected: data_model_too_large")
-          emit_error(socket, error)
-
-        {:error, reason} ->
-          error = Error.validation_error("Data validation failed: #{inspect(reason)}", surface_id)
-          Logger.warning("A2UI local data model update rejected: #{inspect(reason)}")
-          emit_error(socket, error)
-      end
-    else
-      socket
-    end
-  end
 
   defp resolve_action_context(context_list, data_model, scope_path) do
     Enum.reduce(context_list, %{}, fn
