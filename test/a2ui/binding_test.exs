@@ -129,6 +129,29 @@ defmodule A2UI.BindingTest do
       assert Binding.get_at_pointer(data, "/users/1/name") == "Bob"
     end
 
+    # v0.8 canonical array encoding: numeric-key maps
+    test "handles v0.8 canonical array encoding (numeric-key map)" do
+      # v0.8 wire format encodes arrays as maps with numeric string keys
+      data = %{"items" => %{"0" => "a", "1" => "b", "2" => "c"}}
+      assert Binding.get_at_pointer(data, "/items/0") == "a"
+      assert Binding.get_at_pointer(data, "/items/1") == "b"
+      assert Binding.get_at_pointer(data, "/items/2") == "c"
+    end
+
+    test "handles nested objects in v0.8 canonical array encoding" do
+      # v0.8 wire format: array of objects as numeric-key map
+      data = %{
+        "users" => %{
+          "0" => %{"name" => "Alice", "age" => 30},
+          "1" => %{"name" => "Bob", "age" => 25}
+        }
+      }
+
+      assert Binding.get_at_pointer(data, "/users/0/name") == "Alice"
+      assert Binding.get_at_pointer(data, "/users/1/name") == "Bob"
+      assert Binding.get_at_pointer(data, "/users/0/age") == 30
+    end
+
     test "returns nil for invalid array index" do
       data = %{"items" => ["a", "b"]}
       assert Binding.get_at_pointer(data, "/items/invalid") == nil

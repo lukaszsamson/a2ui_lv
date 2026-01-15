@@ -28,7 +28,7 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 - ✅ progressive render gating: UI renders only after `beginRendering`
 - ✅ v0.8 `weight` application for Row/Column descendants
 - ✅ `beginRendering.styles` stored + applied as CSS vars (standard catalog `font`, `primaryColor`)
-- ✅ template expansion supports both map and list collections, with scoped JSON Pointer strings for bound values/events
+- ✅ template expansion supports map collections (v0.8 canonical array encoding: numeric-key maps), with scoped JSON Pointer strings for bound values/events
 
 ---
 
@@ -144,24 +144,36 @@ Current behavior:
 
 ## P3 — Data model & template semantics (spec ambiguity)
 
-### P3.1 Arrays in templates vs v0.8 wire schema limitations
+### ~~P3.1 Arrays in templates vs v0.8 wire schema limitations~~ ✅ RESOLVED
 
-Docs describe template iteration over arrays and scoping like:
-- `/items/0/name` for item 0
+**Resolution:**
 
-But v0.8 wire schema can only express:
-- scalar values
-- `valueMap` with scalar entries (and `valueMap` itself is non-recursive inside its entries)
-- no `valueList` / array type in `dataModelUpdate.contents`
+The v0.8 wire schema intentionally does NOT include a `valueList`/`valueArray` type. Arrays are encoded using the **canonical numeric-key map representation**:
 
-Current behavior:
-- renderer can iterate both lists and maps in template expansion (`lib/a2ui/phoenix/catalog/standard.ex`)
-- strict v0.8 wire decoder (`lib/a2ui/surface.ex`) only builds maps (not lists) for agent-provided updates
+```json
+{"dataModelUpdate": {
+  "surfaceId": "main",
+  "path": "/items/0",
+  "contents": [{"key": "name", "valueString": "first"}]
+}}
+{"dataModelUpdate": {
+  "surfaceId": "main",
+  "path": "/items/1",
+  "contents": [{"key": "name", "valueString": "second"}]
+}}
+```
 
-Design decision needed (documented + enforced):
-- “Strict wire” mode: nested structures built only via multiple `dataModelUpdate` messages with `path`, and define a canonical “array” encoding (e.g., numeric-key maps).
-- “Permissive” mode: allow recursive nested `valueMap` decoding (violates `server_to_client.json` but matches many examples).
-- Or: enhance pointer writes so numeric segments can create lists deterministically (so path-based updates can build arrays).
+This produces a data model structure:
+```json
+{"items": {"0": {"name": "first"}, "1": {"name": "second"}}}
+```
+
+**Implementation:**
+- The renderer (`lib/a2ui/phoenix/catalog/standard.ex`) now only iterates maps in template expansion.
+- `stable_template_keys()` detects numeric-key maps and sorts them numerically (0, 1, 2, ...) rather than lexicographically.
+- The non-spec-compliant list fallback has been removed from `render_children`.
+- `A2UI.Binding.get_at_pointer/2` works correctly with numeric string keys for paths like `/items/0/name`.
+- The wire decoder (`lib/a2ui/surface.ex`) correctly builds maps (not lists) for all `dataModelUpdate` messages.
 
 ---
 

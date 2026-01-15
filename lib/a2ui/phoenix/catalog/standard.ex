@@ -1135,6 +1135,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         template_weight = assigns.apply_weight && component_weight(assigns.surface, template_id)
 
         cond do
+          # v0.8 wire schema only produces maps (not lists) in the data model.
+          # Arrays are canonically encoded as maps with numeric string keys:
+          # {"0": item0, "1": item1, ...}
+          # The stable_template_keys function sorts numeric keys numerically.
           is_map(collection) ->
             keys =
               collection
@@ -1169,45 +1173,6 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                   id={@template_id}
                   surface={@surface}
                   scope_path={Binding.append_pointer_segment(@base_path, key)}
-                  depth={@depth + 1}
-                  suppress_events={@suppress_events}
-                />
-              <% end %>
-            <% end %>
-            """
-
-          is_list(collection) ->
-            # Compatibility fallback: some docs/examples show arrays in the data model.
-            items = Enum.take(collection, max_items)
-
-            assigns =
-              assign(assigns,
-                items: items,
-                template_id: template_id,
-                base_path: base_path,
-                template_weight: template_weight
-              )
-
-            ~H"""
-            <%= for {_item, idx} <- Enum.with_index(@items) do %>
-              <%= if is_number(@template_weight) do %>
-                <div
-                  class="a2ui-weighted"
-                  style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
-                >
-                  <.render_component
-                    id={@template_id}
-                    surface={@surface}
-                    scope_path={Binding.append_pointer_segment(@base_path, Integer.to_string(idx))}
-                    depth={@depth + 1}
-                    suppress_events={@suppress_events}
-                  />
-                </div>
-              <% else %>
-                <.render_component
-                  id={@template_id}
-                  surface={@surface}
-                  scope_path={Binding.append_pointer_segment(@base_path, Integer.to_string(idx))}
                   depth={@depth + 1}
                   suppress_events={@suppress_events}
                 />
