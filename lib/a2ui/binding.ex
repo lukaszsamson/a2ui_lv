@@ -67,10 +67,12 @@ defmodule A2UI.Binding do
   @doc """
   Resolves a JSON Pointer path against data model.
 
-  Scope handling per spec:
-  - v0.8: Scoped paths inside templates are written like `/name` but resolve against the item
-    (we implement this by prefixing `scope_path`).
-  - v0.9: Relative paths like `firstName` resolve as `{scope_path}/firstName`.
+  Uses v0.8 scoping rules by default. For v0.9, use `resolve_path/4` with `version: :v0_9`.
+
+  ## Scope handling
+
+  - v0.8: `/name` in template scope is relative (joined with scope_path)
+  - v0.9: `/name` in template scope is absolute; only `name` is relative
 
   ## Examples
 
@@ -82,11 +84,42 @@ defmodule A2UI.Binding do
   """
   @spec resolve_path(String.t(), data_model(), scope_path()) :: term()
   def resolve_path(path, data_model, scope_path) do
-    get_at_pointer(data_model, expand_path(path, scope_path))
+    resolve_path(path, data_model, scope_path, version: :v0_8)
+  end
+
+  @doc """
+  Resolves a JSON Pointer path against data model with version-specific scoping.
+
+  ## Options
+
+  - `:version` - Protocol version (`:v0_8` or `:v0_9`). Defaults to `:v0_8`.
+
+  ## Examples
+
+      # v0.8: /name is scoped in template context
+      iex> A2UI.Binding.resolve_path("/name", %{"items" => %{"0" => %{"name" => "first"}}}, "/items/0", version: :v0_8)
+      "first"
+
+      # v0.9: /name is absolute even in template context
+      iex> A2UI.Binding.resolve_path("/name", %{"name" => "root", "items" => %{"0" => %{"name" => "first"}}}, "/items/0", version: :v0_9)
+      "root"
+  """
+  @spec resolve_path(String.t(), data_model(), scope_path(), keyword()) :: term()
+  def resolve_path(path, data_model, scope_path, opts) do
+    get_at_pointer(data_model, expand_path(path, scope_path, opts))
   end
 
   @doc """
   Expands a potentially relative path to absolute.
+
+  This is the default v0.8 behavior. For v0.9, use `expand_path/3` with `version: :v0_9`.
+
+  ## v0.8 Scoping Rules
+
+  When `scope_path` is set (inside templates):
+  - `/name` → scoped to template item (becomes `scope_path/name`)
+  - `name` → scoped to template item (becomes `scope_path/name`)
+  - `./name` → explicitly scoped (becomes `scope_path/name`)
 
   ## Examples
 
@@ -100,9 +133,46 @@ defmodule A2UI.Binding do
       "/items/0/name"
   """
   @spec expand_path(String.t() | nil, scope_path()) :: String.t()
-  def expand_path(path, nil), do: normalize_pointer(path)
+  def expand_path(path, scope_path), do: expand_path(path, scope_path, version: :v0_8)
 
-  def expand_path(path, scope_path) when is_binary(scope_path) do
+  @doc """
+  Expands a path to absolute with version-specific scoping rules.
+
+  ## Options
+
+  - `:version` - Protocol version (`:v0_8` or `:v0_9`). Defaults to `:v0_8`.
+
+  ## v0.8 Scoping Rules
+
+  When `scope_path` is set (inside templates):
+  - `/name` → scoped to template item (becomes `scope_path/name`)
+  - `name` → scoped to template item (becomes `scope_path/name`)
+
+  ## v0.9 Scoping Rules
+
+  When `scope_path` is set (inside templates):
+  - `/name` → **absolute** (stays `/name`, NOT scoped)
+  - `name` → scoped to template item (becomes `scope_path/name`)
+
+  ## Examples
+
+      # v0.8: /name is scoped when in template context
+      iex> A2UI.Binding.expand_path("/name", "/items/0", version: :v0_8)
+      "/items/0/name"
+
+      # v0.9: /name stays absolute even in template context
+      iex> A2UI.Binding.expand_path("/name", "/items/0", version: :v0_9)
+      "/name"
+
+      # Both versions: relative path is scoped
+      iex> A2UI.Binding.expand_path("name", "/items/0", version: :v0_9)
+      "/items/0/name"
+  """
+  @spec expand_path(String.t() | nil, scope_path(), keyword()) :: String.t()
+  def expand_path(path, nil, _opts), do: normalize_pointer(path)
+
+  def expand_path(path, scope_path, opts) when is_binary(scope_path) do
+    version = Keyword.get(opts, :version, :v0_8)
     path = to_string(path || "")
 
     cond do
@@ -110,14 +180,19 @@ defmodule A2UI.Binding do
         scope_path
 
       String.starts_with?(path, "./") ->
+        # Explicit relative path - always scoped in both versions
         join_pointer(scope_path, "/" <> String.trim_leading(path, "./"))
 
-      # v0.8 template scoping: `/name` is scoped to the template item.
       String.starts_with?(path, "/") ->
-        join_pointer(scope_path, path)
+        # v0.8: paths starting with / are scoped in templates
+        # v0.9: paths starting with / are ALWAYS absolute
+        case version do
+          :v0_9 -> path
+          _ -> join_pointer(scope_path, path)
+        end
 
-      # v0.9 scoped relative segments: `firstName`
       true ->
+        # Relative path without leading / - scoped in both versions
         join_pointer(scope_path, "/" <> path)
     end
   end

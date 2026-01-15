@@ -28,20 +28,27 @@ Per `docs/A2UI/specification/v0_9/docs/evolution_guide.md`, v0.9 changes:
 
 ## P0 — Refactors to do now (make v0.9 easy later)
 
-### P0.1 Make path expansion version-aware (v0.8 vs v0.9 scoping differs)
+### ~~P0.1 Make path expansion version-aware (v0.8 vs v0.9 scoping differs)~~ ✅ DONE
 
-Current `A2UI.Binding.expand_path/2` implements v0.8 template scoping where `"/name"` is relative when `scope_path` is set.
+**Implementation:**
 
-v0.9 requires:
-- `"/company"` is always absolute, even inside templates
-- `"name"` is relative in templates (joins scope)
+`A2UI.Binding` now supports version-aware path expansion:
 
-Prep work:
-- Introduce version-aware expansion, e.g.:
-  - `A2UI.Binding.expand_path_v08/2`
-  - `A2UI.Binding.expand_path_v09/2`
-  - or `expand_path(path, scope_path, version: :v0_8 | :v0_9)`
-- Ensure all bindings and two-way input writes call the correct variant for their message version.
+- `expand_path(path, scope_path)` - defaults to v0.8 behavior (backwards compatible)
+- `expand_path(path, scope_path, version: :v0_8 | :v0_9)` - explicit version
+- `resolve_path(path, data_model, scope_path, version: :v0_8 | :v0_9)` - version-aware resolution
+
+**Scoping differences:**
+
+| Path | v0.8 (scope: `/items/0`) | v0.9 (scope: `/items/0`) |
+|------|-------------------------|-------------------------|
+| `/name` | `/items/0/name` (scoped) | `/name` (absolute) |
+| `name` | `/items/0/name` (scoped) | `/items/0/name` (scoped) |
+| `./name` | `/items/0/name` (scoped) | `/items/0/name` (scoped) |
+
+**Remaining work for v0.9:**
+- Update `A2UI.Phoenix.Catalog.Standard` to pass version when rendering v0.9 surfaces
+- Store version on `A2UI.Surface` struct (from `createSurface` message)
 
 ### P0.2 Introduce an internal “data model patch” abstraction
 

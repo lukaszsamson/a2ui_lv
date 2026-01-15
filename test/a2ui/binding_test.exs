@@ -201,7 +201,7 @@ defmodule A2UI.BindingTest do
     end
   end
 
-  describe "expand_path/2" do
+  describe "expand_path/2 (v0.8 default)" do
     test "returns normalized path when scope is nil" do
       assert Binding.expand_path("/user/name", nil) == "/user/name"
       assert Binding.expand_path("user/name", nil) == "/user/name"
@@ -212,6 +212,7 @@ defmodule A2UI.BindingTest do
     end
 
     test "joins absolute path with scope (v0.8 template style)" do
+      # v0.8: paths starting with / are scoped when inside templates
       assert Binding.expand_path("/name", "/items/0") == "/items/0/name"
     end
 
@@ -221,6 +222,76 @@ defmodule A2UI.BindingTest do
 
     test "returns scope for empty path" do
       assert Binding.expand_path("", "/items/0") == "/items/0"
+    end
+  end
+
+  describe "expand_path/3 (version-aware)" do
+    test "v0.8: absolute paths are scoped in template context" do
+      # In v0.8, /name inside a template scope becomes scope_path/name
+      assert Binding.expand_path("/name", "/items/0", version: :v0_8) == "/items/0/name"
+      assert Binding.expand_path("/user/email", "/products/5", version: :v0_8) == "/products/5/user/email"
+    end
+
+    test "v0.9: absolute paths stay absolute even in template context" do
+      # In v0.9, /name stays /name regardless of scope
+      assert Binding.expand_path("/name", "/items/0", version: :v0_9) == "/name"
+      assert Binding.expand_path("/user/email", "/products/5", version: :v0_9) == "/user/email"
+    end
+
+    test "v0.9: relative paths (no leading /) are scoped" do
+      # Both versions scope relative paths without leading /
+      assert Binding.expand_path("name", "/items/0", version: :v0_9) == "/items/0/name"
+      assert Binding.expand_path("details/price", "/products/5", version: :v0_9) == "/products/5/details/price"
+    end
+
+    test "v0.9: ./ relative paths are scoped" do
+      assert Binding.expand_path("./name", "/items/0", version: :v0_9) == "/items/0/name"
+    end
+
+    test "both versions: nil scope returns normalized path" do
+      assert Binding.expand_path("/name", nil, version: :v0_8) == "/name"
+      assert Binding.expand_path("/name", nil, version: :v0_9) == "/name"
+      assert Binding.expand_path("name", nil, version: :v0_8) == "/name"
+      assert Binding.expand_path("name", nil, version: :v0_9) == "/name"
+    end
+
+    test "both versions: empty path returns scope" do
+      assert Binding.expand_path("", "/items/0", version: :v0_8) == "/items/0"
+      assert Binding.expand_path("", "/items/0", version: :v0_9) == "/items/0"
+    end
+
+    test "defaults to v0.8 behavior" do
+      # When version is not specified, should behave like v0.8
+      assert Binding.expand_path("/name", "/items/0", []) == "/items/0/name"
+    end
+  end
+
+  describe "resolve_path/4 (version-aware)" do
+    test "v0.8: resolves scoped absolute path" do
+      data = %{"items" => %{"0" => %{"name" => "scoped_value"}, "1" => %{"name" => "other"}}}
+
+      # v0.8: /name in scope /items/0 resolves to /items/0/name
+      assert Binding.resolve_path("/name", data, "/items/0", version: :v0_8) == "scoped_value"
+    end
+
+    test "v0.9: resolves absolute path from root" do
+      data = %{
+        "name" => "root_value",
+        "items" => %{"0" => %{"name" => "scoped_value"}}
+      }
+
+      # v0.9: /name in scope /items/0 still resolves to /name (root)
+      assert Binding.resolve_path("/name", data, "/items/0", version: :v0_9) == "root_value"
+    end
+
+    test "v0.9: resolves relative path from scope" do
+      data = %{
+        "name" => "root_value",
+        "items" => %{"0" => %{"name" => "scoped_value"}}
+      }
+
+      # v0.9: relative path "name" in scope /items/0 resolves to /items/0/name
+      assert Binding.resolve_path("name", data, "/items/0", version: :v0_9) == "scoped_value"
     end
   end
 
