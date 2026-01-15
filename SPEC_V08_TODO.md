@@ -52,13 +52,16 @@ Spec + schema require each JSONL message to contain **exactly one** of:
 Current behavior:
 - `A2UI.Parser` matches known keys but doesn’t reject additional top-level keys (`lib/a2ui/parser.ex`).
 
-### P0.3 A2A `inlineCatalogs` metadata shape is wrong
+### ~~P0.3 A2A `inlineCatalogs` metadata shape is wrong~~ ✅ FIXED
 
 Spec requirement (v0.8 protocol + A2A extension):
 - `metadata.a2uiClientCapabilities.inlineCatalogs` is an **array** of catalog definition documents.
 
-Current behavior:
-- `A2UI.ClientCapabilities` stores `inline_catalogs` as a map and `to_a2a_metadata/1` emits a map (`lib/a2ui/client_capabilities.ex`).
+**Resolution:**
+- `A2UI.ClientCapabilities` now stores `inline_catalogs` as a list of catalog definition documents.
+- Each catalog document has `catalogId`, `components`, and optionally `styles`.
+- `to_a2a_metadata/1` correctly emits `inlineCatalogs` as an array.
+- Added `get_inline_catalog/2` to look up inline catalogs by ID.
 
 ---
 
