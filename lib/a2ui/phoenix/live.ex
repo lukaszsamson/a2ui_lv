@@ -7,11 +7,25 @@ defmodule A2UI.Phoenix.Live do
   - User events via handle_event
   - Two-way binding for input components
   - userAction construction and dispatch
+  - Event transport integration for client→server communication
 
   Per LiveView docs on bindings:
   - phx-click for button actions
   - phx-change with phx-debounce for text inputs
   - phx-value-* for passing data to server
+
+  ## Event Transport
+
+  Per the A2UI v0.8 spec (Section 5), client events (`userAction` and `error`)
+  should be sent back to the server. Configure an event transport to enable this:
+
+      socket = A2UI.Phoenix.Live.init(socket,
+        event_transport: my_transport_pid,
+        event_transport_module: A2UI.Transport.Local
+      )
+
+  When configured, all user actions and errors will be sent via the transport
+  in addition to invoking any configured callbacks.
   """
 
   alias A2UI.{Session, Binding}
@@ -29,8 +43,26 @@ defmodule A2UI.Phoenix.Live do
   - `:error_callback` - Function called when a client-side error occurs.
     Signature: `(error, socket) -> any()`
   - `:client_capabilities` - Optional `A2UI.ClientCapabilities` struct
+  - `:event_transport` - PID of a process implementing `A2UI.Transport.Events`.
+    When configured, userAction and error events are sent to the server.
+  - `:event_transport_module` - Module implementing `A2UI.Transport.Events`.
+    Defaults to `A2UI.Transport.Local` if not specified.
 
-  ## Example
+  ## Example (with transport)
+
+      def mount(_params, _session, socket) do
+        {:ok, transport} = A2UI.Transport.Local.start_link(
+          event_handler: fn event -> handle_server_event(event) end
+        )
+
+        socket = A2UI.Phoenix.Live.init(socket,
+          event_transport: transport,
+          action_callback: &handle_action/2  # Optional: also get local callback
+        )
+        {:ok, socket}
+      end
+
+  ## Example (without transport, callbacks only)
 
       def mount(_params, _session, socket) do
         socket = A2UI.Phoenix.Live.init(socket,
@@ -49,6 +81,8 @@ defmodule A2UI.Phoenix.Live do
       a2ui_surfaces: session.surfaces,
       a2ui_action_callback: opts[:action_callback],
       a2ui_error_callback: opts[:error_callback],
+      a2ui_event_transport: opts[:event_transport],
+      a2ui_event_transport_module: opts[:event_transport_module] || A2UI.Transport.Local,
       a2ui_last_action: nil,
       a2ui_last_error: nil
     )
@@ -136,7 +170,10 @@ defmodule A2UI.Phoenix.Live do
         }
       }
 
-      # Dispatch to callback if configured
+      # Send via transport if configured (per v0.8 spec Section 5)
+      send_event_to_transport(socket, user_action)
+
+      # Dispatch to callback if configured (for local handling)
       socket =
         if callback = socket.assigns[:a2ui_action_callback] do
           case callback.(user_action, socket) do
@@ -380,8 +417,12 @@ defmodule A2UI.Phoenix.Live do
   end
 
   # Emits an error to the configured callback and stores in assigns for debugging
+  # Also sends via transport if configured (per v0.8 spec Section 5)
   defp emit_error(socket, error_map) do
     socket = Phoenix.Component.assign(socket, :a2ui_last_error, error_map)
+
+    # Send via transport if configured (error envelope per spec)
+    send_event_to_transport(socket, error_map)
 
     if callback = socket.assigns[:a2ui_error_callback] do
       case callback.(error_map, socket) do
@@ -391,6 +432,26 @@ defmodule A2UI.Phoenix.Live do
       end
     else
       socket
+    end
+  end
+
+  # Sends an event envelope to the configured transport
+  # Per v0.8 spec Section 5, events are single-key envelopes: {"userAction": ...} or {"error": ...}
+  defp send_event_to_transport(socket, event_envelope) do
+    transport_pid = socket.assigns[:a2ui_event_transport]
+    transport_module = socket.assigns[:a2ui_event_transport_module]
+
+    if transport_pid && Process.alive?(transport_pid) do
+      case transport_module.send_event(transport_pid, event_envelope, []) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning("A2UI failed to send event via transport: #{inspect(reason)}")
+          {:error, reason}
+      end
+    else
+      :ok
     end
   end
 end

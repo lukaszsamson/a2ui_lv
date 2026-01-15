@@ -67,16 +67,21 @@ Spec requirement (v0.8 protocol + A2A extension):
 
 ## P1 — Missing end-to-end protocol behaviors (required by docs for a “renderer”)
 
-### P1.1 Client→server event sending (userAction + error)
+### ~~P1.1 Client→server event sending (userAction + error)~~ ✅ IMPLEMENTED
 
 Docs require the client to send **single-event envelopes** back to the server:
 - `{"userAction": ...}` on action
 - `{"error": ...}` on client errors
 
-Current behavior:
-- `A2UI.Phoenix.Live` constructs `userAction`, but only invokes a callback / stores it (`lib/a2ui/phoenix/live.ex`).
-- Errors are built and passed to `error_callback`, but not sent to the agent.
-- Transport behaviours exist, but LiveView is not wired to any `A2UI.Transport.Events` implementation.
+**Resolution:**
+- `A2UI.Phoenix.Live.init/2` now accepts `:event_transport` option (PID of a process implementing `A2UI.Transport.Events`).
+- When configured, both `userAction` and `error` events are sent via the transport per spec Section 5.
+- Callbacks are still invoked for local handling in addition to transport.
+- Usage example:
+  ```elixir
+  {:ok, transport} = A2UI.Transport.Local.start_link(event_handler: &handle_event/1)
+  socket = A2UI.Phoenix.Live.init(socket, event_transport: transport)
+  ```
 
 ### P1.2 A2A extension packaging (mimeType + client capabilities)
 
