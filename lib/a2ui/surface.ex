@@ -6,6 +6,12 @@ defmodule A2UI.Surface do
   - Component Buffer: Map keyed by ID (adjacency list model)
   - Data Model Store: Separate data model for binding
   - Interpreter State: Readiness flag
+
+  ## Data Model Updates
+
+  Data model changes are handled through `A2UI.DataPatch`, which provides
+  a version-agnostic internal representation. This allows the surface to
+  work with both v0.8 and v0.9 wire formats.
   """
 
   defstruct [
@@ -29,7 +35,7 @@ defmodule A2UI.Surface do
         }
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering}
-  alias A2UI.{Binding, Initializers}
+  alias A2UI.{Binding, DataPatch, Initializers}
 
   @doc """
   Creates a new surface with the given ID.
@@ -63,7 +69,9 @@ defmodule A2UI.Surface do
   end
 
   def apply_message(%__MODULE__{} = surface, %DataModelUpdate{} = update) do
-    new_data = apply_data_update(surface.data_model, update.path, update.contents)
+    # Convert v0.8 wire format to internal patch representation
+    patch = DataPatch.from_v0_8_contents(update.path, update.contents)
+    new_data = DataPatch.apply_patch(surface.data_model, patch)
     %{surface | data_model: new_data}
   end
 
@@ -96,130 +104,43 @@ defmodule A2UI.Surface do
     %{surface | data_model: new_data}
   end
 
-  # Private helpers for data model manipulation
+  @doc """
+  Applies a data patch directly to the surface.
 
-  defp apply_data_update(_data_model, nil, contents) do
-    # v0.8: if path is omitted, the entire data model is replaced
-    decode_contents(contents)
+  This is the version-agnostic way to update the data model. Both v0.8 and v0.9
+  wire format updates are first converted to patches, then applied here.
+
+  ## Example
+
+      iex> surface = A2UI.Surface.new("main")
+      iex> patch = {:set_at, "/user/name", "Alice"}
+      iex> surface = A2UI.Surface.apply_patch(surface, patch)
+      iex> surface.data_model
+      %{"user" => %{"name" => "Alice"}}
+  """
+  @spec apply_patch(t(), DataPatch.patch()) :: t()
+  def apply_patch(%__MODULE__{} = surface, patch) do
+    new_data = DataPatch.apply_patch(surface.data_model, patch)
+    %{surface | data_model: new_data}
   end
 
-  defp apply_data_update(data_model, path, contents) do
-    pointer = Binding.expand_path(path, nil)
+  @doc """
+  Applies multiple data patches in order.
 
-    cond do
-      pointer in ["", "/"] ->
-        # v0.8: if path is '/', the entire data model is replaced
-        decode_contents(contents)
+  ## Example
 
-      true ->
-        existing = Binding.get_at_pointer(data_model, pointer)
-        existing_map = if is_map(existing), do: existing, else: %{}
-        merged = merge_contents(existing_map, contents)
-        Binding.set_at_pointer(data_model, pointer, merged)
-    end
+      iex> surface = A2UI.Surface.new("main")
+      iex> patches = [
+      ...>   {:set_at, "/user/name", "Alice"},
+      ...>   {:set_at, "/user/age", 30}
+      ...> ]
+      iex> surface = A2UI.Surface.apply_patches(surface, patches)
+      iex> surface.data_model
+      %{"user" => %{"name" => "Alice", "age" => 30}}
+  """
+  @spec apply_patches(t(), [DataPatch.patch()]) :: t()
+  def apply_patches(%__MODULE__{} = surface, patches) when is_list(patches) do
+    new_data = DataPatch.apply_all(surface.data_model, patches)
+    %{surface | data_model: new_data}
   end
-
-  # v0.8 format: adjacency-list map representation
-  defp decode_contents(contents), do: merge_contents(%{}, contents)
-
-  # v0.8 format: array of {key, valueType} entries
-  defp merge_contents(existing, contents) when is_map(existing) and is_list(contents) do
-    Enum.reduce(contents, existing, fn entry, acc ->
-      case decode_entry(entry) do
-        {:ok, {key, value}} -> Map.put(acc, key, value)
-        {:error, _reason} -> acc
-      end
-    end)
-  end
-
-  defp merge_contents(existing, _contents), do: existing
-
-  # Strict v0.8 decoding per server_to_client.json:
-  # - Exactly one of valueString/valueNumber/valueBoolean/valueMap
-  # - valueMap entries do NOT support nested valueMap/valueArray (nested objects are built via path updates)
-  defp decode_entry(%{"key" => key} = entry) when is_binary(key) do
-    value_keys =
-      ["valueString", "valueNumber", "valueBoolean", "valueMap"]
-      |> Enum.filter(&Map.has_key?(entry, &1))
-
-    case value_keys do
-      ["valueString"] ->
-        value = entry["valueString"]
-
-        if is_binary(value) do
-          {:ok, {key, value}}
-        else
-          {:error, {:invalid_value, key}}
-        end
-
-      ["valueNumber"] ->
-        value = entry["valueNumber"]
-
-        if is_number(value) do
-          {:ok, {key, value}}
-        else
-          {:error, {:invalid_value, key}}
-        end
-
-      ["valueBoolean"] ->
-        value = entry["valueBoolean"]
-
-        if is_boolean(value) do
-          {:ok, {key, value}}
-        else
-          {:error, {:invalid_value, key}}
-        end
-
-      ["valueMap"] ->
-        {:ok, {key, decode_value_map_shallow(entry["valueMap"])}}
-
-      [] ->
-        {:error, {:missing_value, key}}
-
-      _ ->
-        {:error, {:invalid_value, key}}
-    end
-  end
-
-  defp decode_entry(_), do: {:error, :invalid_entry}
-
-  # v0.8 valueMap entries only support scalar typed values (no nested valueMap).
-  defp decode_value_map_shallow(entries) when is_list(entries) do
-    Enum.reduce(entries, %{}, fn entry, acc ->
-      case decode_value_map_entry(entry) do
-        {:ok, {key, value}} -> Map.put(acc, key, value)
-        {:error, _reason} -> acc
-      end
-    end)
-  end
-
-  defp decode_value_map_shallow(_), do: %{}
-
-  defp decode_value_map_entry(%{"key" => key} = entry) when is_binary(key) do
-    value_keys =
-      ["valueString", "valueNumber", "valueBoolean"]
-      |> Enum.filter(&Map.has_key?(entry, &1))
-
-    case value_keys do
-      ["valueString"] ->
-        value = entry["valueString"]
-        if is_binary(value), do: {:ok, {key, value}}, else: {:error, {:invalid_value, key}}
-
-      ["valueNumber"] ->
-        value = entry["valueNumber"]
-        if is_number(value), do: {:ok, {key, value}}, else: {:error, {:invalid_value, key}}
-
-      ["valueBoolean"] ->
-        value = entry["valueBoolean"]
-        if is_boolean(value), do: {:ok, {key, value}}, else: {:error, {:invalid_value, key}}
-
-      [] ->
-        {:error, {:missing_value, key}}
-
-      _ ->
-        {:error, {:invalid_value, key}}
-    end
-  end
-
-  defp decode_value_map_entry(_), do: {:error, :invalid_entry}
 end

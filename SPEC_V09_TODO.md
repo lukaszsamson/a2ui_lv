@@ -50,16 +50,28 @@ Per `docs/A2UI/specification/v0_9/docs/evolution_guide.md`, v0.9 changes:
 - Update `A2UI.Phoenix.Catalog.Standard` to pass version when rendering v0.9 surfaces
 - Store version on `A2UI.Surface` struct (from `createSurface` message)
 
-### P0.2 Introduce an internal “data model patch” abstraction
+### ~~P0.2 Introduce an internal "data model patch" abstraction~~ ✅ DONE
 
-v0.8 updates use adjacency-list `contents`; v0.9 updates are arbitrary JSON `value`.
+**Implementation:**
 
-Prep work:
-- Refactor `A2UI.Surface` to support an internal update representation like:
-  - `{:replace_root, value}`
-  - `{:merge_at, pointer, map_value}`
-  - `{:set_at, pointer, any_json_value}`
-- Keep v0.8 decoding as one input format and v0.9 `updateDataModel` as another.
+`A2UI.DataPatch` provides a version-agnostic internal representation for data model updates:
+
+**Patch Operations:**
+- `{:replace_root, value}` - Replace entire data model with a map value
+- `{:set_at, pointer, value}` - Set any JSON value at a JSON Pointer path
+- `{:merge_at, pointer, map_value}` - Deep merge a map at a path
+
+**Wire Format Decoders:**
+- `DataPatch.from_v0_8_contents(path, contents)` - Decodes v0.8 adjacency-list format
+- `DataPatch.from_v0_9_update(path, value)` - Decodes v0.9 native JSON format (prep)
+
+**Integration:**
+- `A2UI.Surface.apply_message/2` now uses DataPatch internally for DataModelUpdate
+- `A2UI.Surface.apply_patch/2` - Apply a single patch to surface
+- `A2UI.Surface.apply_patches/2` - Apply multiple patches in order
+
+**Remaining work for v0.9:**
+- Update `A2UI.Session` to use `from_v0_9_update/2` when parsing v0.9 `updateDataModel` messages
 
 ### P0.3 Split parsing per version (and keep adapters thin)
 
