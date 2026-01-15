@@ -171,4 +171,29 @@ defmodule A2UI.Catalog.RegistryTest do
       assert Registry.default_catalog_id() == A2UI.V0_8.standard_catalog_id()
     end
   end
+
+  describe "register_v0_8_standard/1" do
+    test "registers module for all v0.8 standard catalog aliases" do
+      Enum.each(Registry.list(), &Registry.unregister/1)
+
+      assert :ok = Registry.register_v0_8_standard(TestCatalog)
+
+      # All v0.8 aliases should now resolve to the same module
+      Enum.each(A2UI.V0_8.standard_catalog_ids(), fn catalog_id ->
+        assert {:ok, TestCatalog} = Registry.lookup(catalog_id),
+               "Expected #{catalog_id} to be registered"
+      end)
+    end
+
+    test "registers at least 2 aliases" do
+      Enum.each(Registry.list(), &Registry.unregister/1)
+      Registry.register_v0_8_standard(TestCatalog)
+
+      registered_count =
+        A2UI.V0_8.standard_catalog_ids()
+        |> Enum.count(&Registry.registered?/1)
+
+      assert registered_count >= 2
+    end
+  end
 end

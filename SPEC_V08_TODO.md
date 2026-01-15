@@ -118,15 +118,24 @@ Current behavior:
   - no policy for unknown catalogId (warn vs error vs fallback)
   - no inline catalog ingestion (likely intentionally disabled for safety; requires explicit policy)
 
-### P2.2 Standard catalog ID mismatch across v0.8 sources
+### ~~P2.2 Standard catalog ID mismatch across v0.8 sources~~ ✅ RESOLVED
 
-Mismatch:
-- `docs/A2UI/specification/v0_8/json/server_to_client.json` says default is `a2ui.org:standard_catalog_0_8_0`
-- `docs/A2UI/specification/v0_8/docs/a2ui_protocol.md` uses the GitHub URL for the v0.8 standard catalog definition
-- implementation uses the GitHub URL (`lib/a2ui/v0_8.ex`)
+**Resolution:**
 
-Decision needed:
-- alias/normalize multiple known IDs to the same standard catalog module, or pick a canonical id and enforce it.
+The implementation now supports all known v0.8 standard catalog ID aliases for maximum compatibility:
+
+- `"https://github.com/google/A2UI/blob/main/specification/v0_8/json/standard_catalog_definition.json"` (from protocol spec)
+- `"a2ui.org:standard_catalog_0_8_0"` (from server_to_client.json schema)
+
+**Implementation:**
+- `A2UI.V0_8.standard_catalog_ids/0` returns all known aliases
+- `A2UI.V0_8.standard_catalog_id?/1` checks if an ID is a known alias
+- `A2UI.Catalog.Registry.register_v0_8_standard/1` registers a module for all aliases
+- `A2UI.ClientCapabilities.new/1` defaults to all aliases in `supportedCatalogIds`
+- Application startup registers the standard catalog module for all aliases
+
+**TODO (v0.9):** When v0.9 support is added, create `A2UI.V0_9.standard_catalog_ids/0` for the v0.9 catalog ID:
+`"https://a2ui.dev/specification/v0_9/standard_catalog.json"`
 
 ### P2.3 Catalog-schema property validation is not implemented
 

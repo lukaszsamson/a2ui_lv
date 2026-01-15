@@ -94,6 +94,40 @@ defmodule A2UI.Catalog.Registry do
   end
 
   @doc """
+  Registers a module for all known v0.8 standard catalog ID aliases.
+
+  The v0.8 specification uses different catalog IDs in different sources.
+  This function registers the given module for all known aliases, ensuring
+  compatibility with servers that may use any of the known forms.
+
+  ## Parameters
+
+  - `module` - The module implementing the standard catalog
+
+  ## Returns
+
+  - `:ok` - All registrations successful
+
+  ## Known v0.8 Aliases
+
+  - `"https://github.com/google/A2UI/blob/main/specification/v0_8/json/standard_catalog_definition.json"`
+  - `"a2ui.org:standard_catalog_0_8_0"`
+
+  ## Examples
+
+      iex> A2UI.Catalog.Registry.register_v0_8_standard(A2UI.Phoenix.Catalog.Standard)
+      :ok
+  """
+  @spec register_v0_8_standard(module()) :: :ok
+  def register_v0_8_standard(module) when is_atom(module) do
+    Enum.each(A2UI.V0_8.standard_catalog_ids(), fn catalog_id ->
+      register(catalog_id, module)
+    end)
+
+    :ok
+  end
+
+  @doc """
   Looks up the catalog module for a catalog ID.
 
   ## Parameters

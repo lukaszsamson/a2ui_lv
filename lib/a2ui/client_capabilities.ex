@@ -74,7 +74,8 @@ defmodule A2UI.ClientCapabilities do
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
-    supported = opts[:supported_catalog_ids] || [A2UI.V0_8.standard_catalog_id()]
+    # Default to all known v0.8 standard catalog aliases for maximum compatibility
+    supported = opts[:supported_catalog_ids] || A2UI.V0_8.standard_catalog_ids()
     inline = opts[:inline_catalogs] || []
 
     %__MODULE__{
@@ -84,7 +85,7 @@ defmodule A2UI.ClientCapabilities do
   end
 
   @doc """
-  Returns the default client capabilities with only the standard catalog.
+  Returns the default client capabilities with all v0.8 standard catalog aliases.
   """
   @spec default() :: t()
   def default do
