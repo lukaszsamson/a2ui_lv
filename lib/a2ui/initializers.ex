@@ -2,13 +2,20 @@ defmodule A2UI.Initializers do
   @moduledoc """
   Applies the v0.8 "initializer pass" for `BoundValue`s with both `path` and `literal*`.
 
-  If the data model has no value at `path` (i.e., resolves to `nil`),
-  initialize it with the literal value.
+  Per the A2UI v0.8 protocol spec (section 4.2 "Data Binding"):
 
-  This pass is best-effort and intentionally conservative:
-  - It skips root pointers (`""` and `"/"`).
-  - It skips pointers containing numeric segments (to avoid creating maps with `"0"` keys
-    where arrays were intended).
+  > If **both** `path` and a `literal*` value are provided, the client MUST:
+  > 1. Update the data model at the specified `path` with the provided `literal*` value.
+  > 2. Bind the component property to that `path` for rendering and future updates.
+
+  This means the literal value **always overwrites** any existing value at the path.
+  This is an "implicit dataModelUpdate" that happens as part of surfaceUpdate processing.
+
+  ## Safety Measure
+
+  Pointers containing numeric segments (e.g., `/items/0/name`) are skipped to avoid
+  creating maps with `"0"` string keys where arrays were intended. Array structures
+  should be initialized via explicit `dataModelUpdate` messages.
   """
 
   alias A2UI.{Binding, Component}
@@ -57,16 +64,12 @@ defmodule A2UI.Initializers do
     pointer = Binding.expand_path(raw_path, nil)
 
     cond do
-      pointer in ["", "/"] ->
-        data_model
-
+      # Skip numeric segments to avoid creating maps where arrays are intended
       pointer_has_numeric_segments?(pointer) ->
         data_model
 
-      Binding.get_at_pointer(data_model, pointer) != nil ->
-        data_model
-
       true ->
+        # Per spec: always overwrite with the literal value (implicit dataModelUpdate)
         case literal_value(term) do
           {:ok, value} -> Binding.set_at_pointer(data_model, pointer, value)
           :error -> data_model

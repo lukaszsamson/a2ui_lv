@@ -34,19 +34,15 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 
 ## P0 — Spec violations / incorrect behavior
 
-### P0.1 BoundValue “path + literal*” initialization shorthand is not spec-compliant
+### ~~P0.1 BoundValue "path + literal*" initialization shorthand is not spec-compliant~~ ✅ FIXED
 
-Spec requirement (v0.8 protocol section “Path and Literal Value (Initialization Shorthand)”):
+Spec requirement (v0.8 protocol section "Path and Literal Value (Initialization Shorthand)"):
 - Client MUST update the data model at `path` with the `literal*` value, then bind to that path.
 
-Current behavior:
-- `A2UI.Initializers` only initializes when the current value at the pointer is `nil` and additionally skips:
-  - root pointers (`""` and `"/"`)
-  - pointers containing numeric segments
-
-Notes:
-- This is a deliberate safety/convenience choice, but it is not what the spec text says.
-- Fix requires a versioned “initializer” semantics decision (always overwrite vs only-if-missing) and deterministic array creation when the path contains numeric segments.
+**Resolution:**
+- `A2UI.Initializers` now **always overwrites** the data model at the specified path with the literal value, per spec.
+- Root pointers (`""` and `"/"`) are now supported.
+- Pointers containing numeric segments (e.g., `/items/0/name`) are still skipped as a safety measure to avoid creating maps with string-numeric keys where arrays were intended. Array structures should be initialized via explicit `dataModelUpdate` messages.
 
 ### P0.2 Server→client “single-key envelope” is not enforced
 

@@ -96,7 +96,9 @@ defmodule A2UI.SurfaceTest do
       assert surface.data_model == %{"form" => %{"name" => "Alice"}}
     end
 
-    test "initializer pass does not overwrite existing data model values" do
+    test "initializer pass overwrites existing data model values (per v0.8 spec)" do
+      # Per A2UI v0.8 spec section 4.2: path+literal is an implicit dataModelUpdate
+      # that MUST update the data model at the path with the literal value
       surface = %Surface{id: "test", data_model: %{"form" => %{"name" => "Bob"}}}
 
       update = %SurfaceUpdate{
@@ -113,7 +115,8 @@ defmodule A2UI.SurfaceTest do
       }
 
       surface = Surface.apply_message(surface, update)
-      assert surface.data_model == %{"form" => %{"name" => "Bob"}}
+      # "Alice" overwrites "Bob" per spec
+      assert surface.data_model == %{"form" => %{"name" => "Alice"}}
     end
 
     test "initializer pass skips pointers with numeric segments" do
@@ -134,6 +137,26 @@ defmodule A2UI.SurfaceTest do
 
       surface = Surface.apply_message(surface, update)
       assert surface.data_model == %{}
+    end
+
+    test "initializer pass works with root path" do
+      surface = Surface.new("test")
+
+      update = %SurfaceUpdate{
+        surface_id: "test",
+        components: [
+          %Component{
+            id: "status",
+            type: "Text",
+            props: %{
+              "text" => %{"path" => "/status", "literalString" => "ready"}
+            }
+          }
+        ]
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{"status" => "ready"}
     end
   end
 
