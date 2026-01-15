@@ -31,20 +31,20 @@ defmodule A2uiLvWeb.DemoLive do
   @impl true
   def mount(_params, _session, socket) do
     socket =
-      A2UI.Live.init(socket,
+      A2UI.Phoenix.Live.init(socket,
         action_callback: &handle_action/2,
         error_callback: &handle_error/2
       )
 
     # Get available models from Ollama
     available_models =
-      case A2UI.OllamaClient.list_available_models() do
+      case A2uiLv.Demo.OllamaClient.list_available_models() do
         {:ok, models} -> models
         {:error, _} -> []
       end
 
     # Check Claude bridge availability
-    claude_available = A2UI.ClaudeClient.available?()
+    claude_available = A2uiLv.Demo.ClaudeClient.available?()
 
     socket =
       Phoenix.Component.assign(socket,
@@ -90,7 +90,7 @@ defmodule A2uiLvWeb.DemoLive do
 
   @impl true
   def handle_info({:a2ui, _} = msg, socket) do
-    A2UI.Live.handle_a2ui_message(msg, socket)
+    A2UI.Phoenix.Live.handle_a2ui_message(msg, socket)
   end
 
   # Delayed message sending for streaming demo
@@ -293,7 +293,7 @@ defmodule A2uiLvWeb.DemoLive do
           # Claude can take 5+ minutes for complex queries with web search
           Task.start(fn ->
             result =
-              A2UI.ClaudeClient.generate(prompt,
+              A2uiLv.Demo.ClaudeClient.generate(prompt,
                 surface_id: "llm-surface",
                 on_message: fn msg -> send(pid, {:a2ui, msg}) end,
                 # 5 minutes
@@ -322,7 +322,7 @@ defmodule A2uiLvWeb.DemoLive do
             end
 
           Task.start(fn ->
-            result = A2UI.OllamaClient.generate(prompt, opts)
+            result = A2uiLv.Demo.OllamaClient.generate(prompt, opts)
             send(pid, {:llm_response, result})
           end)
       end
@@ -341,7 +341,7 @@ defmodule A2uiLvWeb.DemoLive do
 
   @impl true
   def handle_event("a2ui:" <> _ = event, params, socket) do
-    A2UI.Live.handle_a2ui_event(event, params, socket)
+    A2UI.Phoenix.Live.handle_a2ui_event(event, params, socket)
   end
 
   @impl true
@@ -429,7 +429,7 @@ defmodule A2uiLvWeb.DemoLive do
                         </button>
                       <% end %>
                     </div>
-                    <A2UI.Renderer.surface surface={surface} />
+                    <A2UI.Phoenix.Renderer.surface surface={surface} />
                   </div>
                 <% end %>
               <% end %>
@@ -810,13 +810,13 @@ defmodule A2uiLvWeb.DemoLive do
 
     # Refresh available models from Ollama
     available_models =
-      case A2UI.OllamaClient.list_available_models() do
+      case A2uiLv.Demo.OllamaClient.list_available_models() do
         {:ok, models} -> models
         {:error, _} -> socket.assigns.llm_available_models
       end
 
     # Check Claude bridge availability
-    claude_available = A2UI.ClaudeClient.available?()
+    claude_available = A2uiLv.Demo.ClaudeClient.available?()
 
     assign(socket,
       llm_prompt: "",
@@ -882,7 +882,7 @@ defmodule A2uiLvWeb.DemoLive do
         # Use Claude Agent SDK for follow-up
         Task.start(fn ->
           result =
-            A2UI.ClaudeClient.generate_with_action(
+            A2uiLv.Demo.ClaudeClient.generate_with_action(
               original_prompt,
               user_action,
               data_model,
@@ -900,7 +900,7 @@ defmodule A2uiLvWeb.DemoLive do
         # Use Ollama for follow-up
         Task.start(fn ->
           result =
-            A2UI.OllamaClient.generate_with_action(
+            A2uiLv.Demo.OllamaClient.generate_with_action(
               original_prompt,
               user_action,
               data_model,

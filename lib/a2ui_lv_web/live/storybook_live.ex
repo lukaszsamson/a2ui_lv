@@ -7,12 +7,12 @@ defmodule A2uiLvWeb.StorybookLive do
 
   use A2uiLvWeb, :live_view
 
-  alias A2UI.StorybookSamples
+  alias A2uiLv.Demo.StorybookSamples
 
   @impl true
   def mount(_params, _session, socket) do
     socket =
-      A2UI.Live.init(socket,
+      A2UI.Phoenix.Live.init(socket,
         action_callback: &handle_action/2,
         error_callback: &handle_error/2
       )
@@ -103,12 +103,12 @@ defmodule A2uiLvWeb.StorybookLive do
 
   @impl true
   def handle_event("a2ui:" <> _ = event, params, socket) do
-    A2UI.Live.handle_a2ui_event(event, params, socket)
+    A2UI.Phoenix.Live.handle_a2ui_event(event, params, socket)
   end
 
   @impl true
   def handle_info({:a2ui, _} = msg, socket) do
-    A2UI.Live.handle_a2ui_message(msg, socket)
+    A2UI.Phoenix.Live.handle_a2ui_message(msg, socket)
   end
 
   defp load_sample(socket, sample_id) do
@@ -230,7 +230,7 @@ defmodule A2uiLvWeb.StorybookLive do
                 </h2>
                 <div class="min-h-[200px]">
                   <%= for {_id, surface} <- @a2ui_surfaces do %>
-                    <A2UI.Renderer.surface surface={surface} />
+                    <A2UI.Phoenix.Renderer.surface surface={surface} />
                   <% end %>
 
                   <%= if map_size(@a2ui_surfaces) == 0 do %>

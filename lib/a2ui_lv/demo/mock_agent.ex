@@ -1,4 +1,4 @@
-defmodule A2UI.MockAgent do
+defmodule A2uiLv.Demo.MockAgent do
   @moduledoc """
   Mock agent for PoC testing.
 

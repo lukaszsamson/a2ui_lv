@@ -1,4 +1,4 @@
-defmodule A2UI.Live do
+defmodule A2UI.Phoenix.Live do
   @moduledoc """
   LiveView behavior for A2UI rendering.
 
@@ -33,7 +33,7 @@ defmodule A2UI.Live do
   ## Example
 
       def mount(_params, _session, socket) do
-        socket = A2UI.Live.init(socket,
+        socket = A2UI.Phoenix.Live.init(socket,
           action_callback: &handle_action/2,
           error_callback: &handle_error/2
         )
@@ -58,7 +58,7 @@ defmodule A2UI.Live do
   ## Example
 
       def handle_info({:a2ui, json_line}, socket) do
-        A2UI.Live.handle_a2ui_message({:a2ui, json_line}, socket)
+        A2UI.Phoenix.Live.handle_a2ui_message({:a2ui, json_line}, socket)
       end
   """
   @spec handle_a2ui_message({:a2ui, String.t()}, Phoenix.LiveView.Socket.t()) ::
@@ -136,7 +136,7 @@ defmodule A2UI.Live do
   ## Example
 
       def handle_event("a2ui:" <> _ = event, params, socket) do
-        A2UI.Live.handle_a2ui_event(event, params, socket)
+        A2UI.Phoenix.Live.handle_a2ui_event(event, params, socket)
       end
   """
   @spec handle_a2ui_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::

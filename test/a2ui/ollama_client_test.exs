@@ -1,4 +1,4 @@
-defmodule A2UI.OllamaClientTest do
+defmodule A2uiLv.Demo.OllamaClientTest do
   use ExUnit.Case, async: true
 
   @moduletag :ollama
@@ -6,7 +6,7 @@ defmodule A2UI.OllamaClientTest do
   describe "check_availability/1" do
     @tag :external
     test "returns :ok when Ollama is running and model exists" do
-      case A2UI.OllamaClient.check_availability() do
+      case A2uiLv.Demo.OllamaClient.check_availability() do
         :ok ->
           assert true
 
@@ -25,7 +25,7 @@ defmodule A2UI.OllamaClientTest do
   describe "generate/2" do
     @tag :external
     test "generates valid A2UI messages from prompt" do
-      case A2UI.OllamaClient.generate("show a simple hello message") do
+      case A2uiLv.Demo.OllamaClient.generate("show a simple hello message") do
         {:ok, messages} ->
           assert is_list(messages)
           assert length(messages) > 0

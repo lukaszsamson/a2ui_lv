@@ -1,4 +1,4 @@
-defmodule A2UI.Catalog.Standard do
+defmodule A2UI.Phoenix.Catalog.Standard do
   @moduledoc """
   Standard A2UI component catalog as Phoenix function components.
 

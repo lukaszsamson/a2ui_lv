@@ -1,4 +1,4 @@
-defmodule A2UI.OllamaClient do
+defmodule A2uiLv.Demo.OllamaClient do
   @moduledoc """
   HTTP client for Ollama API with model-specific configuration.
 
@@ -26,7 +26,7 @@ defmodule A2UI.OllamaClient do
   require Logger
 
   alias A2UI.Binding
-  alias A2UI.Ollama.{ModelConfig, PromptBuilder}
+  alias A2uiLv.Demo.Ollama.{ModelConfig, PromptBuilder}
 
   @default_base_url "http://localhost:11434"
   @default_model "gpt-oss:latest"

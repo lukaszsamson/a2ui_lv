@@ -1,4 +1,4 @@
-defmodule A2UI.ClaudeClient do
+defmodule A2uiLv.Demo.ClaudeClient do
   @moduledoc """
   ZeroMQ DEALER client for communicating with the Claude A2UI bridge.
 

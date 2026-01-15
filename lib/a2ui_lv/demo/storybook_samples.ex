@@ -1,4 +1,4 @@
-defmodule A2UI.StorybookSamples do
+defmodule A2uiLv.Demo.StorybookSamples do
   @moduledoc """
   Sample A2UI message sequences for the component storybook.
 

@@ -1,4 +1,4 @@
-defmodule A2UI.Ollama.ModelConfig do
+defmodule A2uiLv.Demo.Ollama.ModelConfig do
   @moduledoc """
   Model-specific configurations for Ollama LLM integration.
 

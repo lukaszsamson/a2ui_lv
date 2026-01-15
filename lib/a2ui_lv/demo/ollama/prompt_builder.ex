@@ -1,4 +1,4 @@
-defmodule A2UI.Ollama.PromptBuilder do
+defmodule A2uiLv.Demo.Ollama.PromptBuilder do
   @moduledoc """
   Builds system prompts for A2UI generation based on model capabilities.
 
@@ -8,10 +8,10 @@ defmodule A2UI.Ollama.PromptBuilder do
   - `:detailed` - Full documentation with examples
   """
 
-  alias A2UI.Ollama.ModelConfig
+  alias A2uiLv.Demo.Ollama.ModelConfig
 
   @catalog_definition_path Path.expand(
-                             "../../../priv/a2ui/spec/v0_8/standard_catalog_definition.json",
+                             "../../../../priv/a2ui/spec/v0_8/standard_catalog_definition.json",
                              __DIR__
                            )
   @external_resource @catalog_definition_path

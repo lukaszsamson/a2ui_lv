@@ -12,7 +12,7 @@ defmodule A2uiLv.Application do
       {DNSCluster, query: Application.get_env(:a2ui_lv, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: A2uiLv.PubSub},
       # Claude Agent SDK bridge client (ZMQ DEALER)
-      A2UI.ClaudeClient,
+      A2uiLv.Demo.ClaudeClient,
       # Start to serve requests, typically the last entry
       A2uiLvWeb.Endpoint
     ]

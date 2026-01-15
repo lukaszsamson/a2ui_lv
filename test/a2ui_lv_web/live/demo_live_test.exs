@@ -296,7 +296,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
   describe "template expansion" do
     test "renders template instances with unique DOM ids" do
       pid = self()
-      A2UI.MockAgent.send_sample_list(pid)
+      A2uiLv.Demo.MockAgent.send_sample_list(pid)
 
       lines =
         for _ <- 1..5 do
@@ -315,7 +315,7 @@ defmodule A2uiLvWeb.DemoLiveTest do
           end
         end)
 
-      html = render_component(&A2UI.Renderer.surface/1, surface: surface)
+      html = render_component(&A2UI.Phoenix.Renderer.surface/1, surface: surface)
       document = from_fragment(html)
 
       all_ids =

@@ -1,4 +1,4 @@
-defmodule A2UI.Renderer do
+defmodule A2UI.Phoenix.Renderer do
   @moduledoc """
   Top-level renderer for A2UI surfaces.
 
@@ -8,7 +8,7 @@ defmodule A2UI.Renderer do
   """
 
   use Phoenix.Component
-  alias A2UI.Catalog.Standard
+  alias A2UI.Phoenix.Catalog.Standard
 
   @doc """
   Renders an A2UI surface.
