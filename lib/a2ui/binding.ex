@@ -283,6 +283,36 @@ defmodule A2UI.Binding do
   def set_at_pointer(data, _, _value), do: data
 
   @doc """
+  Delete value at JSON Pointer path (for v0.9 delete operations).
+  Returns updated data model with the key removed.
+
+  ## Examples
+
+      iex> A2UI.Binding.delete_at_pointer(%{"user" => %{"name" => "Alice", "age" => 30}}, "/user/name")
+      %{"user" => %{"age" => 30}}
+
+      iex> A2UI.Binding.delete_at_pointer(%{"a" => 1, "b" => 2}, "/a")
+      %{"b" => 2}
+  """
+  @spec delete_at_pointer(data_model(), String.t()) :: data_model()
+  def delete_at_pointer(data, "/" <> path) do
+    segments =
+      path
+      |> String.split("/", trim: true)
+      |> Enum.map(&unescape_pointer_segment/1)
+
+    if segments == [] do
+      # Delete at root means clear everything
+      %{}
+    else
+      delete_at_path(data, segments)
+    end
+  end
+
+  def delete_at_pointer(_data, ""), do: %{}
+  def delete_at_pointer(data, _), do: data
+
+  @doc """
   Escapes a single JSON Pointer segment (RFC 6901).
 
   Use this when constructing pointer strings from user/data-model keys.
@@ -379,4 +409,38 @@ defmodule A2UI.Binding do
   defp get_literal_fallback(%{"literalBoolean" => v}), do: v
   defp get_literal_fallback(%{"literalArray" => v}), do: v
   defp get_literal_fallback(_), do: nil
+
+  # Path deletion implementation
+  defp delete_at_path(data, [key]) when is_map(data) do
+    Map.delete(data, key)
+  end
+
+  defp delete_at_path(data, [key]) when is_list(data) do
+    case Integer.parse(key) do
+      {index, ""} when index >= 0 -> List.delete_at(data, index)
+      _ -> data
+    end
+  end
+
+  defp delete_at_path(data, [key | rest]) when is_map(data) do
+    case Map.get(data, key) do
+      nil -> data
+      nested -> Map.put(data, key, delete_at_path(nested, rest))
+    end
+  end
+
+  defp delete_at_path(data, [key | rest]) when is_list(data) do
+    case Integer.parse(key) do
+      {index, ""} when index >= 0 ->
+        case Enum.at(data, index) do
+          nil -> data
+          nested -> List.replace_at(data, index, delete_at_path(nested, rest))
+        end
+
+      _ ->
+        data
+    end
+  end
+
+  defp delete_at_path(data, _), do: data
 end

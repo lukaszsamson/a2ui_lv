@@ -1,13 +1,29 @@
 defmodule A2UI.Parser do
   @moduledoc """
-  Parses A2UI JSONL messages.
+  Parses A2UI JSONL messages with automatic version detection.
 
   Per the Renderer Development Guide, implements:
   - JSONL Stream Parser: Process streaming responses line-by-line
   - Message Dispatcher: Route to appropriate handlers
+
+  ## Version Detection
+
+  This parser automatically detects v0.8 vs v0.9 wire format based on envelope keys:
+
+  - v0.8: `surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`
+  - v0.9: `createSurface`, `updateComponents`, `updateDataModel`, `deleteSurface`
+
+  Both versions produce the same internal message types for downstream compatibility.
+
+  ## Version-Specific Parsers
+
+  For explicit version handling, use:
+  - `A2UI.Parser.V0_8.parse_map/1` - v0.8 wire format only
+  - `A2UI.Parser.V0_9.parse_map/1` - v0.9 wire format only
   """
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
+  alias A2UI.Parser.{V0_8, V0_9}
 
   @type message ::
           {:surface_update, SurfaceUpdate.t()}
@@ -19,13 +35,17 @@ defmodule A2UI.Parser do
   @doc """
   Parses a single JSONL line into a typed message.
 
+  Automatically detects v0.8 vs v0.9 wire format based on envelope keys.
+
   ## Examples
 
+      # v0.8 format
       iex> A2UI.Parser.parse_line(~s({"surfaceUpdate":{"surfaceId":"main","components":[]}}))
       {:surface_update, %A2UI.Messages.SurfaceUpdate{surface_id: "main", components: []}}
 
-      iex> A2UI.Parser.parse_line(~s({"beginRendering":{"surfaceId":"main","root":"root"}}))
-      {:begin_rendering, %A2UI.Messages.BeginRendering{surface_id: "main", root_id: "root", ...}}
+      # v0.9 format
+      iex> A2UI.Parser.parse_line(~s({"updateComponents":{"surfaceId":"main","components":[]}}))
+      {:surface_update, %A2UI.Messages.SurfaceUpdate{surface_id: "main", components: []}}
 
       iex> A2UI.Parser.parse_line("not json")
       {:error, {:json_decode, %Jason.DecodeError{...}}}
@@ -46,19 +66,42 @@ defmodule A2UI.Parser do
     end
   end
 
-  # v0.8 message dispatch
-  defp dispatch_message(%{"surfaceUpdate" => data}),
-    do: {:surface_update, SurfaceUpdate.from_map(data)}
+  @doc """
+  Parses a decoded JSON map with automatic version detection.
 
-  defp dispatch_message(%{"dataModelUpdate" => data}),
-    do: {:data_model_update, DataModelUpdate.from_map(data)}
+  ## Examples
 
-  defp dispatch_message(%{"beginRendering" => data}),
-    do: {:begin_rendering, BeginRendering.from_map(data)}
+      iex> A2UI.Parser.parse_map(%{"surfaceUpdate" => %{"surfaceId" => "main", "components" => []}})
+      {:surface_update, %A2UI.Messages.SurfaceUpdate{...}}
 
-  defp dispatch_message(%{"deleteSurface" => data}),
-    do: {:delete_surface, DeleteSurface.from_map(data)}
+      iex> A2UI.Parser.parse_map(%{"updateComponents" => %{"surfaceId" => "main", "components" => []}})
+      {:surface_update, %A2UI.Messages.SurfaceUpdate{...}}
+  """
+  @spec parse_map(map()) :: message()
+  def parse_map(decoded) when is_map(decoded), do: dispatch_message(decoded)
 
-  defp dispatch_message(_),
-    do: {:error, :unknown_message_type}
+  @doc """
+  Detects the protocol version of a decoded message.
+
+  Returns `:v0_8`, `:v0_9`, or `:unknown`.
+  """
+  @spec detect_version(map()) :: :v0_8 | :v0_9 | :unknown
+  def detect_version(decoded) when is_map(decoded) do
+    cond do
+      V0_8.v0_8_message?(decoded) -> :v0_8
+      V0_9.v0_9_message?(decoded) -> :v0_9
+      true -> :unknown
+    end
+  end
+
+  def detect_version(_), do: :unknown
+
+  # Version-detecting dispatch
+  defp dispatch_message(decoded) do
+    cond do
+      V0_8.v0_8_message?(decoded) -> V0_8.parse_map(decoded)
+      V0_9.v0_9_message?(decoded) -> V0_9.parse_map(decoded)
+      true -> {:error, :unknown_message_type}
+    end
+  end
 end

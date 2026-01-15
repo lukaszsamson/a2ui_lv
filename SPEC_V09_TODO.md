@@ -73,12 +73,34 @@ Per `docs/A2UI/specification/v0_9/docs/evolution_guide.md`, v0.9 changes:
 **Remaining work for v0.9:**
 - Update `A2UI.Session` to use `from_v0_9_update/2` when parsing v0.9 `updateDataModel` messages
 
-### P0.3 Split parsing per version (and keep adapters thin)
+### ~~P0.3 Split parsing per version (and keep adapters thin)~~ ✅ DONE
 
-Prep work:
-- Create `A2UI.Parser.V0_8` and `A2UI.Parser.V0_9` (or a versioned dispatcher).
-- Implement `A2UI.V0_9.Adapter` to translate v0.9 messages into internal operations without forcing the rest of the renderer to care about version.
-- Avoid coupling Phoenix catalog rendering to v0.8-only property names.
+**Implementation:**
+
+Version-specific parsers with auto-detection:
+
+**Parser Modules:**
+- `A2UI.Parser` - Auto-detecting dispatcher (detects v0.8 vs v0.9 by envelope keys)
+- `A2UI.Parser.V0_8` - v0.8 wire format: `surfaceUpdate`, `dataModelUpdate`, `beginRendering`
+- `A2UI.Parser.V0_9` - v0.9 wire format: `createSurface`, `updateComponents`, `updateDataModel`
+
+**Version Entrypoints:**
+- `A2UI.V0_8.parse_line/1`, `A2UI.V0_8.parse_map/1` - Explicit v0.8 parsing
+- `A2UI.V0_9.Adapter.parse_line/1`, `A2UI.V0_9.Adapter.parse_map/1` - Explicit v0.9 parsing
+- `A2UI.V0_9.Adapter.standard_catalog_id/0` - v0.9 catalog ID
+
+**Internal Message Compatibility:**
+Both versions produce the same internal message structs (`SurfaceUpdate`, `BeginRendering`, etc.)
+enabling version-agnostic downstream processing.
+
+**Key Additions:**
+- `BeginRendering.from_map_v09/1` - Handles v0.9 `createSurface` (no explicit root, has `broadcastDataModel`)
+- `DataModelUpdate.from_map_v09/1` - Handles v0.9 native JSON values (includes `:delete` sentinel)
+- `DataPatch.{:delete_at, pointer}` - New patch type for v0.9 delete operations
+- `Binding.delete_at_pointer/2` - JSON Pointer deletion
+
+**Remaining work for v0.9:**
+- Catalog rendering needs version flag to use v0.9 path scoping rules (see P0.1)
 
 ---
 

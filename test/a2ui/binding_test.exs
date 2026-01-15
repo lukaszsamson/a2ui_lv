@@ -310,4 +310,46 @@ defmodule A2UI.BindingTest do
       assert Binding.get_path(nil) == nil
     end
   end
+
+  describe "delete_at_pointer/2" do
+    test "deletes key from map" do
+      data = %{"a" => 1, "b" => 2}
+      assert Binding.delete_at_pointer(data, "/a") == %{"b" => 2}
+    end
+
+    test "deletes nested key" do
+      data = %{"user" => %{"name" => "Alice", "age" => 30}}
+      assert Binding.delete_at_pointer(data, "/user/name") == %{"user" => %{"age" => 30}}
+    end
+
+    test "deletes deeply nested key" do
+      data = %{"a" => %{"b" => %{"c" => 1, "d" => 2}}}
+      assert Binding.delete_at_pointer(data, "/a/b/c") == %{"a" => %{"b" => %{"d" => 2}}}
+    end
+
+    test "empty path clears entire data" do
+      data = %{"a" => 1, "b" => 2}
+      assert Binding.delete_at_pointer(data, "") == %{}
+    end
+
+    test "root slash clears entire data" do
+      data = %{"a" => 1, "b" => 2}
+      assert Binding.delete_at_pointer(data, "/") == %{}
+    end
+
+    test "deleting missing key is no-op" do
+      data = %{"a" => 1}
+      assert Binding.delete_at_pointer(data, "/missing") == %{"a" => 1}
+    end
+
+    test "deleting from array" do
+      data = %{"items" => ["a", "b", "c"]}
+      assert Binding.delete_at_pointer(data, "/items/1") == %{"items" => ["a", "c"]}
+    end
+
+    test "handles invalid path gracefully" do
+      data = %{"a" => 1}
+      assert Binding.delete_at_pointer(data, "no_slash") == %{"a" => 1}
+    end
+  end
 end

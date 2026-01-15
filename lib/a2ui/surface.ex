@@ -68,9 +68,16 @@ defmodule A2UI.Surface do
     %{surface | components: new_components, data_model: new_data_model}
   end
 
-  def apply_message(%__MODULE__{} = surface, %DataModelUpdate{} = update) do
+  def apply_message(%__MODULE__{} = surface, %DataModelUpdate{format: :v0_8} = update) do
     # Convert v0.8 wire format to internal patch representation
     patch = DataPatch.from_v0_8_contents(update.path, update.contents)
+    new_data = DataPatch.apply_patch(surface.data_model, patch)
+    %{surface | data_model: new_data}
+  end
+
+  def apply_message(%__MODULE__{} = surface, %DataModelUpdate{format: :v0_9} = update) do
+    # Convert v0.9 wire format to internal patch representation
+    patch = DataPatch.from_v0_9_update(update.path, update.value)
     new_data = DataPatch.apply_patch(surface.data_model, patch)
     %{surface | data_model: new_data}
   end

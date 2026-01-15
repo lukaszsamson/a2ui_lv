@@ -42,6 +42,7 @@ defmodule A2UI.DataPatch do
           {:replace_root, json_value()}
           | {:set_at, pointer(), json_value()}
           | {:merge_at, pointer(), map()}
+          | {:delete_at, pointer()}
 
   # ============================================
   # Patch Application
@@ -91,6 +92,10 @@ defmodule A2UI.DataPatch do
   def apply_patch(data_model, {:merge_at, _pointer, _non_map}) do
     # merge_at with non-map is a no-op
     data_model
+  end
+
+  def apply_patch(data_model, {:delete_at, pointer}) do
+    Binding.delete_at_pointer(data_model, pointer)
   end
 
   @doc """
@@ -195,7 +200,20 @@ defmodule A2UI.DataPatch do
       iex> A2UI.DataPatch.from_v0_9_update("/user/name", "Alice")
       {:set_at, "/user/name", "Alice"}
   """
-  @spec from_v0_9_update(String.t() | nil, json_value()) :: patch()
+  @spec from_v0_9_update(String.t() | nil, json_value() | :delete) :: patch()
+  def from_v0_9_update(path, :delete) do
+    pointer = normalize_pointer(path)
+
+    case pointer do
+      p when p in ["", "/"] ->
+        # Delete at root means clear everything
+        {:replace_root, %{}}
+
+      _ ->
+        {:delete_at, pointer}
+    end
+  end
+
   def from_v0_9_update(path, value) do
     pointer = normalize_pointer(path)
 

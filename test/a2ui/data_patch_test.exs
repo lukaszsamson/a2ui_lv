@@ -79,6 +79,26 @@ defmodule A2UI.DataPatchTest do
     end
   end
 
+  describe "apply_patch/2 with :delete_at" do
+    test "deletes key at path" do
+      data = %{"user" => %{"name" => "Alice", "age" => 30}}
+      result = DataPatch.apply_patch(data, {:delete_at, "/user/name"})
+      assert result == %{"user" => %{"age" => 30}}
+    end
+
+    test "deletes top-level key" do
+      data = %{"a" => 1, "b" => 2}
+      result = DataPatch.apply_patch(data, {:delete_at, "/a"})
+      assert result == %{"b" => 2}
+    end
+
+    test "deleting missing key is no-op" do
+      data = %{"a" => 1}
+      result = DataPatch.apply_patch(data, {:delete_at, "/missing"})
+      assert result == %{"a" => 1}
+    end
+  end
+
   describe "apply_all/2" do
     test "applies patches in order" do
       patches = [
@@ -263,6 +283,17 @@ defmodule A2UI.DataPatchTest do
     test "normalizes path without leading slash" do
       assert DataPatch.from_v0_9_update("user/name", "Alice") ==
                {:set_at, "/user/name", "Alice"}
+    end
+
+    test ":delete at root produces empty replace_root" do
+      assert DataPatch.from_v0_9_update(nil, :delete) == {:replace_root, %{}}
+      assert DataPatch.from_v0_9_update("", :delete) == {:replace_root, %{}}
+      assert DataPatch.from_v0_9_update("/", :delete) == {:replace_root, %{}}
+    end
+
+    test ":delete at nested path produces delete_at" do
+      assert DataPatch.from_v0_9_update("/user/name", :delete) == {:delete_at, "/user/name"}
+      assert DataPatch.from_v0_9_update("/temp", :delete) == {:delete_at, "/temp"}
     end
   end
 end

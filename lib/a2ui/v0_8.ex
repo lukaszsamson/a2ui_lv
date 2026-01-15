@@ -2,8 +2,7 @@ defmodule A2UI.V0_8 do
   @moduledoc """
   v0.8 protocol entrypoints.
 
-  The current PoC implementation is v0.8-native end-to-end, so this module is a
-  small façade over `A2UI.Parser` to make version boundaries explicit.
+  Provides v0.8-specific parsing and catalog ID management.
 
   ## Standard Catalog ID Aliases
 
@@ -16,6 +15,7 @@ defmodule A2UI.V0_8 do
   """
 
   alias A2UI.Parser
+  alias A2UI.Parser.V0_8, as: ParserV08
 
   @type message :: Parser.message()
 
@@ -63,6 +63,30 @@ defmodule A2UI.V0_8 do
   @spec standard_catalog_id?(String.t()) :: boolean()
   def standard_catalog_id?(catalog_id), do: catalog_id in @standard_catalog_ids
 
+  @doc """
+  Parses a JSONL line as v0.8 format.
+
+  For auto-detecting format, use `A2UI.Parser.parse_line/1` instead.
+  """
   @spec parse_line(String.t()) :: message()
-  def parse_line(jsonl_line), do: Parser.parse_line(jsonl_line)
+  def parse_line(jsonl_line) do
+    case Jason.decode(jsonl_line) do
+      {:ok, decoded} ->
+        try do
+          ParserV08.parse_map(decoded)
+        rescue
+          exception ->
+            {:error, {:parse_exception, exception}}
+        end
+
+      {:error, reason} ->
+        {:error, {:json_decode, reason}}
+    end
+  end
+
+  @doc """
+  Parses a decoded JSON map as v0.8 format.
+  """
+  @spec parse_map(map()) :: message()
+  def parse_map(decoded), do: ParserV08.parse_map(decoded)
 end
