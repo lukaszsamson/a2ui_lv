@@ -7,11 +7,17 @@ defmodule A2UI.OllamaClientTest do
     @tag :external
     test "returns :ok when Ollama is running and model exists" do
       case A2UI.OllamaClient.check_availability() do
-        :ok -> assert true
-        {:error, {:connection_failed, _}} -> skip_test("Ollama not running")
+        :ok ->
+          assert true
+
+        {:error, {:connection_failed, _}} ->
+          skip_test("Ollama not running")
+
         {:error, {:model_not_found, model, available}} ->
           skip_test("Model #{model} not found. Available: #{inspect(available)}")
-        {:error, reason} -> flunk("Unexpected error: #{inspect(reason)}")
+
+        {:error, reason} ->
+          flunk("Unexpected error: #{inspect(reason)}")
       end
     end
   end

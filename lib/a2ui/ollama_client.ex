@@ -25,6 +25,7 @@ defmodule A2UI.OllamaClient do
 
   require Logger
 
+  alias A2UI.Binding
   alias A2UI.Ollama.{ModelConfig, PromptBuilder}
 
   @default_base_url "http://localhost:11434"
@@ -62,12 +63,85 @@ defmodule A2UI.OllamaClient do
 
     system_prompt = PromptBuilder.build(config, surface_id)
 
-    Logger.info(
-      "Generating A2UI with #{model_name} (schema: #{use_schema}, stream: #{stream})"
-    )
+    Logger.info("Generating A2UI with #{model_name} (schema: #{use_schema}, stream: #{stream})")
 
     if stream do
-      generate_streaming(user_prompt, system_prompt, model_name, base_url, surface_id, use_schema, on_chunk)
+      generate_streaming(
+        user_prompt,
+        system_prompt,
+        model_name,
+        base_url,
+        surface_id,
+        use_schema,
+        on_chunk
+      )
+    else
+      generate_sync(user_prompt, system_prompt, model_name, base_url, surface_id, use_schema)
+    end
+  end
+
+  @doc """
+  Generate A2UI response for a user action (follow-up request).
+
+  This sends the action context along with the current data model back to the LLM
+  so it can generate an updated UI based on user interactions.
+
+  ## Parameters
+
+  - `original_prompt` - The original prompt that created the UI
+  - `user_action` - The userAction map from the A2UI event
+  - `data_model` - Current data model state
+  - `opts` - Options (same as generate/2)
+  """
+  @spec generate_with_action(String.t(), map(), map(), keyword()) ::
+          {:ok, [String.t()]} | {:error, term()}
+  def generate_with_action(original_prompt, user_action, data_model, opts \\ []) do
+    model_name = opts[:model] || @default_model
+    base_url = opts[:base_url] || @default_base_url
+    surface_id = opts[:surface_id] || "llm-surface"
+    stream = opts[:stream] || false
+    on_chunk = opts[:on_chunk]
+
+    config = ModelConfig.get(model_name)
+
+    # Determine if we should use schema
+    use_schema =
+      case opts[:force_schema] do
+        nil -> config.supports_schema
+        val -> val
+      end
+
+    # Extract action info
+    action = user_action["userAction"] || user_action
+    action_name = action["name"] || "unknown"
+    action_context = action["context"] || %{}
+
+    action_info = %{
+      original_prompt: original_prompt,
+      action_name: action_name,
+      action_context: action_context,
+      data_model: data_model
+    }
+
+    system_prompt = PromptBuilder.build_action_prompt(config, surface_id, action_info)
+
+    Logger.info(
+      "Generating A2UI action response with #{model_name} (action: #{action_name}, schema: #{use_schema})"
+    )
+
+    # Use a minimal user prompt since context is in system prompt
+    user_prompt = "Process the action '#{action_name}' and generate the updated UI."
+
+    if stream do
+      generate_streaming(
+        user_prompt,
+        system_prompt,
+        model_name,
+        base_url,
+        surface_id,
+        use_schema,
+        on_chunk
+      )
     else
       generate_sync(user_prompt, system_prompt, model_name, base_url, surface_id, use_schema)
     end
@@ -96,7 +170,15 @@ defmodule A2UI.OllamaClient do
   end
 
   # Streaming generation
-  defp generate_streaming(user_prompt, system_prompt, model, base_url, surface_id, use_schema, on_chunk) do
+  defp generate_streaming(
+         user_prompt,
+         system_prompt,
+         model,
+         base_url,
+         surface_id,
+         use_schema,
+         on_chunk
+       ) do
     unless is_function(on_chunk, 1) do
       raise ArgumentError, "on_chunk callback required for streaming mode"
     end
@@ -110,65 +192,65 @@ defmodule A2UI.OllamaClient do
     # arbitrary chunks, so we buffer and split on newlines before decoding.
     stream_handler = fn
       {:data, data}, acc ->
-      acc =
-        case acc do
-          %{buffer: _buf, response: _resp, done: _done} ->
-            acc
+        acc =
+          case acc do
+            %{buffer: _buf, response: _resp, done: _done} ->
+              acc
 
-          %{buffer: _buf, response: _resp} ->
-            Map.put(acc, :done, false)
+            %{buffer: _buf, response: _resp} ->
+              Map.put(acc, :done, false)
 
-          %{response: resp} ->
-            %{buffer: "", response: resp, done: false}
+            %{response: resp} ->
+              %{buffer: "", response: resp, done: false}
 
-          _ ->
-            %{buffer: "", response: "", done: false}
-        end
-
-      chunk = IO.iodata_to_binary(data)
-      buffer = acc.buffer <> chunk
-      lines = String.split(buffer, "\n", trim: false)
-
-      {complete_lines, rest} =
-        case lines do
-          [] -> {[], ""}
-          _ -> {Enum.drop(lines, -1), List.last(lines) || ""}
-        end
-
-      reduce_result =
-        Enum.reduce_while(complete_lines, %{acc | buffer: rest}, fn line, acc2 ->
-          line = String.trim(line)
-
-          if line == "" do
-            {:cont, acc2}
-          else
-            case Jason.decode(line) do
-              {:ok, %{"response" => resp_chunk} = msg} when is_binary(resp_chunk) ->
-                new_response = acc2.response <> resp_chunk
-                on_chunk.(resp_chunk)
-
-                if msg["done"] == true do
-                  send(pid, {:stream_complete, new_response})
-                  {:halt, %{acc2 | response: new_response, done: true}}
-                else
-                  {:cont, %{acc2 | response: new_response}}
-                end
-
-              {:ok, %{"done" => true}} ->
-                send(pid, {:stream_complete, acc2.response})
-                {:halt, %{acc2 | done: true}}
-
-              _ ->
-                {:cont, acc2}
-            end
+            _ ->
+              %{buffer: "", response: "", done: false}
           end
-        end)
 
-      if reduce_result.done do
-        {:halt, reduce_result}
-      else
-        {:cont, reduce_result}
-      end
+        chunk = IO.iodata_to_binary(data)
+        buffer = acc.buffer <> chunk
+        lines = String.split(buffer, "\n", trim: false)
+
+        {complete_lines, rest} =
+          case lines do
+            [] -> {[], ""}
+            _ -> {Enum.drop(lines, -1), List.last(lines) || ""}
+          end
+
+        reduce_result =
+          Enum.reduce_while(complete_lines, %{acc | buffer: rest}, fn line, acc2 ->
+            line = String.trim(line)
+
+            if line == "" do
+              {:cont, acc2}
+            else
+              case Jason.decode(line) do
+                {:ok, %{"response" => resp_chunk} = msg} when is_binary(resp_chunk) ->
+                  new_response = acc2.response <> resp_chunk
+                  on_chunk.(resp_chunk)
+
+                  if msg["done"] == true do
+                    send(pid, {:stream_complete, new_response})
+                    {:halt, %{acc2 | response: new_response, done: true}}
+                  else
+                    {:cont, %{acc2 | response: new_response}}
+                  end
+
+                {:ok, %{"done" => true}} ->
+                  send(pid, {:stream_complete, acc2.response})
+                  {:halt, %{acc2 | done: true}}
+
+                _ ->
+                  {:cont, acc2}
+              end
+            end
+          end)
+
+        if reduce_result.done do
+          {:halt, reduce_result}
+        else
+          {:cont, reduce_result}
+        end
 
       {:done, _}, acc ->
         acc =
@@ -308,20 +390,10 @@ defmodule A2UI.OllamaClient do
         messages
       end
 
-    # 2. dataModelUpdate message
+    # 2. dataModelUpdate message(s) - strict v0.8 encoding (no nested valueMap).
     messages =
       if data_model = parsed["dataModel"] do
-        contents = convert_data_model_to_contents(data_model)
-
-        json =
-          Jason.encode!(%{
-            "dataModelUpdate" => %{
-              "surfaceId" => surface_id,
-              "contents" => contents
-            }
-          })
-
-        [json | messages]
+        build_data_model_update_messages(data_model, surface_id) ++ messages
       else
         messages
       end
@@ -337,28 +409,106 @@ defmodule A2UI.OllamaClient do
         json = Jason.encode!(%{"beginRendering" => begin_rendering})
         [json | messages]
       else
-        json = Jason.encode!(%{"beginRendering" => %{"surfaceId" => surface_id, "root" => "root"}})
+        json =
+          Jason.encode!(%{"beginRendering" => %{"surfaceId" => surface_id, "root" => "root"}})
+
         [json | messages]
       end
 
     Enum.reverse(messages)
   end
 
-  defp convert_data_model_to_contents(data_model) when is_map(data_model) do
-    Enum.map(data_model, fn {key, value} ->
-      content = %{"key" => to_string(key)}
+  defp build_data_model_update_messages(data_model, surface_id) when is_map(data_model) do
+    updates =
+      [%{path: nil, contents: contents_for_container(data_model)}] ++
+        nested_container_updates("", data_model)
 
-      cond do
-        is_binary(value) -> Map.put(content, "valueString", value)
-        is_number(value) -> Map.put(content, "valueNumber", value)
-        is_boolean(value) -> Map.put(content, "valueBoolean", value)
-        is_map(value) -> Map.put(content, "valueMap", convert_data_model_to_contents(value))
-        true -> Map.put(content, "valueString", inspect(value))
-      end
+    Enum.map(updates, fn %{path: path, contents: contents} ->
+      payload =
+        %{
+          "surfaceId" => surface_id,
+          "contents" => contents
+        }
+        |> maybe_put_path(path)
+
+      Jason.encode!(%{"dataModelUpdate" => payload})
     end)
   end
 
-  defp convert_data_model_to_contents(_), do: []
+  defp build_data_model_update_messages(_data_model, _surface_id), do: []
+
+  defp maybe_put_path(payload, nil), do: payload
+  defp maybe_put_path(payload, ""), do: payload
+  defp maybe_put_path(payload, path) when is_binary(path), do: Map.put(payload, "path", path)
+
+  defp contents_for_container(container) when is_map(container) do
+    Enum.map(container, fn {key, value} -> content_entry(to_string(key), value) end)
+  end
+
+  defp contents_for_container(container) when is_list(container) do
+    container
+    |> Enum.with_index()
+    |> Enum.map(fn {value, idx} -> content_entry(Integer.to_string(idx), value) end)
+  end
+
+  defp contents_for_container(_), do: []
+
+  defp content_entry(key, value) when is_binary(key) do
+    base = %{"key" => key}
+
+    cond do
+      is_binary(value) ->
+        Map.put(base, "valueString", value)
+
+      is_number(value) ->
+        Map.put(base, "valueNumber", value)
+
+      is_boolean(value) ->
+        Map.put(base, "valueBoolean", value)
+
+      is_map(value) or is_list(value) ->
+        # v0.8: valueMap cannot contain nested valueMap entries. We create an empty
+        # map placeholder and populate children via path-based updates.
+        Map.put(base, "valueMap", [])
+
+      true ->
+        Map.put(base, "valueString", inspect(value))
+    end
+  end
+
+  defp nested_container_updates(base_path, container) when is_map(container) do
+    container
+    |> Enum.flat_map(fn {key, value} ->
+      nested_updates_for_entry(base_path, to_string(key), value)
+    end)
+  end
+
+  defp nested_container_updates(base_path, container) when is_list(container) do
+    container
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {value, idx} ->
+      nested_updates_for_entry(base_path, Integer.to_string(idx), value)
+    end)
+  end
+
+  defp nested_container_updates(_base_path, _), do: []
+
+  defp nested_updates_for_entry(base_path, key, value)
+       when is_binary(key) and (is_map(value) or is_list(value)) do
+    path = Binding.append_pointer_segment(base_path, key)
+    contents = contents_for_container(value)
+
+    updates =
+      if contents == [] do
+        []
+      else
+        [%{path: path, contents: contents}]
+      end
+
+    updates ++ nested_container_updates(path, value)
+  end
+
+  defp nested_updates_for_entry(_base_path, _key, _value), do: []
 
   @doc """
   Check if Ollama is available and optionally verify a specific model exists.

@@ -23,8 +23,10 @@ defmodule A2UI.ClaudeClient do
   require Logger
 
   @default_endpoint "tcp://127.0.0.1:5555"
-  @recv_timeout 300_000  # 5 minutes - Claude can take a while
-  @poll_interval 100     # Check for messages every 100ms
+  # 5 minutes - Claude can take a while
+  @recv_timeout 300_000
+  # Check for messages every 100ms
+  @poll_interval 100
 
   # Client API
 
@@ -138,14 +140,20 @@ defmodule A2UI.ClaudeClient do
         request_id = "req_#{state.request_counter}"
         state = %{state | request_counter: state.request_counter + 1}
 
-        Logger.info("ClaudeClient sending request #{request_id}: #{String.slice(prompt, 0, 50)}...")
+        Logger.info(
+          "ClaudeClient sending request #{request_id}: #{String.slice(prompt, 0, 50)}..."
+        )
 
         # Send request: [empty_frame, request_id, prompt]
         case :erlzmq.send_multipart(socket, ["", request_id, prompt]) do
           :ok ->
             Logger.info("ClaudeClient request #{request_id} sent, waiting for response...")
             result = receive_messages(socket, request_id, on_message, [], timeout)
-            Logger.info("ClaudeClient request #{request_id} completed: #{inspect(result, limit: 100)}")
+
+            Logger.info(
+              "ClaudeClient request #{request_id} completed: #{inspect(result, limit: 100)}"
+            )
+
             {:reply, result, state}
 
           {:error, reason} ->
@@ -226,7 +234,10 @@ defmodule A2UI.ClaudeClient do
   defp handle_response(parts, socket, request_id, on_message, acc, deadline) do
     # Detailed logging to debug message format
     parts_info = Enum.map(parts, fn p -> "#{inspect(p)} (#{byte_size(p)} bytes)" end)
-    Logger.info("handle_response parts=[#{Enum.join(parts_info, ", ")}], expected_id=#{request_id}")
+
+    Logger.info(
+      "handle_response parts=[#{Enum.join(parts_info, ", ")}], expected_id=#{request_id}"
+    )
 
     # More flexible pattern matching - don't rely on pin operator
     case parts do
@@ -234,15 +245,23 @@ defmodule A2UI.ClaudeClient do
         recv_id_str = to_string(recv_id)
         msg_str = to_string(msg)
 
-        Logger.debug("Received 3-part message: recv_id=#{recv_id_str}, msg=#{String.slice(msg_str, 0, 50)}")
+        Logger.debug(
+          "Received 3-part message: recv_id=#{recv_id_str}, msg=#{String.slice(msg_str, 0, 50)}"
+        )
 
         cond do
           recv_id_str != request_id ->
-            Logger.warning("Message for different request: #{recv_id_str} (expected #{request_id})")
+            Logger.warning(
+              "Message for different request: #{recv_id_str} (expected #{request_id})"
+            )
+
             receive_loop(socket, request_id, on_message, acc, deadline)
 
           msg_str == "__done__" ->
-            Logger.info("ClaudeClient received __done__ for #{request_id}, collected #{length(acc)} messages")
+            Logger.info(
+              "ClaudeClient received __done__ for #{request_id}, collected #{length(acc)} messages"
+            )
+
             {:ok, Enum.reverse(acc)}
 
           true ->
@@ -251,8 +270,10 @@ defmodule A2UI.ClaudeClient do
             receive_loop(socket, request_id, on_message, [msg | acc], deadline)
         end
 
-      [empty, recv_id, err_marker, error_msg] when (empty == <<>> or empty == "") and err_marker == "__error__" ->
+      [empty, recv_id, err_marker, error_msg]
+      when (empty == <<>> or empty == "") and err_marker == "__error__" ->
         recv_id_str = to_string(recv_id)
+
         if recv_id_str == request_id do
           Logger.error("ClaudeClient received error for #{request_id}: #{error_msg}")
           {:error, {:bridge_error, to_string(error_msg)}}
@@ -262,7 +283,10 @@ defmodule A2UI.ClaudeClient do
         end
 
       other ->
-        Logger.warning("Unexpected message format (#{length(other)} parts): #{inspect(other, limit: 200)}")
+        Logger.warning(
+          "Unexpected message format (#{length(other)} parts): #{inspect(other, limit: 200)}"
+        )
+
         receive_loop(socket, request_id, on_message, acc, deadline)
     end
   end

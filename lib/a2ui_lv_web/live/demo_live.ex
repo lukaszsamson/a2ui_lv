@@ -292,11 +292,14 @@ defmodule A2uiLvWeb.DemoLive do
           # Use Claude Agent SDK via ZMQ bridge
           # Claude can take 5+ minutes for complex queries with web search
           Task.start(fn ->
-            result = A2UI.ClaudeClient.generate(prompt,
-              surface_id: "llm-surface",
-              on_message: fn msg -> send(pid, {:a2ui, msg}) end,
-              timeout: 300_000  # 5 minutes
-            )
+            result =
+              A2UI.ClaudeClient.generate(prompt,
+                surface_id: "llm-surface",
+                on_message: fn msg -> send(pid, {:a2ui, msg}) end,
+                # 5 minutes
+                timeout: 300_000
+              )
+
             send(pid, {:llm_done, result})
           end)
 
@@ -364,10 +367,8 @@ defmodule A2uiLvWeb.DemoLive do
               class={[
                 "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
                 if(@active_scenario == key,
-                  do:
-                    "bg-indigo-600 text-white shadow-sm",
-                  else:
-                    "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  do: "bg-indigo-600 text-white shadow-sm",
+                  else: "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 )
               ]}
             >
@@ -528,7 +529,8 @@ defmodule A2uiLvWeb.DemoLive do
   defp scenario_controls(%{scenario: "delete_surface"} = assigns) do
     ~H"""
     <div class="text-sm text-zinc-600 dark:text-zinc-400">
-      Click "Delete" on any surface to send a <code class="rounded bg-zinc-200 px-1 dark:bg-zinc-800">deleteSurface</code>
+      Click "Delete" on any surface to send a
+      <code class="rounded bg-zinc-200 px-1 dark:bg-zinc-800">deleteSurface</code>
       message
     </div>
     """
@@ -572,7 +574,8 @@ defmodule A2uiLvWeb.DemoLive do
   defp scenario_controls(%{scenario: "streaming"} = assigns) do
     ~H"""
     <div class="text-sm text-zinc-600 dark:text-zinc-400">
-      Watch components appear progressively as <code class="rounded bg-zinc-200 px-1 dark:bg-zinc-800">surfaceUpdate</code>
+      Watch components appear progressively as
+      <code class="rounded bg-zinc-200 px-1 dark:bg-zinc-800">surfaceUpdate</code>
       messages stream in
     </div>
     """
@@ -601,7 +604,7 @@ defmodule A2uiLvWeb.DemoLive do
             disabled={@llm_loading}
           >
             <option value="claude" selected={@llm_provider == "claude"}>
-              Claude <%= if @claude_available, do: "✓", else: "(unavailable)" %>
+              Claude {if @claude_available, do: "✓", else: "(unavailable)"}
             </option>
             <option value="ollama" selected={@llm_provider == "ollama"}>
               Ollama (local)
@@ -643,7 +646,7 @@ defmodule A2uiLvWeb.DemoLive do
               )
             ]}
           >
-            Stream: <%= if @llm_use_streaming, do: "ON", else: "OFF" %>
+            Stream: {if @llm_use_streaming, do: "ON", else: "OFF"}
           </button>
 
           <%!-- Schema Force Toggle --%>
@@ -690,8 +693,8 @@ defmodule A2uiLvWeb.DemoLive do
             <span class="font-medium">{model.display_name}:</span>
             {model.description}
             <span class="ml-2">
-              [schema: <%= if model.supports_schema, do: "✓", else: "✗" %>,
-              streaming: <%= if model.supports_streaming, do: "✓", else: "✗" %>,
+              [schema: {if model.supports_schema, do: "✓", else: "✗"},
+              streaming: {if model.supports_streaming, do: "✓", else: "✗"},
               prompt: {model.prompt_style}]
             </span>
           </div>
@@ -711,12 +714,15 @@ defmodule A2uiLvWeb.DemoLive do
         />
         <button
           type="submit"
-          disabled={@llm_loading or @llm_prompt == "" or (@llm_provider == "claude" and not @claude_available)}
+          disabled={
+            @llm_loading or @llm_prompt == "" or (@llm_provider == "claude" and not @claude_available)
+          }
           class={[
             "rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors",
             if(@llm_loading,
               do: "bg-indigo-400 cursor-wait",
-              else: "bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-400 disabled:cursor-not-allowed"
+              else:
+                "bg-indigo-600 hover:bg-indigo-500 disabled:bg-zinc-400 disabled:cursor-not-allowed"
             )
           ]}
         >
@@ -734,7 +740,7 @@ defmodule A2uiLvWeb.DemoLive do
       <%!-- Error Display --%>
       <%= if @llm_error do %>
         <div class="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-400">
-          <strong>Error:</strong> <%= @llm_error %>
+          <strong>Error:</strong> {@llm_error}
         </div>
       <% end %>
     </div>
@@ -855,10 +861,10 @@ defmodule A2uiLvWeb.DemoLive do
     end
   end
 
-  # Handle actions from LLM-generated UI by sending them back to Claude
+  # Handle actions from LLM-generated UI by sending them back to the LLM
   defp handle_llm_action(user_action, socket) do
     require Logger
-    Logger.info("Sending LLM action back to Claude: #{inspect(user_action)}")
+    Logger.info("Sending LLM action back to provider: #{inspect(user_action)}")
 
     # Get the current data model for the LLM surface
     surface = socket.assigns.a2ui_surfaces["llm-surface"]
@@ -891,10 +897,23 @@ defmodule A2uiLvWeb.DemoLive do
         socket
 
       _ollama ->
-        # For Ollama, we'd need similar follow-up support
-        # For now, just log that it's not supported
-        Logger.warning("Action follow-up not yet implemented for Ollama")
-        assign(socket, llm_loading: false, llm_error: "Action follow-up requires Claude provider")
+        # Use Ollama for follow-up
+        Task.start(fn ->
+          result =
+            A2UI.OllamaClient.generate_with_action(
+              original_prompt,
+              user_action,
+              data_model,
+              model: socket.assigns.llm_model,
+              surface_id: "llm-surface",
+              stream: socket.assigns.llm_use_streaming,
+              force_schema: socket.assigns.llm_force_schema
+            )
+
+          send(pid, {:llm_response, result})
+        end)
+
+        socket
     end
   end
 

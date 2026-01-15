@@ -309,7 +309,9 @@ defmodule A2UI.Catalog.Standard do
     # Row needs full width for all distributions except "start" (which can be content-sized)
     needs_full_width = distribution != "start"
     width_style = if needs_full_width, do: "width: 100%;", else: ""
-    assigns = assign(assigns, distribution: distribution, alignment: alignment, width_style: width_style)
+
+    assigns =
+      assign(assigns, distribution: distribution, alignment: alignment, width_style: width_style)
 
     ~H"""
     <div
@@ -569,7 +571,12 @@ defmodule A2UI.Catalog.Standard do
     {wrapper_class, wrapper_style} = image_size_style(hint)
 
     assigns =
-      assign(assigns, url: url, fit: fit, wrapper_class: wrapper_class, wrapper_style: wrapper_style)
+      assign(assigns,
+        url: url,
+        fit: fit,
+        wrapper_class: wrapper_class,
+        wrapper_style: wrapper_style
+      )
 
     ~H"""
     <div
@@ -1299,16 +1306,19 @@ defmodule A2UI.Catalog.Standard do
 
   defp parse_thickness(nil), do: 2
   defp parse_thickness(n) when is_number(n), do: max(1, n)
+
   defp parse_thickness(s) when is_binary(s) do
     case Integer.parse(s) do
       {n, _} -> max(1, n)
       :error -> 2
     end
   end
+
   defp parse_thickness(_), do: 2
 
   # Only allow safe hex colors
   defp parse_color(nil), do: nil
+
   defp parse_color(<<"#", rest::binary>> = color) when byte_size(rest) in [3, 6] do
     if String.match?(rest, ~r/^[0-9a-fA-F]+$/) do
       color
@@ -1316,6 +1326,7 @@ defmodule A2UI.Catalog.Standard do
       nil
     end
   end
+
   defp parse_color(_), do: nil
 
   defp button_classes(true) do

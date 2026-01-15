@@ -83,7 +83,11 @@ defmodule A2UI.Live do
 
           {:error, {:unknown_component_types, types}} ->
             error = Error.unknown_component(types, sid)
-            Logger.warning("A2UI surfaceUpdate rejected: unknown_component_types #{inspect(types)}")
+
+            Logger.warning(
+              "A2UI surfaceUpdate rejected: unknown_component_types #{inspect(types)}"
+            )
+
             {:noreply, emit_error(socket, error)}
 
           {:error, reason} ->
@@ -404,7 +408,9 @@ defmodule A2UI.Live do
         emit_error(socket, error)
 
       {:error, reason} ->
-        error = Error.validation_error("Data model validation failed: #{inspect(reason)}", surface_id)
+        error =
+          Error.validation_error("Data model validation failed: #{inspect(reason)}", surface_id)
+
         Logger.warning("A2UI data model update rejected: #{inspect(reason)}")
         emit_error(socket, error)
     end

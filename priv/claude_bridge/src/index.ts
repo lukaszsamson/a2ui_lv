@@ -77,9 +77,14 @@ Use literals for static labels. Use paths for dynamic content the user might cha
 
 # DATA MODEL FORMAT
 
-The dataModel is converted to A2UI's "contents" format:
-- Each entry has "key" and exactly ONE typed value property
-- valueString, valueNumber, valueBoolean, or valueMap (for nested objects)
+The dataModel you provide is converted to A2UI's v0.8 "dataModelUpdate.contents" adjacency list.
+
+IMPORTANT v0.8 constraint: nested "valueMap" inside a "valueMap" entry is NOT allowed.
+To stay compatible, follow these rules in your dataModel:
+- Prefer primitives (string/number/boolean) for values.
+- Nested objects are allowed, but keep them as maps of primitives (no deeply nested objects).
+- Avoid JSON arrays. If you need a list, represent it as an object with numeric string keys:
+  {"items": {"0": {"name": "A"}, "1": {"name": "B"}}}
 
 Example dataModel you provide:
 {"userName": "Alice", "itemCount": 3, "premium": true}
@@ -295,7 +300,7 @@ Your response MUST be a single JSON object with exactly these three fields:
 {
   "surfaceUpdate": { "surfaceId": "llm-surface", "components": [...] },
   "dataModel": { ... },
-  "beginRendering": { "surfaceId": "llm-surface", "root": "root" }
+  "beginRendering": { "surfaceId": "llm-surface", "root": "root", "catalogId": "...", "styles": {...} }
 }
 
 Output ONLY the JSON object. No markdown, no explanation, no code blocks.
@@ -404,20 +409,20 @@ function buildA2uiMessages(parsed: any, surfaceId: string): string[] {
 
   // 2. dataModelUpdate message
   if (parsed.dataModel) {
-    const contents = convertDataModelToContents(parsed.dataModel);
-    messages.push(JSON.stringify({
-      dataModelUpdate: {
-        surfaceId,
-        contents,
-      },
-    }));
+    messages.push(...buildDataModelUpdateMessages(parsed.dataModel, surfaceId));
   }
 
   // 3. beginRendering message
-  const beginRendering = {
+  const beginRendering: any = {
     surfaceId,
     root: parsed.beginRendering?.root || "root",
   };
+  if (typeof parsed.beginRendering?.catalogId === "string") {
+    beginRendering.catalogId = parsed.beginRendering.catalogId;
+  }
+  if (parsed.beginRendering?.styles && typeof parsed.beginRendering.styles === "object") {
+    beginRendering.styles = parsed.beginRendering.styles;
+  }
   messages.push(JSON.stringify({ beginRendering }));
 
   return messages;
@@ -426,38 +431,89 @@ function buildA2uiMessages(parsed: any, surfaceId: string): string[] {
 /**
  * Convert data model to A2UI contents format (adjacency list).
  */
-function convertDataModelToContents(dataModel: Record<string, any>): any[] {
-  return Object.entries(dataModel).map(([key, value]) => {
-    const content: any = { key };
+function buildDataModelUpdateMessages(dataModel: Record<string, any>, surfaceId: string): string[] {
+  if (!dataModel || typeof dataModel !== "object") return [];
 
-    if (typeof value === "string") {
-      content.valueString = value;
-    } else if (typeof value === "number") {
-      content.valueNumber = value;
-    } else if (typeof value === "boolean") {
-      content.valueBoolean = value;
-    } else if (Array.isArray(value)) {
-      content.valueMap = value.map((item, index) => {
-        if (typeof item === "object" && item !== null) {
-          return { key: String(index), valueMap: convertDataModelToContents(item) };
-        } else if (typeof item === "string") {
-          return { key: String(index), valueString: item };
-        } else if (typeof item === "number") {
-          return { key: String(index), valueNumber: item };
-        } else if (typeof item === "boolean") {
-          return { key: String(index), valueBoolean: item };
-        } else {
-          return { key: String(index), valueString: String(item) };
-        }
-      });
-    } else if (typeof value === "object" && value !== null) {
-      content.valueMap = convertDataModelToContents(value);
-    } else {
-      content.valueString = String(value);
+  const updates: Array<{ path?: string; contents: any[] }> = [];
+
+  // Root replacement. Non-scalar values are created as empty maps and filled via path updates.
+  const rootContents = buildContentsForContainer(dataModel);
+  updates.push({ contents: rootContents });
+
+  // Recursively add path updates for nested containers and array elements.
+  const nested = buildNestedUpdates("", dataModel);
+  updates.push(...nested);
+
+  return updates.map((u) =>
+    JSON.stringify({
+      dataModelUpdate: {
+        surfaceId,
+        ...(u.path ? { path: u.path } : {}),
+        contents: u.contents,
+      },
+    })
+  );
+}
+
+function buildContentsForContainer(container: any): any[] {
+  if (!container || typeof container !== "object") return [];
+
+  if (Array.isArray(container)) {
+    return container.map((value, idx) => contentEntry(String(idx), value));
+  }
+
+  return Object.entries(container).map(([key, value]) => contentEntry(key, value));
+}
+
+function contentEntry(key: string, value: any): any {
+  const entry: any = { key };
+
+  if (typeof value === "string") {
+    entry.valueString = value;
+  } else if (typeof value === "number") {
+    entry.valueNumber = value;
+  } else if (typeof value === "boolean") {
+    entry.valueBoolean = value;
+  } else if (value && typeof value === "object") {
+    // v0.8: valueMap entries must not contain nested valueMap entries; use empty map placeholder
+    // and populate children via path-based dataModelUpdate messages.
+    entry.valueMap = [];
+  } else {
+    entry.valueString = String(value);
+  }
+
+  return entry;
+}
+
+function buildNestedUpdates(basePath: string, container: any): Array<{ path: string; contents: any[] }> {
+  if (!container || typeof container !== "object") return [];
+
+  const entries: Array<[string, any]> = Array.isArray(container)
+    ? container.map((v, i) => [String(i), v])
+    : Object.entries(container);
+
+  const updates: Array<{ path: string; contents: any[] }> = [];
+
+  for (const [key, value] of entries) {
+    if (!value || typeof value !== "object") continue;
+
+    const path = `${basePath}/${escapeJsonPointerSegment(key)}`;
+    const contents = buildContentsForContainer(value);
+
+    // Skip empty container updates; the parent placeholder already creates the empty map.
+    if (contents.length > 0) {
+      updates.push({ path, contents });
     }
 
-    return content;
-  });
+    updates.push(...buildNestedUpdates(path, value));
+  }
+
+  return updates;
+}
+
+// RFC 6901 JSON Pointer segment escaping
+function escapeJsonPointerSegment(segment: string): string {
+  return segment.replace(/~/g, "~0").replace(/\//g, "~1");
 }
 
 /**

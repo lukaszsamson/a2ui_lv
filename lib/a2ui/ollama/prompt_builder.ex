@@ -10,6 +10,15 @@ defmodule A2UI.Ollama.PromptBuilder do
 
   alias A2UI.Ollama.ModelConfig
 
+  @catalog_definition_path Path.expand(
+                             "../../../priv/a2ui/spec/v0_8/standard_catalog_definition.json",
+                             __DIR__
+                           )
+  @external_resource @catalog_definition_path
+
+  @catalog_definition Jason.decode!(File.read!(@catalog_definition_path))
+  @catalog_components Map.fetch!(@catalog_definition, "components")
+
   @doc """
   Build a system prompt for the given model and surface ID.
   """
@@ -23,24 +32,59 @@ defmodule A2UI.Ollama.PromptBuilder do
   end
 
   @doc """
+  Build a prompt for handling follow-up actions.
+  """
+  @spec build_action_prompt(ModelConfig.t(), String.t(), map()) :: String.t()
+  def build_action_prompt(%ModelConfig{prompt_style: style}, surface_id, action_info) do
+    case style do
+      :minimal -> minimal_action_prompt(surface_id, action_info)
+      :concise -> concise_action_prompt(surface_id, action_info)
+      :detailed -> detailed_action_prompt(surface_id, action_info)
+    end
+  end
+
+  @doc """
   Get the JSON schema for models that support it.
   """
   @spec a2ui_schema() :: map()
   def a2ui_schema do
+    component_one_of =
+      @catalog_components
+      |> Enum.map(fn {type, schema} ->
+        %{
+          "type" => "object",
+          "additionalProperties" => false,
+          "properties" => %{type => schema},
+          "required" => [type]
+        }
+      end)
+
+    component_wrapper = %{
+      "type" => "object",
+      "minProperties" => 1,
+      "maxProperties" => 1,
+      "oneOf" => component_one_of
+    }
+
     %{
       "type" => "object",
+      "additionalProperties" => false,
       "properties" => %{
         "surfaceUpdate" => %{
           "type" => "object",
+          "additionalProperties" => false,
           "properties" => %{
             "surfaceId" => %{"type" => "string"},
             "components" => %{
               "type" => "array",
+              "minItems" => 1,
               "items" => %{
                 "type" => "object",
+                "additionalProperties" => false,
                 "properties" => %{
                   "id" => %{"type" => "string"},
-                  "component" => %{"type" => "object"}
+                  "weight" => %{"type" => "number"},
+                  "component" => component_wrapper
                 },
                 "required" => ["id", "component"]
               }
@@ -51,9 +95,12 @@ defmodule A2UI.Ollama.PromptBuilder do
         "dataModel" => %{"type" => "object"},
         "beginRendering" => %{
           "type" => "object",
+          "additionalProperties" => false,
           "properties" => %{
             "surfaceId" => %{"type" => "string"},
-            "root" => %{"type" => "string"}
+            "root" => %{"type" => "string"},
+            "catalogId" => %{"type" => "string"},
+            "styles" => %{"type" => "object", "additionalProperties" => true}
           },
           "required" => ["surfaceId", "root"]
         }
@@ -96,7 +143,7 @@ defmodule A2UI.Ollama.PromptBuilder do
     - TextField: {"label":{"literalString":"Label"},"text":{"path":"/field"}}
     - CheckBox: {"label":{"literalString":"Label"},"value":{"path":"/bool"}}
 
-    dataModel is flat: {"key1":"value1","key2":"value2"}
+    dataModel: Prefer primitives. Avoid arrays (v0.8 contents cannot represent arrays); if you need a list, use an object with numeric string keys: {"items":{"0":{"name":"A"},"1":{"name":"B"}}}
     Use {"path":"/key1"} in components to display dataModel values.
 
     EXAMPLE for "show a greeting":
@@ -136,11 +183,11 @@ defmodule A2UI.Ollama.PromptBuilder do
     ### Layout Components
     - Column: Vertical stack of children
       {"Column": {"children": {"explicitList": ["child_id1", "child_id2"]}}}
-      Optional: "alignment": "start|center|end|stretch", "distribution": "start|center|end|spaceBetween|spaceAround"
+      Optional: "alignment": "start|center|end|stretch", "distribution": "start|center|end|spaceBetween|spaceAround|spaceEvenly"
 
     - Row: Horizontal stack of children
       {"Row": {"children": {"explicitList": ["child_id1", "child_id2"]}}}
-      Optional: "alignment": "start|center|end|stretch", "distribution": "start|center|end|spaceBetween|spaceAround"
+      Optional: "alignment": "start|center|end|stretch", "distribution": "start|center|end|spaceBetween|spaceAround|spaceEvenly"
 
     - Card: Styled container with single child
       {"Card": {"child": "content_id"}}
@@ -167,7 +214,7 @@ defmodule A2UI.Ollama.PromptBuilder do
     ## DATA BINDING
     - Static value: {"literalString": "Hello"} or {"literalNumber": 42} or {"literalBoolean": true}
     - Dynamic binding: {"path": "/keyname"} - references dataModel["keyname"]
-    - The dataModel is a flat key-value object
+    - The dataModel should prefer primitives. Avoid JSON arrays (v0.8 contents cannot represent arrays); use maps with numeric string keys instead.
 
     ## RULES
     1. The root component MUST have id "root"
@@ -182,7 +229,115 @@ defmodule A2UI.Ollama.PromptBuilder do
     Response:
     {"surfaceUpdate":{"surfaceId":"#{surface_id}","components":[{"id":"root","component":{"Column":{"children":{"explicitList":["title","card"]}}}},{"id":"title","component":{"Text":{"text":{"literalString":"Weather"},"usageHint":"h2"}}},{"id":"card","component":{"Card":{"child":"info"}}},{"id":"info","component":{"Column":{"children":{"explicitList":["city","temp","desc"]}}}},{"id":"city","component":{"Text":{"text":{"path":"/city"},"usageHint":"h3"}}},{"id":"temp","component":{"Text":{"text":{"path":"/temperature"},"usageHint":"h1"}}},{"id":"desc","component":{"Text":{"text":{"path":"/description"},"usageHint":"caption"}}}],"surfaceId":"#{surface_id}"},"dataModel":{"city":"Paris","temperature":"18°C","description":"Partly cloudy"},"beginRendering":{"surfaceId":"#{surface_id}","root":"root"}}
 
+    beginRendering MAY include optional "catalogId" and "styles" (e.g. {"styles":{"primaryColor":"#4f46e5","font":"ui-sans-serif"}}).
+
     Now generate the A2UI JSON for the user's request.
+    """
+  end
+
+  # Action prompt builders - for handling follow-up user interactions
+
+  defp minimal_action_prompt(surface_id, %{
+         original_prompt: original,
+         action_name: action,
+         action_context: context,
+         data_model: data_model
+       }) do
+    """
+    OUTPUT JSON ONLY. No explanation.
+
+    A2UI format: {"surfaceUpdate":{"surfaceId":"#{surface_id}","components":[...]},"dataModel":{...},"beginRendering":{"surfaceId":"#{surface_id}","root":"root"}}
+
+    Original request: #{original}
+    User clicked: #{action}
+    Context: #{Jason.encode!(context)}
+    Current data: #{Jason.encode!(data_model)}
+
+    Generate UPDATED UI showing results of the action.
+    """
+  end
+
+  defp concise_action_prompt(surface_id, %{
+         original_prompt: original,
+         action_name: action,
+         action_context: context,
+         data_model: data_model
+       }) do
+    """
+    OUTPUT ONLY VALID JSON. NO EXPLANATION. NO MARKDOWN. JUST THE JSON OBJECT.
+
+    You previously created a UI for: "#{original}"
+    User clicked button with action: "#{action}"
+
+    Action context (data sent with click):
+    #{Jason.encode!(context, pretty: true)}
+
+    Current data model (form values):
+    #{Jason.encode!(data_model, pretty: true)}
+
+    Generate an UPDATED A2UI response showing the results. For example:
+    - If form submission: process data and show results/confirmation
+    - If analysis request: perform analysis and display findings
+    - Show success/error states as appropriate
+
+    Required structure:
+    {"surfaceUpdate":{"surfaceId":"#{surface_id}","components":[...]},"dataModel":{...},"beginRendering":{"surfaceId":"#{surface_id}","root":"root"}}
+
+    Component format: {"id":"unique_id","component":{"TypeName":{...props...}}}
+    Types: Column, Row, Card, Text, Button, TextField, CheckBox
+    Children: {"explicitList":["id1","id2"]} - reference by ID
+
+    The root component MUST have id "root".
+    """
+  end
+
+  defp detailed_action_prompt(surface_id, %{
+         original_prompt: original,
+         action_name: action,
+         action_context: context,
+         data_model: data_model
+       }) do
+    """
+    You are an AI agent handling a user interaction with a UI you previously generated.
+
+    IMPORTANT: Output ONLY valid JSON. No markdown, no explanation, no code blocks.
+
+    ## CONTEXT
+
+    Original user request: "#{original}"
+
+    User clicked button with action: "#{action}"
+
+    Action context (data sent with the button click):
+    #{Jason.encode!(context, pretty: true)}
+
+    Current data model (form values, user inputs):
+    #{Jason.encode!(data_model, pretty: true)}
+
+    ## YOUR TASK
+
+    Process this action and generate an UPDATED UI showing results. For example:
+    - If this is a form submission: process the data and show results/confirmation
+    - If this is an analysis request: perform the analysis and display findings with indicators
+    - Show appropriate success/error states
+
+    ## RESPONSE STRUCTURE
+    {
+      "surfaceUpdate": {
+        "surfaceId": "#{surface_id}",
+        "components": [/* flat array of component objects */]
+      },
+      "dataModel": {/* key-value pairs - the NEW state after processing */},
+      "beginRendering": {"surfaceId": "#{surface_id}", "root": "root"}
+    }
+
+    ## RULES
+    1. The root component MUST have id "root"
+    2. Children are referenced BY ID in explicitList arrays
+    3. Use path bindings {"path": "/key"} to display dynamic data from dataModel
+    4. Generate meaningful results based on the action and context
+
+    Now generate the updated A2UI JSON.
     """
   end
 end

@@ -26,6 +26,7 @@ defmodule A2UI.Renderer do
       style={surface_style(@surface)}
     >
       <%= if @surface.ready? do %>
+        <%!-- TODO(v0.8): implement clientUiCapabilities + catalog negotiation and select a catalog based on @surface.catalog_id. --%>
         <Standard.render_component
           id={@surface.root_id}
           surface={@surface}
