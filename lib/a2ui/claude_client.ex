@@ -71,14 +71,14 @@ defmodule A2UI.ClaudeClient do
     action_name = action["name"] || "unknown"
     action_context = action["context"] || %{}
 
-    # Format as action request (special format the bridge understands)
-    prompt = """
-    __ACTION__
-    Original: #{original_prompt}
-    Action: #{action_name}
-    Context: #{Jason.encode!(action_context)}
-    DataModel: #{Jason.encode!(data_model)}
-    """
+    # Format as action request (special format the bridge understands).
+    # Use JSON-encoded fields to keep each value on a single line.
+    prompt =
+      "__ACTION__\n" <>
+        "OriginalJSON: #{Jason.encode!(original_prompt)}\n" <>
+        "Action: #{action_name}\n" <>
+        "Context: #{Jason.encode!(action_context)}\n" <>
+        "DataModel: #{Jason.encode!(data_model)}"
 
     generate(prompt, opts)
   end

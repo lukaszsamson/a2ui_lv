@@ -464,7 +464,7 @@ function convertDataModelToContents(dataModel: Record<string, any>): any[] {
  * Check if prompt is an action request (contains __ACTION__ marker).
  */
 function isActionRequest(prompt: string): boolean {
-  return prompt.startsWith("__ACTION__");
+  return prompt.trimStart().startsWith("__ACTION__");
 }
 
 /**
@@ -481,14 +481,21 @@ function parseActionRequest(prompt: string): {
   actionContext: Record<string, any>;
   dataModel: Record<string, any>;
 } {
-  const lines = prompt.split("\n");
+  const lines = prompt.trimStart().split("\n");
   let originalPrompt = "";
   let actionName = "";
   let actionContext: Record<string, any> = {};
   let dataModel: Record<string, any> = {};
 
   for (const line of lines) {
-    if (line.startsWith("Original: ")) {
+    if (line.startsWith("OriginalJSON: ")) {
+      try {
+        originalPrompt = JSON.parse(line.substring("OriginalJSON: ".length));
+      } catch (e) {
+        console.error("[Claude] Failed to parse original prompt JSON:", e);
+      }
+    } else if (line.startsWith("Original: ")) {
+      // Backwards-compatible fallback
       originalPrompt = line.substring("Original: ".length);
     } else if (line.startsWith("Action: ")) {
       actionName = line.substring("Action: ".length);

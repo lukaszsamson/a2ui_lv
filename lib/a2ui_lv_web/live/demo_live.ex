@@ -131,6 +131,22 @@ defmodule A2uiLvWeb.DemoLive do
     {:noreply, socket}
   end
 
+  # Claude generation streams A2UI messages via `on_message`, so the completion
+  # notification must not re-send them (avoids duplicates).
+  def handle_info({:llm_done, {:ok, _messages}}, socket) do
+    {:noreply, assign(socket, llm_loading: false, llm_error: nil)}
+  end
+
+  def handle_info({:llm_done, {:error, reason}}, socket) do
+    {:noreply, assign(socket, llm_loading: false, llm_error: format_llm_error(reason))}
+  end
+
+  # Ollama streaming currently uses `on_chunk` for token streaming; the demo UI
+  # doesn't render partial tokens yet, but we must handle the message to avoid crashes.
+  def handle_info({:llm_chunk, _chunk}, socket) do
+    {:noreply, socket}
+  end
+
   @impl true
   def handle_event("select_scenario", %{"scenario" => scenario}, socket) do
     {:noreply, push_patch(socket, to: ~p"/demo?scenario=#{scenario}")}
@@ -281,7 +297,7 @@ defmodule A2uiLvWeb.DemoLive do
               on_message: fn msg -> send(pid, {:a2ui, msg}) end,
               timeout: 300_000  # 5 minutes
             )
-            send(pid, {:llm_response, result})
+            send(pid, {:llm_done, result})
           end)
 
         _ollama ->
@@ -869,7 +885,7 @@ defmodule A2uiLvWeb.DemoLive do
               timeout: 300_000
             )
 
-          send(pid, {:llm_response, result})
+          send(pid, {:llm_done, result})
         end)
 
         socket

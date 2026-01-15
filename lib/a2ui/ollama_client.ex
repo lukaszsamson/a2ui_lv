@@ -104,33 +104,103 @@ defmodule A2UI.OllamaClient do
     request_body =
       build_request_body(user_prompt, system_prompt, model, use_schema, true)
 
-    # Use Req with into: for streaming
     pid = self()
 
-    stream_handler = fn {:data, data}, acc ->
-      # Parse each JSON line from the stream
-      case Jason.decode(data) do
-        {:ok, %{"response" => chunk, "done" => done}} ->
-          new_response = acc.response <> chunk
+    # Ollama streaming returns newline-delimited JSON (NDJSON). Req may deliver
+    # arbitrary chunks, so we buffer and split on newlines before decoding.
+    stream_handler = fn
+      {:data, data}, acc ->
+      acc =
+        case acc do
+          %{buffer: _buf, response: _resp, done: _done} ->
+            acc
 
-          # Send chunk to callback
-          on_chunk.(chunk)
+          %{buffer: _buf, response: _resp} ->
+            Map.put(acc, :done, false)
 
-          if done do
-            # Final chunk - parse complete response
-            send(pid, {:stream_complete, new_response})
-            {:halt, %{acc | response: new_response, done: true}}
+          %{response: resp} ->
+            %{buffer: "", response: resp, done: false}
+
+          _ ->
+            %{buffer: "", response: "", done: false}
+        end
+
+      chunk = IO.iodata_to_binary(data)
+      buffer = acc.buffer <> chunk
+      lines = String.split(buffer, "\n", trim: false)
+
+      {complete_lines, rest} =
+        case lines do
+          [] -> {[], ""}
+          _ -> {Enum.drop(lines, -1), List.last(lines) || ""}
+        end
+
+      reduce_result =
+        Enum.reduce_while(complete_lines, %{acc | buffer: rest}, fn line, acc2 ->
+          line = String.trim(line)
+
+          if line == "" do
+            {:cont, acc2}
           else
-            {:cont, %{acc | response: new_response}}
+            case Jason.decode(line) do
+              {:ok, %{"response" => resp_chunk} = msg} when is_binary(resp_chunk) ->
+                new_response = acc2.response <> resp_chunk
+                on_chunk.(resp_chunk)
+
+                if msg["done"] == true do
+                  send(pid, {:stream_complete, new_response})
+                  {:halt, %{acc2 | response: new_response, done: true}}
+                else
+                  {:cont, %{acc2 | response: new_response}}
+                end
+
+              {:ok, %{"done" => true}} ->
+                send(pid, {:stream_complete, acc2.response})
+                {:halt, %{acc2 | done: true}}
+
+              _ ->
+                {:cont, acc2}
+            end
+          end
+        end)
+
+      if reduce_result.done do
+        {:halt, reduce_result}
+      else
+        {:cont, reduce_result}
+      end
+
+      {:done, _}, acc ->
+        acc =
+          case acc do
+            %{buffer: _buf, response: _resp, done: _done} -> acc
+            %{buffer: _buf, response: _resp} -> Map.put(acc, :done, false)
+            %{response: resp} -> %{buffer: "", response: resp, done: false}
+            _ -> %{buffer: "", response: "", done: false}
           end
 
-        {:ok, %{"done" => true}} ->
-          send(pid, {:stream_complete, acc.response})
-          {:halt, %{acc | done: true}}
+        # Best-effort: process any trailing buffered line (stream may not end with "\n").
+        tail = String.trim(acc.buffer || "")
 
-        _ ->
-          {:cont, acc}
-      end
+        acc =
+          if tail != "" do
+            case Jason.decode(tail) do
+              {:ok, %{"response" => resp_chunk}} when is_binary(resp_chunk) ->
+                on_chunk.(resp_chunk)
+                %{acc | response: acc.response <> resp_chunk}
+
+              _ ->
+                acc
+            end
+          else
+            acc
+          end
+
+        send(pid, {:stream_complete, acc.response})
+        {:halt, %{acc | done: true}}
+
+      _other, acc ->
+        {:cont, acc}
     end
 
     Task.start(fn ->
