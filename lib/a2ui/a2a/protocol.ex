@@ -14,8 +14,8 @@ defmodule A2UI.A2A.Protocol do
   - v0.9: `https://a2ui.org/a2a-extension/a2ui/v0.9`
 
   Clients activate extensions via:
-  - HTTP/JSON: `A2A-Extensions` header
-  - gRPC: `a2a-extensions` metadata key
+  - HTTP/JSON-RPC: `X-A2A-Extensions` header
+  - gRPC: `X-A2A-Extensions` metadata value
 
   ## Message Packaging
 
