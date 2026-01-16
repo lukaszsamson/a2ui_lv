@@ -9,8 +9,9 @@ defmodule A2UI.DataPatch do
   ## Patch Operations
 
   - `{:replace_root, value}` - Replace the entire data model
-  - `{:set_at, pointer, value}` - Set any JSON value at a path
-  - `{:merge_at, pointer, map_value}` - Deep merge a map at a path
+  - `{:set_at, pointer, value}` - Set/replace any JSON value at a path (v0.9 semantics)
+  - `{:merge_at, pointer, map_value}` - Shallow merge a map at a path (v0.8 semantics)
+  - `{:delete_at, pointer}` - Delete value at a path (v0.9 semantics)
 
   ## Wire Format Support
 
@@ -54,8 +55,9 @@ defmodule A2UI.DataPatch do
   ## Patch Types
 
   - `{:replace_root, value}` - Replaces the entire data model with `value`
-  - `{:set_at, pointer, value}` - Sets `value` at the JSON Pointer path
-  - `{:merge_at, pointer, map}` - Merges `map` into the existing map at path
+  - `{:set_at, pointer, value}` - Sets/replaces `value` at the JSON Pointer path (v0.9 semantics)
+  - `{:merge_at, pointer, map}` - Shallow merges `map` into the existing map at path (v0.8 semantics)
+  - `{:delete_at, pointer}` - Deletes the value at the JSON Pointer path (v0.9 semantics)
 
   ## Examples
 
