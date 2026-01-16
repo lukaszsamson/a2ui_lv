@@ -11,14 +11,17 @@ defmodule A2UI.Initializers do
   This means the literal value **always overwrites** any existing value at the path.
   This is an "implicit dataModelUpdate" that happens as part of surfaceUpdate processing.
 
-  ## Safety Measure
+  ## Numeric Segments
 
-  Pointers containing numeric segments (e.g., `/items/0/name`) are skipped to avoid
-  creating maps with `"0"` string keys where arrays were intended. Array structures
-  should be initialized via explicit `dataModelUpdate` messages.
+  Paths with numeric segments (e.g., `/items/0/name`) are fully supported. In v0.8,
+  collections are map-based (the wire format uses `valueMap`, not arrays), so paths
+  like `/items/0/name` create `%{"items" => %{"0" => %{"name" => "value"}}}`.
+
+  This matches the v0.8 wire format where template collections use maps with numeric
+  string keys rather than JSON arrays.
   """
 
-  alias A2UI.{Binding, Component}
+  alias A2UI.{Binding, Component, JsonPointer}
 
   @literal_keys ~w(literalString literalNumber literalBoolean literalArray)
 
@@ -33,7 +36,7 @@ defmodule A2UI.Initializers do
   defp apply_in_term(data_model, %{} = term, path) do
     cond do
       bound_value_with_literal?(term) ->
-        maybe_initialize(data_model, term)
+        initialize(data_model, term)
 
       true ->
         Enum.reduce(term, data_model, fn
@@ -60,33 +63,15 @@ defmodule A2UI.Initializers do
 
   defp bound_value_with_literal?(_), do: false
 
-  defp maybe_initialize(data_model, %{"path" => raw_path} = term) do
+  defp initialize(data_model, %{"path" => raw_path} = term) do
     pointer = Binding.expand_path(raw_path, nil)
 
-    cond do
-      # Skip numeric segments to avoid creating maps where arrays are intended
-      pointer_has_numeric_segments?(pointer) ->
-        data_model
-
-      true ->
-        # Per spec: always overwrite with the literal value (implicit dataModelUpdate)
-        case literal_value(term) do
-          {:ok, value} -> Binding.set_at_pointer(data_model, pointer, value)
-          :error -> data_model
-        end
+    # Per spec: always overwrite with the literal value (implicit dataModelUpdate)
+    # Use v0.8 semantics: creates maps for missing containers (matches valueMap wire format)
+    case literal_value(term) do
+      {:ok, value} -> JsonPointer.upsert(data_model, pointer, value, version: :v0_8)
+      :error -> data_model
     end
-  end
-
-  defp pointer_has_numeric_segments?(pointer) when is_binary(pointer) do
-    pointer
-    |> String.trim_leading("/")
-    |> String.split("/", trim: true)
-    |> Enum.any?(fn segment ->
-      case Integer.parse(segment) do
-        {n, ""} when n >= 0 -> true
-        _ -> false
-      end
-    end)
   end
 
   defp literal_value(term) do

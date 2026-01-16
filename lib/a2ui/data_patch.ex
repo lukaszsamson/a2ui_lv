@@ -34,7 +34,7 @@ defmodule A2UI.DataPatch do
       new_data = DataPatch.apply(%{}, patch)
   """
 
-  alias A2UI.Binding
+  alias A2UI.{Binding, JsonPointer}
 
   @type json_value :: String.t() | number() | boolean() | map() | list() | nil
   @type pointer :: String.t()
@@ -81,14 +81,16 @@ defmodule A2UI.DataPatch do
   end
 
   def apply_patch(data_model, {:set_at, pointer, value}) do
-    Binding.set_at_pointer(data_model, pointer, value)
+    # v0.9 semantics: creates lists for numeric segments when creating containers
+    JsonPointer.upsert(data_model, pointer, value, version: :v0_9)
   end
 
   def apply_patch(data_model, {:merge_at, pointer, map_value}) when is_map(map_value) do
+    # v0.8 semantics: shallow merge, creates maps for missing containers
     existing = Binding.get_at_pointer(data_model, pointer)
     existing_map = if is_map(existing), do: existing, else: %{}
     merged = Map.merge(existing_map, map_value)
-    Binding.set_at_pointer(data_model, pointer, merged)
+    JsonPointer.upsert(data_model, pointer, merged, version: :v0_8)
   end
 
   def apply_patch(data_model, {:merge_at, _pointer, _non_map}) do
@@ -97,7 +99,8 @@ defmodule A2UI.DataPatch do
   end
 
   def apply_patch(data_model, {:delete_at, pointer}) do
-    Binding.delete_at_pointer(data_model, pointer)
+    # v0.9 semantics for delete
+    JsonPointer.delete(data_model, pointer, version: :v0_9)
   end
 
   @doc """

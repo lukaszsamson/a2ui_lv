@@ -119,7 +119,9 @@ defmodule A2UI.SurfaceTest do
       assert surface.data_model == %{"form" => %{"name" => "Alice"}}
     end
 
-    test "initializer pass skips pointers with numeric segments" do
+    test "initializer pass handles numeric segments with v0.8 map semantics" do
+      # In v0.8, collections are map-based (valueMap wire format, not arrays)
+      # So /items/0/name creates %{"items" => %{"0" => %{"name" => "Alice"}}}
       surface = Surface.new("test")
 
       update = %SurfaceUpdate{
@@ -136,7 +138,7 @@ defmodule A2UI.SurfaceTest do
       }
 
       surface = Surface.apply_message(surface, update)
-      assert surface.data_model == %{}
+      assert surface.data_model == %{"items" => %{"0" => %{"name" => "Alice"}}}
     end
 
     test "initializer pass works with root path" do
