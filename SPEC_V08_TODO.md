@@ -289,10 +289,32 @@ This produces a data model structure:
 
 ## P4 — Security and robustness improvements (not strictly required by schema, but required by docs/production)
 
-- cycle detection in component graph (depth limit mitigates but doesn’t guarantee correctness)
-- URL allowlist / scheme validation for media components (`Image`, `Video`, `AudioPlayer`)
+### ~~P4.1 Cycle detection in component graph~~ ✅ IMPLEMENTED
+
+**Resolution:**
+- `A2UI.Validator` provides cycle detection functions:
+  - `check_cycle/2` - Checks if component ID is in visited set
+  - `track_visited/2` - Adds component ID to visited set
+  - `new_visited/0` - Creates empty visited set
+- `render_component/1` now tracks visited component IDs through the render tree
+- If a cycle is detected (component references itself directly or indirectly), an error message is displayed instead of infinite recursion
+
+### ~~P4.2 URL scheme validation for media components~~ ✅ IMPLEMENTED
+
+**Resolution:**
+- `A2UI.Validator` provides URL validation functions:
+  - `validate_media_url/1` - Returns `{:ok, url}` or `{:error, reason}`
+  - `sanitize_media_url/1` - Returns sanitized URL or nil
+  - `allowed_url_schemes/0` - Returns `["https", "http", "data", "blob"]`
+- Media components (`Image`, `Video`, `AudioPlayer`) now use `sanitize_media_url/1`:
+  - Valid URLs are rendered normally
+  - Invalid/unsafe URLs show placeholder UI instead of rendering potentially dangerous content
+- Unsafe schemes like `javascript:`, `vbscript:`, `file:`, `ftp:` are rejected
+
+### Remaining (stay permissive for now)
+
 - decide when to emit `{"error": ...}` vs silently ignore invalid `dataModelUpdate` entries
-- “strict mode” toggle: reject vs warn+render for unknown props/enums/invalid children references
+- "strict mode" toggle: reject vs warn+render for unknown props/enums/invalid children references
 
 ---
 

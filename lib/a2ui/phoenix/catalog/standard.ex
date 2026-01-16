@@ -108,27 +108,48 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   Per DESIGN_V1.md: Pass `scope_path` (a JSON Pointer string like "/items/0")
   instead of the full scope object. This keeps DOM payloads small and
   bindings are resolved at render/event time.
+
+  Cycle detection: The `visited` attribute tracks component IDs seen in the
+  current render path. If a component references itself directly or indirectly,
+  a cycle error is displayed instead of infinite recursion.
   """
   attr :id, :string, required: true
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def render_component(assigns) do
     component = assigns.surface.components[assigns.id]
+    # Initialize visited set if nil (first render in this path)
+    visited = assigns.visited || A2UI.Validator.new_visited()
 
-    if component do
-      assigns = assign(assigns, :component, component)
+    # Check for cycles before rendering
+    case A2UI.Validator.check_cycle(assigns.id, visited) do
+      {:error, {:cycle_detected, _id}} ->
+        assigns = assign(assigns, :cycle_id, assigns.id)
 
-      # Use display:contents to not break flex layout while keeping the wrapper for debugging
-      ~H"""
-      <div
-        class="a2ui-component contents"
-        id={component_dom_id(@surface.id, @id, @scope_path)}
-        data-a2ui-scope={@scope_path || ""}
-      >
-        <%= if @depth > A2UI.Validator.max_depth() do %>
+        ~H"""
+        <div class="a2ui-error rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
+          Cycle detected: component {@cycle_id} references itself
+        </div>
+        """
+
+      :ok ->
+        if component do
+          # Track this component as visited for child renders
+          new_visited = A2UI.Validator.track_visited(assigns.id, visited)
+          assigns = assign(assigns, component: component, visited: new_visited)
+
+          # Use display:contents to not break flex layout while keeping the wrapper for debugging
+          ~H"""
+          <div
+            class="a2ui-component contents"
+            id={component_dom_id(@surface.id, @id, @scope_path)}
+            data-a2ui-scope={@scope_path || ""}
+          >
+            <%= if @depth > A2UI.Validator.max_depth() do %>
           <div class="a2ui-error rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
             Max render depth exceeded
           </div>
@@ -141,6 +162,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 scope_path={@scope_path}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% "Row" -> %>
               <.a2ui_row
@@ -149,6 +171,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 scope_path={@scope_path}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% "Card" -> %>
               <.a2ui_card
@@ -158,6 +181,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 id={@id}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% "Text" -> %>
               <.a2ui_text props={@component.props} surface={@surface} scope_path={@scope_path} />
@@ -171,6 +195,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 id={@id}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% "TextField" -> %>
               <.a2ui_text_field
@@ -231,6 +256,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 scope_path={@scope_path}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% "Tabs" -> %>
               <.a2ui_tabs
@@ -240,6 +266,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 id={@id}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% "Modal" -> %>
               <.a2ui_modal
@@ -249,6 +276,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 id={@id}
                 depth={@depth}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             <% unknown -> %>
               <.a2ui_unknown type={unknown} />
@@ -256,12 +284,13 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         <% end %>
       </div>
       """
-    else
-      ~H"""
-      <div class="a2ui-missing rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
-        Missing component: {@id}
-      </div>
-      """
+        else
+          ~H"""
+          <div class="a2ui-missing rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
+            Missing component: {@id}
+          </div>
+          """
+        end
     end
   end
 
@@ -274,6 +303,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_column(assigns) do
     distribution = assigns.props["distribution"] || "start"
@@ -292,6 +322,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         depth={@depth}
         apply_weight={true}
         suppress_events={@suppress_events}
+        visited={@visited}
       />
     </div>
     """
@@ -302,6 +333,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_row(assigns) do
     distribution = assigns.props["distribution"] || "start"
@@ -325,6 +357,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         depth={@depth}
         apply_weight={true}
         suppress_events={@suppress_events}
+        visited={@visited}
       />
     </div>
     """
@@ -336,6 +369,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_card(assigns) do
     ~H"""
@@ -347,6 +381,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         scope_path={@scope_path}
         depth={@depth + 1}
         suppress_events={@suppress_events}
+        visited={@visited}
       />
     </div>
     """
@@ -401,6 +436,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_button(assigns) do
     primary = assigns.props["primary"] || false
@@ -423,6 +459,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         scope_path={@scope_path}
         depth={@depth + 1}
         suppress_events={@suppress_events}
+        visited={@visited}
       />
     </button>
     """
@@ -559,13 +596,18 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   @doc """
   Image - displays an image with optional fit and usage hint.
+
+  URL validation: Only allows safe URL schemes (https, http, data, blob).
+  Unsafe schemes like javascript: are rejected for security.
   """
   attr :props, :map, required: true
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def a2ui_image(assigns) do
-    url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    # Sanitize URL - returns nil for unsafe schemes
+    url = A2UI.Validator.sanitize_media_url(raw_url)
     fit = assigns.props["fit"] || "contain"
     hint = assigns.props["usageHint"]
     {wrapper_class, wrapper_style} = image_size_style(hint)
@@ -586,25 +628,36 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       ]}
       style={@wrapper_style}
     >
-      <img
-        src={@url}
-        class="a2ui-image w-full h-full"
-        style={"object-fit: #{@fit};"}
-        loading="lazy"
-      />
+      <%= if @url do %>
+        <img
+          src={@url}
+          class="a2ui-image w-full h-full"
+          style={"object-fit: #{@fit};"}
+          loading="lazy"
+        />
+      <% else %>
+        <div class="flex h-full w-full items-center justify-center text-zinc-400 dark:text-zinc-500">
+          <.icon name="hero-photo" class="size-8" />
+        </div>
+      <% end %>
     </div>
     """
   end
 
   @doc """
   AudioPlayer - HTML5 audio player with optional description.
+
+  URL validation: Only allows safe URL schemes (https, http, data, blob).
+  Unsafe schemes like javascript: are rejected for security.
   """
   attr :props, :map, required: true
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def a2ui_audio_player(assigns) do
-    url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    # Sanitize URL - returns nil for unsafe schemes
+    url = A2UI.Validator.sanitize_media_url(raw_url)
 
     description =
       Binding.resolve(
@@ -618,28 +671,49 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     ~H"""
     <div class="a2ui-audio-player">
       <p :if={@description} class="mb-2 text-sm text-zinc-600 dark:text-zinc-400">{@description}</p>
-      <audio controls class="w-full">
-        <source src={@url} /> Your browser does not support the audio element.
-      </audio>
+      <%= if @url do %>
+        <audio controls class="w-full">
+          <source src={@url} /> Your browser does not support the audio element.
+        </audio>
+      <% else %>
+        <div class="flex items-center gap-2 rounded-lg bg-zinc-100 p-3 text-sm text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+          <.icon name="hero-musical-note" class="size-5" />
+          <span>Invalid audio URL</span>
+        </div>
+      <% end %>
     </div>
     """
   end
 
   @doc """
   Video - HTML5 video player.
+
+  URL validation: Only allows safe URL schemes (https, http, data, blob).
+  Unsafe schemes like javascript: are rejected for security.
   """
   attr :props, :map, required: true
   attr :surface, :map, required: true
   attr :scope_path, :string, default: nil
 
   def a2ui_video(assigns) do
-    url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    # Sanitize URL - returns nil for unsafe schemes
+    url = A2UI.Validator.sanitize_media_url(raw_url)
     assigns = assign(assigns, url: url)
 
     ~H"""
-    <video controls class="a2ui-video w-full rounded-lg">
-      <source src={@url} /> Your browser does not support the video element.
-    </video>
+    <%= if @url do %>
+      <video controls class="a2ui-video w-full rounded-lg">
+        <source src={@url} /> Your browser does not support the video element.
+      </video>
+    <% else %>
+      <div class="flex items-center justify-center rounded-lg bg-zinc-100 p-6 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+        <div class="flex flex-col items-center gap-2">
+          <.icon name="hero-video-camera-slash" class="size-8" />
+          <span class="text-sm">Invalid video URL</span>
+        </div>
+      </div>
+    <% end %>
     """
   end
 
@@ -876,6 +950,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_list(assigns) do
     direction = assigns.props["direction"] || "vertical"
@@ -893,6 +968,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         scope_path={@scope_path}
         depth={@depth}
         suppress_events={@suppress_events}
+        visited={@visited}
       />
     </div>
     """
@@ -908,6 +984,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_tabs(assigns) do
     tab_items = assigns.props["tabItems"] || []
@@ -962,6 +1039,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
               scope_path={@scope_path}
               depth={@depth + 1}
               suppress_events={@suppress_events}
+              visited={@visited}
             />
           </div>
         <% end %>
@@ -980,6 +1058,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :id, :string, required: true
   attr :depth, :integer, default: 0
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def a2ui_modal(assigns) do
     entry_point_child = assigns.props["entryPointChild"]
@@ -1020,6 +1099,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
           scope_path={@scope_path}
           depth={@depth + 1}
           suppress_events={true}
+          visited={@visited}
         />
       </div>
       <%!-- Modal Dialog --%>
@@ -1053,6 +1133,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
               scope_path={@scope_path}
               depth={@depth + 1}
               suppress_events={@suppress_events}
+              visited={@visited}
             />
           </div>
         </div>
@@ -1078,6 +1159,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :depth, :integer, default: 0
   attr :apply_weight, :boolean, default: false
   attr :suppress_events, :boolean, default: false
+  attr :visited, :any, default: nil
 
   def render_children(assigns) do
     children_spec = assigns.props["children"]
@@ -1107,6 +1189,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                 scope_path={@scope_path}
                 depth={@depth + 1}
                 suppress_events={@suppress_events}
+                visited={@visited}
               />
             </div>
           <% else %>
@@ -1116,6 +1199,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
               scope_path={@scope_path}
               depth={@depth + 1}
               suppress_events={@suppress_events}
+              visited={@visited}
             />
           <% end %>
         <% end %>
@@ -1166,6 +1250,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                     scope_path={Binding.append_pointer_segment(@base_path, key)}
                     depth={@depth + 1}
                     suppress_events={@suppress_events}
+                    visited={@visited}
                   />
                 </div>
               <% else %>
@@ -1175,6 +1260,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                   scope_path={Binding.append_pointer_segment(@base_path, key)}
                   depth={@depth + 1}
                   suppress_events={@suppress_events}
+                  visited={@visited}
                 />
               <% end %>
             <% end %>

@@ -7,6 +7,10 @@ defmodule A2UI.Validator do
   - Max components per surface: 1000 (memory/render performance)
   - Max template expansion: 200 items (prevent huge lists)
   - Max data model size: 100KB (memory bounds)
+
+  Additional security validations:
+  - Cycle detection: Prevent infinite loops in component graph
+  - URL scheme validation: Only allow safe schemes for media components
   """
 
   @max_components 1000
@@ -19,6 +23,9 @@ defmodule A2UI.Validator do
     Column Row Card Text Divider Button TextField CheckBox
     Icon Image AudioPlayer Video Slider DateTimeInput MultipleChoice List Tabs Modal
   )
+
+  # Allowed URL schemes for media components (Image, Video, AudioPlayer)
+  @allowed_url_schemes ~w(https http data blob)
 
   @doc """
   Returns the maximum number of components allowed per surface.
@@ -126,6 +133,156 @@ defmodule A2UI.Validator do
       :ok
     else
       {:error, {:data_model_too_large, size, @max_data_model_bytes}}
+    end
+  end
+
+  # ============================================
+  # Cycle Detection
+  # ============================================
+
+  @doc """
+  Checks if rendering a component would create a cycle.
+
+  A cycle occurs when a component references itself directly or indirectly
+  through its children. This is detected by tracking the path of component
+  IDs during traversal.
+
+  ## Parameters
+
+  - `component_id` - The component ID about to be rendered
+  - `visited` - MapSet of component IDs already in the current render path
+
+  ## Returns
+
+  - `:ok` - No cycle detected, safe to render
+  - `{:error, {:cycle_detected, component_id}}` - Cycle detected
+
+  ## Example
+
+      visited = MapSet.new(["root", "card1"])
+      :ok = A2UI.Validator.check_cycle("text1", visited)
+      {:error, {:cycle_detected, "root"}} = A2UI.Validator.check_cycle("root", visited)
+  """
+  @spec check_cycle(String.t(), MapSet.t(String.t())) :: :ok | {:error, term()}
+  def check_cycle(component_id, visited) do
+    if MapSet.member?(visited, component_id) do
+      {:error, {:cycle_detected, component_id}}
+    else
+      :ok
+    end
+  end
+
+  @doc """
+  Adds a component ID to the visited set for cycle tracking.
+
+  ## Example
+
+      visited = A2UI.Validator.track_visited("root", MapSet.new())
+      visited = A2UI.Validator.track_visited("card1", visited)
+  """
+  @spec track_visited(String.t(), MapSet.t(String.t())) :: MapSet.t(String.t())
+  def track_visited(component_id, visited) do
+    MapSet.put(visited, component_id)
+  end
+
+  @doc """
+  Creates a new empty visited set for cycle detection.
+  """
+  @spec new_visited() :: MapSet.t(String.t())
+  def new_visited, do: MapSet.new()
+
+  # ============================================
+  # URL Scheme Validation
+  # ============================================
+
+  @doc """
+  Returns the list of allowed URL schemes for media components.
+  """
+  @spec allowed_url_schemes() :: [String.t()]
+  def allowed_url_schemes, do: @allowed_url_schemes
+
+  @doc """
+  Validates a URL for use in media components (Image, Video, AudioPlayer).
+
+  Only allows safe URL schemes: https, http, data, blob.
+  Returns the URL unchanged if valid, or nil if invalid.
+
+  ## Parameters
+
+  - `url` - The URL to validate (may be nil or any term)
+
+  ## Returns
+
+  - `{:ok, url}` - URL is valid and safe to use
+  - `{:error, :invalid_url}` - URL is nil, empty, or not a string
+  - `{:error, {:unsafe_scheme, scheme}}` - URL uses an unsafe scheme
+
+  ## Examples
+
+      iex> A2UI.Validator.validate_media_url("https://example.com/image.png")
+      {:ok, "https://example.com/image.png"}
+
+      iex> A2UI.Validator.validate_media_url("data:image/png;base64,...")
+      {:ok, "data:image/png;base64,..."}
+
+      iex> A2UI.Validator.validate_media_url("javascript:alert(1)")
+      {:error, {:unsafe_scheme, "javascript"}}
+
+      iex> A2UI.Validator.validate_media_url(nil)
+      {:error, :invalid_url}
+  """
+  @spec validate_media_url(term()) :: {:ok, String.t()} | {:error, term()}
+  def validate_media_url(nil), do: {:error, :invalid_url}
+  def validate_media_url(""), do: {:error, :invalid_url}
+
+  def validate_media_url(url) when is_binary(url) do
+    case extract_scheme(url) do
+      {:ok, scheme} ->
+        if scheme in @allowed_url_schemes do
+          {:ok, url}
+        else
+          {:error, {:unsafe_scheme, scheme}}
+        end
+
+      :error ->
+        # No scheme found - could be a relative URL, which is safe
+        # (will be resolved relative to the page origin)
+        {:ok, url}
+    end
+  end
+
+  def validate_media_url(_), do: {:error, :invalid_url}
+
+  @doc """
+  Sanitizes a URL for media components, returning nil for invalid URLs.
+
+  This is a convenience wrapper around `validate_media_url/1` that returns
+  the URL or nil, suitable for use in templates.
+
+  ## Examples
+
+      iex> A2UI.Validator.sanitize_media_url("https://example.com/img.png")
+      "https://example.com/img.png"
+
+      iex> A2UI.Validator.sanitize_media_url("javascript:alert(1)")
+      nil
+
+      iex> A2UI.Validator.sanitize_media_url(nil)
+      nil
+  """
+  @spec sanitize_media_url(term()) :: String.t() | nil
+  def sanitize_media_url(url) do
+    case validate_media_url(url) do
+      {:ok, valid_url} -> valid_url
+      {:error, _} -> nil
+    end
+  end
+
+  # Extract scheme from URL (e.g., "https" from "https://example.com")
+  defp extract_scheme(url) when is_binary(url) do
+    case Regex.run(~r/^([a-zA-Z][a-zA-Z0-9+.-]*):/, url) do
+      [_, scheme] -> {:ok, String.downcase(scheme)}
+      _ -> :error
     end
   end
 end
