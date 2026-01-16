@@ -253,7 +253,8 @@ defmodule A2UI.SSE.Event do
   end
 
   defp parse_line("data:" <> value, event) do
-    value = String.trim_leading(value, " ")
+    # SSE spec: strip single leading space after colon, plus any trailing \r from CRLF
+    value = value |> String.trim_leading(" ") |> String.trim_trailing("\r")
 
     data =
       case event.data do

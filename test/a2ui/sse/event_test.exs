@@ -103,7 +103,21 @@ defmodule A2UI.SSE.EventTest do
       {events, buffer} = Event.parse_stream(data)
 
       assert length(events) == 2
+      # Verify data doesn't contain trailing \r
+      assert Enum.at(events, 0).data == "{\"a\":1}"
+      assert Enum.at(events, 1).data == "{\"b\":2}"
       assert buffer == ""
+    end
+
+    test "handles CRLF in all fields" do
+      data = "id: 42\r\nretry: 3000\r\ndata: {\"test\":true}\r\n\r\n"
+      {events, _buffer} = Event.parse_stream(data)
+
+      assert length(events) == 1
+      event = Enum.at(events, 0)
+      assert event.id == "42"
+      assert event.retry == 3000
+      assert event.data == "{\"test\":true}"
     end
 
     test "processes events with ids for resumption" do
