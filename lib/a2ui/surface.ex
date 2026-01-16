@@ -19,16 +19,26 @@ defmodule A2UI.Surface do
     :root_id,
     :catalog_id,
     :styles,
+    :catalog_status,
     components: %{},
     data_model: %{},
     ready?: false
   ]
+
+  @typedoc """
+  Catalog resolution status.
+
+  - `:ok` - Catalog resolved successfully
+  - `{:error, reason}` - Catalog resolution failed
+  """
+  @type catalog_status :: :ok | {:error, A2UI.Catalog.Resolver.error_reason()}
 
   @type t :: %__MODULE__{
           id: String.t(),
           root_id: String.t() | nil,
           catalog_id: String.t() | nil,
           styles: map() | nil,
+          catalog_status: catalog_status() | nil,
           components: %{String.t() => A2UI.Component.t()},
           data_model: map(),
           ready?: boolean()
@@ -83,12 +93,44 @@ defmodule A2UI.Surface do
   end
 
   def apply_message(%__MODULE__{} = surface, %BeginRendering{} = msg) do
+    apply_begin_rendering(surface, msg, :ok)
+  end
+
+  @doc """
+  Applies a BeginRendering message with catalog resolution status.
+
+  This variant is called from Session after catalog resolution.
+  The catalog_status indicates whether the catalog was successfully resolved.
+  The surface is only marked ready if catalog resolution succeeded.
+
+  ## Parameters
+
+  - `surface` - The surface to update
+  - `msg` - The BeginRendering message
+  - `catalog_status` - `:ok` or `{:error, reason}` from Catalog.Resolver
+
+  ## Example
+
+      # Successful resolution
+      surface = Surface.apply_begin_rendering(surface, msg, :ok)
+      surface.ready? # => true
+
+      # Failed resolution
+      surface = Surface.apply_begin_rendering(surface, msg, {:error, :unsupported_catalog})
+      surface.ready? # => false
+  """
+  @spec apply_begin_rendering(t(), BeginRendering.t(), catalog_status()) :: t()
+  def apply_begin_rendering(%__MODULE__{} = surface, %BeginRendering{} = msg, catalog_status) do
+    # Only mark ready if catalog resolution succeeded
+    ready = catalog_status == :ok
+
     %{
       surface
       | root_id: msg.root_id,
         catalog_id: msg.catalog_id,
         styles: msg.styles,
-        ready?: true
+        catalog_status: catalog_status,
+        ready?: ready
     }
   end
 

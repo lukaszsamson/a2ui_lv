@@ -30,6 +30,7 @@ defmodule A2UI.Session do
   """
 
   alias A2UI.{Parser, Surface, Validator, Error, ClientCapabilities}
+  alias A2UI.Catalog.Resolver
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
 
   @type t :: %__MODULE__{
@@ -165,8 +166,27 @@ defmodule A2UI.Session do
     end
   end
 
-  def apply_message(session, %BeginRendering{surface_id: sid} = msg) do
-    {:ok, update_surface(session, sid, msg)}
+  def apply_message(session, %BeginRendering{surface_id: sid, catalog_id: catalog_id} = msg) do
+    # Resolve catalog ID against client capabilities
+    case Resolver.resolve(catalog_id, session.client_capabilities, :v0_8) do
+      {:ok, resolved_catalog_id} ->
+        # Use the resolved catalog ID (canonical form)
+        updated_msg = %{msg | catalog_id: resolved_catalog_id}
+        updated = update_surface_with_catalog(session, sid, updated_msg, :ok)
+        {:ok, updated}
+
+      {:error, reason} ->
+        # Catalog resolution failed - return error without updating session
+        # Per CATALOG_NEGOTIATION.md, this is "strict mode" behavior
+        error =
+          Error.catalog_error(
+            Resolver.format_error(reason),
+            sid,
+            Resolver.error_details(catalog_id, reason)
+          )
+
+        {:error, error}
+    end
   end
 
   def apply_message(session, %DeleteSurface{surface_id: sid}) do
@@ -272,6 +292,12 @@ defmodule A2UI.Session do
   defp update_surface(session, surface_id, message) do
     surface = Map.get(session.surfaces, surface_id) || Surface.new(surface_id)
     updated = Surface.apply_message(surface, message)
+    %{session | surfaces: Map.put(session.surfaces, surface_id, updated)}
+  end
+
+  defp update_surface_with_catalog(session, surface_id, %BeginRendering{} = msg, catalog_status) do
+    surface = Map.get(session.surfaces, surface_id) || Surface.new(surface_id)
+    updated = Surface.apply_begin_rendering(surface, msg, catalog_status)
     %{session | surfaces: Map.put(session.surfaces, surface_id, updated)}
   end
 end

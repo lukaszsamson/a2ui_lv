@@ -17,6 +17,7 @@ defmodule A2UI.Error do
           | :binding_error
           | :render_error
           | :unknown_component
+          | :catalog_error
 
   @doc """
   Builds an A2UI error message.
@@ -90,6 +91,24 @@ defmodule A2UI.Error do
       |> maybe_add(:surface_id, surface_id)
 
     build(:unknown_component, message, opts)
+  end
+
+  @doc """
+  Builds a catalog resolution error.
+
+  Used when `beginRendering.catalogId` cannot be resolved:
+  - Unsupported catalog (only standard catalog is supported)
+  - Inline catalog attempted (not supported)
+  - Missing catalog ID (v0.9 only)
+  """
+  @spec catalog_error(String.t(), String.t() | nil, map() | nil) :: map()
+  def catalog_error(message, surface_id \\ nil, details \\ nil) do
+    opts =
+      []
+      |> maybe_add(:surface_id, surface_id)
+      |> maybe_add(:details, details)
+
+    build(:catalog_error, message, opts)
   end
 
   # Private helpers

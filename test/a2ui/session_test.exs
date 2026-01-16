@@ -341,4 +341,109 @@ defmodule A2UI.SessionTest do
       assert Session.surface_count(session) == 2
     end
   end
+
+  describe "catalog resolution on beginRendering" do
+    setup do
+      session = Session.new()
+
+      # Create a surface first
+      surface_json =
+        ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
+
+      {:ok, session} = Session.apply_json_line(session, surface_json)
+      %{session: session}
+    end
+
+    test "nil catalogId resolves to standard catalog", %{session: session} do
+      begin_json = ~s({"beginRendering":{"surfaceId":"test","root":"root"}})
+
+      assert {:ok, updated} = Session.apply_json_line(session, begin_json)
+      assert updated.surfaces["test"].ready? == true
+      assert updated.surfaces["test"].catalog_id == A2UI.V0_8.standard_catalog_id()
+      assert updated.surfaces["test"].catalog_status == :ok
+    end
+
+    test "standard catalog ID resolves successfully", %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+
+      begin_json =
+        ~s({"beginRendering":{"surfaceId":"test","root":"root","catalogId":"#{catalog_id}"}})
+
+      assert {:ok, updated} = Session.apply_json_line(session, begin_json)
+      assert updated.surfaces["test"].ready? == true
+      assert updated.surfaces["test"].catalog_id == catalog_id
+      assert updated.surfaces["test"].catalog_status == :ok
+    end
+
+    test "standard catalog alias resolves to canonical ID", %{session: session} do
+      alias_id = "a2ui.org:standard_catalog_0_8_0"
+
+      begin_json =
+        ~s({"beginRendering":{"surfaceId":"test","root":"root","catalogId":"#{alias_id}"}})
+
+      assert {:ok, updated} = Session.apply_json_line(session, begin_json)
+      assert updated.surfaces["test"].ready? == true
+      # Resolves to canonical
+      assert updated.surfaces["test"].catalog_id == A2UI.V0_8.standard_catalog_id()
+      assert updated.surfaces["test"].catalog_status == :ok
+    end
+
+    test "unknown catalog returns error and doesn't mark ready", %{session: session} do
+      begin_json =
+        ~s({"beginRendering":{"surfaceId":"test","root":"root","catalogId":"https://unknown/catalog.json"}})
+
+      assert {:error, error} = Session.apply_json_line(session, begin_json)
+      assert error["error"]["type"] == "catalog_error"
+      assert error["error"]["message"] =~ "standard catalog"
+      assert error["error"]["surfaceId"] == "test"
+      assert error["error"]["details"]["catalogId"] == "https://unknown/catalog.json"
+
+      # Session should be unchanged (surface not updated)
+      assert session.surfaces["test"].ready? == false
+    end
+
+    test "inline catalog returns error", %{session: session} do
+      # Create a session with inline catalogs
+      inline = %{
+        "catalogId" => "inline.custom",
+        "components" => %{},
+        "styles" => %{}
+      }
+
+      caps = A2UI.ClientCapabilities.new(inline_catalogs: [inline])
+      session = %{session | client_capabilities: caps}
+
+      begin_json =
+        ~s({"beginRendering":{"surfaceId":"test","root":"root","catalogId":"inline.custom"}})
+
+      assert {:error, error} = Session.apply_json_line(session, begin_json)
+      assert error["error"]["type"] == "catalog_error"
+      assert error["error"]["message"] =~ "Inline"
+    end
+
+    test "BeginRendering message with explicit catalog", %{session: session} do
+      begin_msg = %A2UI.Messages.BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: A2UI.V0_8.standard_catalog_id(),
+        styles: nil
+      }
+
+      assert {:ok, updated} = Session.apply_message(session, begin_msg)
+      assert updated.surfaces["test"].ready? == true
+      assert updated.surfaces["test"].catalog_status == :ok
+    end
+
+    test "BeginRendering message with unknown catalog", %{session: session} do
+      begin_msg = %A2UI.Messages.BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: "unknown.catalog",
+        styles: nil
+      }
+
+      assert {:error, error} = Session.apply_message(session, begin_msg)
+      assert error["error"]["type"] == "catalog_error"
+    end
+  end
 end

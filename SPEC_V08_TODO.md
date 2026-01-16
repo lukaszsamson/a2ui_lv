@@ -181,18 +181,43 @@ Process.send_after(self(), :reconnect, delay)
 
 ## P2 — Catalog negotiation and strict validation
 
-### P2.1 Catalog negotiation and compatibility checks are incomplete
+### ~~P2.1 Catalog negotiation and compatibility checks are incomplete~~ ✅ MINIMAL IMPLEMENTATION
 
 Docs specify:
 - Client advertises `supportedCatalogIds` (and optionally `inlineCatalogs`)
 - Server chooses a catalog and sends it in `beginRendering.catalogId`
 - Client must default to the standard catalog if omitted
 
-Current behavior:
-- Catalog dispatch exists (`A2UI.Catalog.Registry` + `A2UI.Phoenix.Renderer`), but there is no compatibility validation:
-  - no check that `beginRendering.catalogId` is supported by client capabilities
-  - no policy for unknown catalogId (warn vs error vs fallback)
-  - no inline catalog ingestion (likely intentionally disabled for safety; requires explicit policy)
+**Minimal Implementation (standard catalog only):**
+
+`A2UI.Catalog.Resolver` validates catalog IDs on `beginRendering`:
+
+- **nil catalogId** → Defaults to standard catalog (v0.8 behavior)
+- **Standard catalog aliases** → Resolves to canonical standard catalog ID
+- **Unknown catalogs** → Returns error, surface not marked ready
+- **Inline catalogs** → Returns error (not supported)
+
+`A2UI.Session.apply_message/2` for BeginRendering:
+- Calls `Resolver.resolve/3` before updating surface
+- On success: Updates surface with resolved catalog ID, marks ready
+- On error: Returns `{:error, catalog_error}`, session unchanged
+
+`A2UI.Surface` now tracks:
+- `catalog_status` - `:ok` or `{:error, reason}` from resolution
+
+**Error behavior (strict mode):**
+- Unsupported catalogs return error without updating session
+- Surface is NOT marked ready on catalog resolution failure
+- Caller should emit error event to server
+
+**v0.9 compatibility:**
+- `Resolver.resolve/3` accepts version (`:v0_8` or `:v0_9`)
+- v0.9: Returns `:missing_catalog_id` error when catalogId is nil (required in v0.9)
+
+**Future work:**
+- Custom catalog support (requires catalog module registration)
+- Inline catalog ingestion (security implications)
+- Fallback/compatibility mode (warn but render with standard catalog)
 
 ### ~~P2.2 Standard catalog ID mismatch across v0.8 sources~~ ✅ RESOLVED
 
