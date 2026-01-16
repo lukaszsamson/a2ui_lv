@@ -52,6 +52,7 @@ defmodule A2UI.ParserTest do
       assert msg.root_id == "root"
       assert msg.catalog_id == nil
       assert msg.styles == nil
+      assert msg.protocol_version == :v0_8
     end
 
     test "parses v0.8 beginRendering with catalogId and styles" do
@@ -99,6 +100,7 @@ defmodule A2UI.ParserTest do
       assert msg.root_id == "root"
       assert msg.catalog_id == "test.catalog"
       assert msg.broadcast_data_model? == false
+      assert msg.protocol_version == :v0_9
     end
 
     test "parses v0.9 createSurface with broadcastDataModel" do

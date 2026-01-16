@@ -291,7 +291,8 @@ defmodule A2UI.SurfaceTest do
         surface_id: "test",
         root_id: "root",
         catalog_id: nil,
-        styles: nil
+        styles: nil,
+        protocol_version: :v0_8
       }
 
       surface = Surface.apply_message(surface, render)
@@ -307,12 +308,43 @@ defmodule A2UI.SurfaceTest do
         surface_id: "test",
         root_id: "root",
         catalog_id: "standard",
-        styles: nil
+        styles: nil,
+        protocol_version: :v0_8
       }
 
       surface = Surface.apply_message(surface, render)
       assert surface.catalog_id == "standard"
       assert surface.styles == nil
+    end
+
+    test "stores protocol_version from v0.8 message" do
+      surface = Surface.new("test")
+
+      render = %BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: nil,
+        styles: nil,
+        protocol_version: :v0_8
+      }
+
+      surface = Surface.apply_message(surface, render)
+      assert surface.protocol_version == :v0_8
+    end
+
+    test "stores protocol_version from v0.9 message" do
+      surface = Surface.new("test")
+
+      render = %BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: "test.catalog",
+        styles: nil,
+        protocol_version: :v0_9
+      }
+
+      surface = Surface.apply_message(surface, render)
+      assert surface.protocol_version == :v0_9
     end
   end
 

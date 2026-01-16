@@ -396,7 +396,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
 
   def a2ui_text(assigns) do
-    text = Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path)
+    opts = binding_opts(assigns.surface)
+    text = Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path, opts)
     hint = assigns.props["usageHint"] || "body"
     {style, class} = text_style(hint)
     assigns = assign(assigns, text: text, style: style, class: class)
@@ -479,16 +480,18 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :suppress_events, :boolean, default: false
 
   def a2ui_text_field(assigns) do
+    opts = binding_opts(assigns.surface)
+
     label =
-      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path, opts)
 
     text_prop = assigns.props["text"]
-    text = Binding.resolve(text_prop, assigns.surface.data_model, assigns.scope_path)
+    text = Binding.resolve(text_prop, assigns.surface.data_model, assigns.scope_path, opts)
     field_type = assigns.props["textFieldType"] || "shortText"
 
     # Get absolute path for binding (expand if relative)
     raw_path = Binding.get_path(text_prop)
-    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
     # Handle validationRegexp (v0.8 standard catalog)
     validation_regexp = assigns.props["validationRegexp"]
@@ -538,15 +541,17 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :suppress_events, :boolean, default: false
 
   def a2ui_checkbox(assigns) do
+    opts = binding_opts(assigns.surface)
+
     label =
-      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path, opts)
 
     value =
-      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path, opts)
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
-    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
     assigns = assign(assigns, label: label, value: !!value, path: path)
 
@@ -585,7 +590,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
 
   def a2ui_icon(assigns) do
-    name = Binding.resolve(assigns.props["name"], assigns.surface.data_model, assigns.scope_path)
+    opts = binding_opts(assigns.surface)
+    name = Binding.resolve(assigns.props["name"], assigns.surface.data_model, assigns.scope_path, opts)
     hero_name = Map.get(@icon_mapping, name, "hero-question-mark-circle")
     assigns = assign(assigns, hero_name: hero_name)
 
@@ -605,7 +611,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
 
   def a2ui_image(assigns) do
-    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    opts = binding_opts(assigns.surface)
+    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
     fit = assigns.props["fit"] || "contain"
@@ -655,7 +662,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
 
   def a2ui_audio_player(assigns) do
-    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    opts = binding_opts(assigns.surface)
+    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
 
@@ -663,7 +671,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       Binding.resolve(
         assigns.props["description"],
         assigns.surface.data_model,
-        assigns.scope_path
+        assigns.scope_path,
+        opts
       )
 
     assigns = assign(assigns, url: url, description: description)
@@ -696,7 +705,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :scope_path, :string, default: nil
 
   def a2ui_video(assigns) do
-    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path)
+    opts = binding_opts(assigns.surface)
+    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
     assigns = assign(assigns, url: url)
@@ -731,15 +741,17 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :suppress_events, :boolean, default: false
 
   def a2ui_slider(assigns) do
+    opts = binding_opts(assigns.surface)
+
     value =
-      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path, opts)
 
     min_val = assigns.props["minValue"] || 0
     max_val = assigns.props["maxValue"] || 100
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
-    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
     assigns =
       assign(assigns, value: value || min_val, min_val: min_val, max_val: max_val, path: path)
@@ -781,8 +793,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :suppress_events, :boolean, default: false
 
   def a2ui_datetime_input(assigns) do
+    opts = binding_opts(assigns.surface)
+
     value =
-      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path, opts)
 
     enable_date = assigns.props["enableDate"] != false
     enable_time = assigns.props["enableTime"] != false
@@ -808,7 +822,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
-    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
     assigns =
       assign(assigns, html_value: html_value, input_type: input_type, path: path, step: step)
@@ -847,8 +861,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :suppress_events, :boolean, default: false
 
   def a2ui_multiple_choice(assigns) do
+    opts = binding_opts(assigns.surface)
+
     raw_selections =
-      Binding.resolve(assigns.props["selections"], assigns.surface.data_model, assigns.scope_path)
+      Binding.resolve(assigns.props["selections"], assigns.surface.data_model, assigns.scope_path, opts)
 
     # Ensure selections is a list (it might come as a map or nil)
     selections =
@@ -865,7 +881,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["selections"])
-    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path), else: nil
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
     # Determine if this should be radio (single select) or checkbox (multi select)
     is_single_select = max_allowed == 1
@@ -881,7 +897,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         max_allowed: max_allowed,
         path: path,
         is_single_select: is_single_select,
-        max_reached: max_reached
+        max_reached: max_reached,
+        binding_opts: opts
       )
 
     ~H"""
@@ -900,7 +917,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       <input type="hidden" name="a2ui_input[values][]" value="" />
       <div class="space-y-2">
         <%= for option <- @options do %>
-          <% opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path)
+          <% opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path, @binding_opts)
           opt_value = option["value"]
           opt_value = if is_binary(opt_value), do: opt_value, else: ""
           is_selected = opt_value != "" and opt_value in @selections
@@ -988,14 +1005,15 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_tabs(assigns) do
     tab_items = assigns.props["tabItems"] || []
-    assigns = assign(assigns, tab_items: tab_items)
+    opts = binding_opts(assigns.surface)
+    assigns = assign(assigns, tab_items: tab_items, binding_opts: opts)
 
     ~H"""
     <div class="a2ui-tabs" id={component_dom_id(@surface.id, @id, @scope_path, "tabs")}>
       <%!-- Tab Headers --%>
       <div class="flex border-b border-zinc-200 dark:border-zinc-700">
         <%= for {tab, idx} <- Enum.with_index(@tab_items) do %>
-          <% title = Binding.resolve(tab["title"], @surface.data_model, @scope_path) %>
+          <% title = Binding.resolve(tab["title"], @surface.data_model, @scope_path, @binding_opts) %>
           <button
             type="button"
             phx-click={
@@ -1211,8 +1229,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         data_binding = template["dataBinding"]
         template_id = template["componentId"]
 
-        # Compute base path for template items
-        base_path = Binding.expand_path(data_binding, assigns.scope_path)
+        # Compute base path for template items (version-aware expansion)
+        base_path = Binding.expand_path(data_binding, assigns.scope_path, binding_opts(assigns.surface))
 
         collection = Binding.get_at_pointer(assigns.surface.data_model, base_path)
         max_items = A2UI.Validator.max_template_items()
@@ -1528,4 +1546,13 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   end
 
   defp numeric_string?(_), do: false
+
+  # Returns binding options based on the surface's protocol version.
+  # This affects how paths are scoped in templates:
+  # - v0.8: `/path` is scoped in template context
+  # - v0.9: `/path` is absolute even in template context
+  defp binding_opts(surface) do
+    version = surface.protocol_version || :v0_8
+    [version: version]
+  end
 end

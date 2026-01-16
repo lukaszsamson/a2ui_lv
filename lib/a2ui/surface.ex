@@ -12,7 +12,16 @@ defmodule A2UI.Surface do
   Data model changes are handled through `A2UI.DataPatch`, which provides
   a version-agnostic internal representation. This allows the surface to
   work with both v0.8 and v0.9 wire formats.
+
+  ## Protocol Version
+
+  The `protocol_version` field tracks which wire format this surface was created with.
+  This affects:
+  - Catalog resolution: v0.8 allows nil catalogId, v0.9 requires it
+  - Template binding: v0.8 scopes `/path` in templates, v0.9 treats `/path` as absolute
   """
+
+  @type protocol_version :: :v0_8 | :v0_9
 
   defstruct [
     :id,
@@ -20,6 +29,7 @@ defmodule A2UI.Surface do
     :catalog_id,
     :styles,
     :catalog_status,
+    :protocol_version,
     components: %{},
     data_model: %{},
     ready?: false
@@ -39,6 +49,7 @@ defmodule A2UI.Surface do
           catalog_id: String.t() | nil,
           styles: map() | nil,
           catalog_status: catalog_status() | nil,
+          protocol_version: protocol_version() | nil,
           components: %{String.t() => A2UI.Component.t()},
           data_model: map(),
           ready?: boolean()
@@ -130,6 +141,7 @@ defmodule A2UI.Surface do
         catalog_id: msg.catalog_id,
         styles: msg.styles,
         catalog_status: catalog_status,
+        protocol_version: msg.protocol_version,
         ready?: ready
     }
   end

@@ -166,9 +166,15 @@ defmodule A2UI.Session do
     end
   end
 
-  def apply_message(session, %BeginRendering{surface_id: sid, catalog_id: catalog_id} = msg) do
-    # Resolve catalog ID against client capabilities
-    case Resolver.resolve(catalog_id, session.client_capabilities, :v0_8) do
+  def apply_message(
+        session,
+        %BeginRendering{surface_id: sid, catalog_id: catalog_id, protocol_version: version} = msg
+      ) do
+    # Use the message's protocol version for catalog resolution
+    # v0.8: nil catalogId defaults to standard, v0.9: catalogId is required
+    version = version || :v0_8
+
+    case Resolver.resolve(catalog_id, session.client_capabilities, version) do
       {:ok, resolved_catalog_id} ->
         # Use the resolved catalog ID (canonical form)
         updated_msg = %{msg | catalog_id: resolved_catalog_id}

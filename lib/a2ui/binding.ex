@@ -27,6 +27,13 @@ defmodule A2UI.Binding do
   2. **Path Only**: Resolve path against data_model
   3. **Path + Literal**: Path with fallback to literal if path is nil
 
+  ## Options
+
+  - `:version` - Protocol version (`:v0_8` or `:v0_9`). Affects path scoping in templates.
+    v0.8: `/path` is scoped in template context.
+    v0.9: `/path` is absolute even in template context.
+    Default: `:v0_8`
+
   ## Examples
 
       iex> A2UI.Binding.resolve(%{"literalString" => "Hello"}, %{}, nil)
@@ -38,31 +45,31 @@ defmodule A2UI.Binding do
       iex> A2UI.Binding.resolve(%{"path" => "/missing", "literalString" => "default"}, %{}, nil)
       "default"
   """
-  @spec resolve(bound_value(), data_model(), scope_path()) :: term()
-  def resolve(bound_value, data_model, scope_path \\ nil)
+  @spec resolve(bound_value(), data_model(), scope_path(), keyword()) :: term()
+  def resolve(bound_value, data_model, scope_path \\ nil, opts \\ [])
 
   # Path with optional literal fallback - try path first, fall back to literal if path returns nil
-  def resolve(%{"path" => path} = bound, data_model, scope_path) when is_binary(path) do
-    case resolve_path(path, data_model, scope_path) do
+  def resolve(%{"path" => path} = bound, data_model, scope_path, opts) when is_binary(path) do
+    case resolve_path(path, data_model, scope_path, opts) do
       nil -> get_literal_fallback(bound)
       value -> value
     end
   end
 
   # Literal-only values (v0.8 format) - no path key present
-  def resolve(%{"literalString" => value}, _data, _scope), do: value
-  def resolve(%{"literalNumber" => value}, _data, _scope), do: value
-  def resolve(%{"literalBoolean" => value}, _data, _scope), do: value
-  def resolve(%{"literalArray" => value}, _data, _scope), do: value
+  def resolve(%{"literalString" => value}, _data, _scope, _opts), do: value
+  def resolve(%{"literalNumber" => value}, _data, _scope, _opts), do: value
+  def resolve(%{"literalBoolean" => value}, _data, _scope, _opts), do: value
+  def resolve(%{"literalArray" => value}, _data, _scope, _opts), do: value
 
   # v0.9 simplified format: direct values
-  def resolve(value, _data, _scope) when is_binary(value), do: value
-  def resolve(value, _data, _scope) when is_number(value), do: value
-  def resolve(value, _data, _scope) when is_boolean(value), do: value
-  def resolve(nil, _data, _scope), do: nil
+  def resolve(value, _data, _scope, _opts) when is_binary(value), do: value
+  def resolve(value, _data, _scope, _opts) when is_number(value), do: value
+  def resolve(value, _data, _scope, _opts) when is_boolean(value), do: value
+  def resolve(nil, _data, _scope, _opts), do: nil
 
   # Map without path - could be nested structure, return as-is
-  def resolve(%{} = value, _data, _scope), do: value
+  def resolve(%{} = value, _data, _scope, _opts), do: value
 
   @doc """
   Resolves a JSON Pointer path against data model.

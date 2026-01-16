@@ -90,6 +90,48 @@ defmodule A2UI.BindingTest do
     end
   end
 
+  describe "resolve/4 with version options" do
+    test "v0.8: path starting with / is scoped in template context" do
+      data = %{"items" => [%{"name" => "scoped_value"}], "name" => "root_value"}
+
+      # v0.8: /name in scope /items/0 resolves to /items/0/name
+      bound = %{"path" => "/name"}
+      assert Binding.resolve(bound, data, "/items/0", version: :v0_8) == "scoped_value"
+    end
+
+    test "v0.9: path starting with / is absolute even in template context" do
+      data = %{"items" => [%{"name" => "scoped_value"}], "name" => "root_value"}
+
+      # v0.9: /name in scope /items/0 still resolves to root /name
+      bound = %{"path" => "/name"}
+      assert Binding.resolve(bound, data, "/items/0", version: :v0_9) == "root_value"
+    end
+
+    test "v0.9: relative path (no /) is scoped in template context" do
+      data = %{"items" => [%{"name" => "scoped_value"}], "name" => "root_value"}
+
+      # v0.9: name (no /) in scope /items/0 resolves to /items/0/name
+      bound = %{"path" => "name"}
+      assert Binding.resolve(bound, data, "/items/0", version: :v0_9) == "scoped_value"
+    end
+
+    test "version defaults to v0_8 when not specified" do
+      data = %{"items" => [%{"name" => "scoped_value"}], "name" => "root_value"}
+
+      # Default (v0.8): /name in scope /items/0 resolves to /items/0/name
+      bound = %{"path" => "/name"}
+      assert Binding.resolve(bound, data, "/items/0") == "scoped_value"
+    end
+
+    test "falls back to literal when path not found in v0.9" do
+      data = %{"items" => [%{"name" => "scoped_value"}]}
+
+      # v0.9: /missing is absolute, not found, so fall back to literal
+      bound = %{"path" => "/missing", "literalString" => "default"}
+      assert Binding.resolve(bound, data, "/items/0", version: :v0_9) == "default"
+    end
+  end
+
   describe "get_at_pointer/2" do
     test "handles empty pointer" do
       data = %{"key" => "value"}

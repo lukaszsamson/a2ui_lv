@@ -446,4 +446,64 @@ defmodule A2UI.SessionTest do
       assert error["error"]["type"] == "catalog_error"
     end
   end
+
+  describe "v0.9 protocol version tracking" do
+    setup do
+      session = Session.new()
+
+      # Create a surface first
+      surface_json =
+        ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
+
+      {:ok, session} = Session.apply_json_line(session, surface_json)
+      %{session: session}
+    end
+
+    test "v0.8 beginRendering stores protocol_version :v0_8", %{session: session} do
+      begin_json = ~s({"beginRendering":{"surfaceId":"test","root":"root"}})
+
+      assert {:ok, updated} = Session.apply_json_line(session, begin_json)
+      assert updated.surfaces["test"].protocol_version == :v0_8
+    end
+
+    test "v0.9 createSurface stores protocol_version :v0_9", %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      # Use v0.9 createSurface format (requires catalogId)
+      begin_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+
+      assert {:ok, updated} = Session.apply_json_line(session, begin_json)
+      assert updated.surfaces["test"].protocol_version == :v0_9
+    end
+
+    test "v0.9 nil catalogId returns error (required in v0.9)", %{session: session} do
+      # v0.9 createSurface without catalogId should fail
+      begin_msg = %A2UI.Messages.BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: nil,
+        styles: nil,
+        protocol_version: :v0_9
+      }
+
+      assert {:error, error} = Session.apply_message(session, begin_msg)
+      assert error["error"]["type"] == "catalog_error"
+      assert error["error"]["message"] =~ "required"
+    end
+
+    test "v0.9 catalogId resolves successfully", %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+
+      begin_msg = %A2UI.Messages.BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: catalog_id,
+        styles: nil,
+        protocol_version: :v0_9
+      }
+
+      assert {:ok, updated} = Session.apply_message(session, begin_msg)
+      assert updated.surfaces["test"].ready? == true
+      assert updated.surfaces["test"].protocol_version == :v0_9
+    end
+  end
 end
