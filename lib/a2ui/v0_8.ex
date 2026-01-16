@@ -64,6 +64,14 @@ defmodule A2UI.V0_8 do
   def standard_catalog_id?(catalog_id), do: catalog_id in @standard_catalog_ids
 
   @doc """
+  Returns the A2A extension URI for v0.8.
+
+  Delegates to `A2UI.A2A.Protocol.extension_uri(:v0_8)`.
+  """
+  @spec extension_uri() :: String.t()
+  def extension_uri, do: A2UI.A2A.Protocol.extension_uri(:v0_8)
+
+  @doc """
   Parses a JSONL line as v0.8 format.
 
   For auto-detecting format, use `A2UI.Parser.parse_line/1` instead.

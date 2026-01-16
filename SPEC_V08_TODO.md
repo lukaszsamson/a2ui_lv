@@ -85,14 +85,41 @@ Docs require the client to send **single-event envelopes** back to the server:
   socket = A2UI.Phoenix.Live.init(socket, event_transport: transport)
   ```
 
-### P1.2 A2A extension packaging (mimeType + client capabilities)
+### ~~P1.2 A2A extension packaging (mimeType + client capabilities)~~ ✅ PROVISIONS READY
 
 A2A extension spec requirements:
 - A2UI messages are A2A `DataPart` with `metadata.mimeType = "application/json+a2ui"`.
 - Every client→server A2A message must include `metadata.a2uiClientCapabilities`.
 
-Current behavior:
-- No A2A transport implementation exists (only in-process `A2UI.Transport.Local`).
+**Implementation (plumbing only - no A2A transport yet):**
+
+Modules added to make implementing A2A transport straightforward:
+
+- `A2UI.A2A.Protocol` - Protocol constants:
+  - `mime_type/0` → `"application/json+a2ui"`
+  - `extension_uri/0`, `extension_uri(:v0_8 | :v0_9)` → A2A extension URIs
+  - `client_capabilities_key/0` → `"a2uiClientCapabilities"`
+  - `client_role/0` → `"user"`, `server_role/0` → `"agent"`
+
+- `A2UI.A2A.DataPart` - Message packaging:
+  - `wrap_envelope/1` → Wraps A2UI envelope in DataPart with mimeType
+  - `unwrap_envelope/1` → Extracts A2UI envelope from DataPart
+  - `build_client_message/2` → Builds full A2A message with capabilities
+  - `build_server_message/1` → Builds server→client A2A message
+  - `extract_envelopes/1` → Extracts A2UI envelopes from A2A message
+  - `parse_client_capabilities/1` → Parses capabilities from A2A metadata
+
+- `A2UI.Session` updates:
+  - Now defaults to `ClientCapabilities.default()` (not nil)
+  - `client_capabilities/1` → Returns session's capabilities
+  - `supports_catalog?/2` → Checks catalog support
+
+- Version entrypoints:
+  - `A2UI.V0_8.extension_uri/0` → v0.8 A2A extension URI
+  - `A2UI.V0_9.Adapter.extension_uri/0` → v0.9 A2A extension URI
+
+**Remaining work:**
+- Implement actual A2A transport (HTTP client, SSE/WebSocket)
 
 ### P1.3 Streaming UI transport
 

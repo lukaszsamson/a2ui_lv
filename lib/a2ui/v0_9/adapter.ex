@@ -13,6 +13,11 @@ defmodule A2UI.V0_9.Adapter do
   - `updateDataModel` replaces `dataModelUpdate` (native JSON instead of adjacency-list)
   - Component format uses `"component": "Text"` discriminator instead of wrapper objects
   - Path scoping: absolute paths `/foo` stay absolute in templates (v0.8 scopes them)
+
+  ## A2A Extension
+
+  For A2A transport, use extension URI: `https://a2ui.org/a2a-extension/a2ui/v0.9`
+  See `A2UI.A2A.Protocol.extension_uri(:v0_9)`.
   """
 
   alias A2UI.Parser
@@ -40,6 +45,14 @@ defmodule A2UI.V0_9.Adapter do
   """
   @spec standard_catalog_id?(String.t()) :: boolean()
   def standard_catalog_id?(catalog_id), do: catalog_id == @standard_catalog_id
+
+  @doc """
+  Returns the A2A extension URI for v0.9.
+
+  Delegates to `A2UI.A2A.Protocol.extension_uri(:v0_9)`.
+  """
+  @spec extension_uri() :: String.t()
+  def extension_uri, do: A2UI.A2A.Protocol.extension_uri(:v0_9)
 
   @doc """
   Parses a JSONL line as v0.9 format.

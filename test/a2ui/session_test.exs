@@ -4,16 +4,19 @@ defmodule A2UI.SessionTest do
   alias A2UI.Session
 
   describe "new/1" do
-    test "creates empty session" do
+    test "creates empty session with default capabilities" do
       session = Session.new()
       assert session.surfaces == %{}
-      assert session.client_capabilities == nil
+      # Defaults to ClientCapabilities.default() with v0.8 standard catalogs
+      assert %A2UI.ClientCapabilities{} = session.client_capabilities
+      assert session.client_capabilities.supported_catalog_ids == A2UI.V0_8.standard_catalog_ids()
     end
 
     test "accepts client_capabilities option" do
-      caps = A2UI.ClientCapabilities.new()
+      caps = A2UI.ClientCapabilities.new(supported_catalog_ids: ["custom.catalog"])
       session = Session.new(client_capabilities: caps)
       assert session.client_capabilities == caps
+      assert session.client_capabilities.supported_catalog_ids == ["custom.catalog"]
     end
   end
 

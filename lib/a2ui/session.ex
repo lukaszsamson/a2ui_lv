@@ -29,12 +29,12 @@ defmodule A2UI.Session do
       session = A2UI.Session.delete_surface(session, "my-surface")
   """
 
-  alias A2UI.{Parser, Surface, Validator, Error}
+  alias A2UI.{Parser, Surface, Validator, Error, ClientCapabilities}
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
 
   @type t :: %__MODULE__{
           surfaces: %{String.t() => Surface.t()},
-          client_capabilities: map() | nil
+          client_capabilities: ClientCapabilities.t()
         }
 
   defstruct surfaces: %{},
@@ -45,13 +45,26 @@ defmodule A2UI.Session do
 
   ## Options
 
-  - `:client_capabilities` - Optional client capabilities map
+  - `:client_capabilities` - Optional `A2UI.ClientCapabilities` struct.
+    If not provided, defaults to `ClientCapabilities.default()` which includes
+    all v0.8 standard catalog aliases.
+
+  ## Example
+
+      # With default capabilities
+      session = A2UI.Session.new()
+
+      # With custom capabilities
+      caps = A2UI.ClientCapabilities.new(supported_catalog_ids: ["custom.catalog"])
+      session = A2UI.Session.new(client_capabilities: caps)
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
+    capabilities = opts[:client_capabilities] || ClientCapabilities.default()
+
     %__MODULE__{
       surfaces: %{},
-      client_capabilities: opts[:client_capabilities]
+      client_capabilities: capabilities
     }
   end
 
@@ -233,6 +246,25 @@ defmodule A2UI.Session do
   @spec surface_count(t()) :: non_neg_integer()
   def surface_count(session) do
     map_size(session.surfaces)
+  end
+
+  @doc """
+  Returns the client capabilities for this session.
+
+  This is useful for A2A transport implementations that need to attach
+  capabilities to every outgoing message.
+  """
+  @spec client_capabilities(t()) :: ClientCapabilities.t()
+  def client_capabilities(session), do: session.client_capabilities
+
+  @doc """
+  Checks if the session supports a given catalog ID.
+
+  Delegates to `ClientCapabilities.supports_catalog?/2`.
+  """
+  @spec supports_catalog?(t(), String.t()) :: boolean()
+  def supports_catalog?(session, catalog_id) do
+    ClientCapabilities.supports_catalog?(session.client_capabilities, catalog_id)
   end
 
   # Private helpers
