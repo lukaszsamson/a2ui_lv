@@ -121,14 +121,61 @@ Modules added to make implementing A2A transport straightforward:
 **Remaining work:**
 - Implement actual A2A transport (HTTP client, SSE/WebSocket)
 
-### P1.3 Streaming UI transport
+### ~~P1.3 Streaming UI transport~~ ✅ PROVISIONS READY
 
 Docs describe:
 - one-way JSONL stream (often SSE/WebSocket/etc.) for UI updates
 - separate channel for events (often A2A)
 
-Current behavior:
-- No concrete SSE/WebSocket transport implementation exists (only in-process transport).
+**Implementation (plumbing only - no concrete HTTP/SSE client yet):**
+
+Modules added to make implementing SSE transport straightforward:
+
+- `A2UI.SSE.Protocol` - SSE wire format constants:
+  - `content_type/0` → `"text/event-stream"`
+  - `event_stream?/1` → Checks Content-Type header
+  - `response_headers/1` → SSE response headers (content-type, cache-control, connection)
+  - `request_headers/0` → Accept header for SSE requests
+  - `request_headers_with_resume/1` → Includes Last-Event-ID for reconnection
+  - `default_retry_ms/0` → Default reconnect delay (2000ms)
+
+- `A2UI.SSE.Event` - SSE event parsing:
+  - `parse/1` → Parse single SSE event text block
+  - `parse_stream/1` → Parse streaming data, returns `{events, buffer}`
+  - `extract_payload/1` → Get JSON from parsed event
+  - `format/2` → Format envelope as SSE event (for servers)
+
+- `A2UI.SSE.StreamState` - Reconnection state tracking:
+  - `new/1` → Create stream state with URL, surface_id, retry_ms
+  - `mark_connected/1`, `mark_disconnected/1` → Connection state
+  - `update_from_event/1` → Track last_event_id, retry_ms from events
+  - `process_chunk/2` → Parse chunk, update state, return events
+  - `reconnect_headers/1` → Headers with Last-Event-ID for resume
+  - `retry_delay/1` → Get retry interval
+  - `completion_meta/1` → Stream statistics for `{:a2ui_stream_done, meta}`
+
+**Integration pattern:**
+
+```elixir
+# SSE client would implement A2UI.Transport.UIStream and use:
+state = A2UI.SSE.StreamState.new(url: url, surface_id: surface_id)
+
+# On each HTTP chunk:
+{events, state} = A2UI.SSE.StreamState.process_chunk(state, chunk)
+for event <- events do
+  {:ok, json_line} = A2UI.SSE.Event.extract_payload(event)
+  send(consumer, {:a2ui, json_line})
+end
+
+# On disconnect:
+headers = A2UI.SSE.StreamState.reconnect_headers(state)
+delay = A2UI.SSE.StreamState.retry_delay(state)
+Process.send_after(self(), :reconnect, delay)
+```
+
+**Remaining work:**
+- Implement concrete SSE HTTP client (using `Req` or `Finch`)
+- Implement WebSocket transport (if needed)
 
 ---
 
