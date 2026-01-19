@@ -40,6 +40,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   use Phoenix.Component
   import A2uiLvWeb.CoreComponents, only: [input: 1, icon: 1]
   alias A2UI.{Binding, Checks}
+  alias A2UI.Props.Adapter
 
   # A2UI standard icon names mapped to Heroicons
   @icon_mapping %{
@@ -315,9 +316,9 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :visited, :any, default: nil
 
   def a2ui_column(assigns) do
-    distribution = assigns.props["distribution"] || "start"
-    alignment = assigns.props["alignment"] || "stretch"
-    assigns = assign(assigns, distribution: distribution, alignment: alignment)
+    # Support both v0.8 (distribution/alignment) and v0.9 (justify/align)
+    {justify, align} = Adapter.row_column_props(assigns.props, "stretch")
+    assigns = assign(assigns, distribution: justify, alignment: align)
 
     ~H"""
     <div
@@ -345,14 +346,14 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :visited, :any, default: nil
 
   def a2ui_row(assigns) do
-    distribution = assigns.props["distribution"] || "start"
-    alignment = assigns.props["alignment"] || "center"
+    # Support both v0.8 (distribution/alignment) and v0.9 (justify/align)
+    {justify, align} = Adapter.row_column_props(assigns.props, "center")
     # Row needs full width for all distributions except "start" (which can be content-sized)
-    needs_full_width = distribution != "start"
+    needs_full_width = justify != "start"
     width_style = if needs_full_width, do: "width: 100%;", else: ""
 
     assigns =
-      assign(assigns, distribution: distribution, alignment: alignment, width_style: width_style)
+      assign(assigns, distribution: justify, alignment: align, width_style: width_style)
 
     ~H"""
     <div
@@ -410,7 +411,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     text =
       Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path, opts)
 
-    hint = assigns.props["usageHint"] || "body"
+    # Support both v0.8 (usageHint) and v0.9 (variant)
+    hint = Adapter.variant_prop(assigns.props, "body")
     {style, class} = text_style(hint)
     assigns = assign(assigns, text: text, style: style, class: class)
 
@@ -516,10 +518,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       )
 
     # Support both v0.8 "text" and v0.9 "value" props
-    value_prop = assigns.props["value"] || assigns.props["text"]
+    value_prop = Adapter.text_field_value_prop(assigns.props)
     text = Binding.resolve(value_prop, assigns.surface.data_model, assigns.scope_path, opts)
     # Support both v0.8 "textFieldType" and v0.9 "variant"
-    field_type = assigns.props["variant"] || assigns.props["textFieldType"] || "shortText"
+    field_type = Adapter.text_field_type_prop(assigns.props)
 
     # Get absolute path for binding (expand if relative)
     raw_path = Binding.get_path(value_prop)
@@ -669,7 +671,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
     fit = assigns.props["fit"] || "contain"
-    hint = assigns.props["usageHint"]
+    # Support both v0.8 (usageHint) and v0.9 (variant)
+    hint = Adapter.variant_prop(assigns.props)
     {wrapper_class, wrapper_style} = image_size_style(hint)
 
     assigns =
@@ -819,8 +822,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       )
 
     # Support both v0.8 "minValue"/"maxValue" and v0.9 "min"/"max"
-    min_val = assigns.props["min"] || assigns.props["minValue"] || 0
-    max_val = assigns.props["max"] || assigns.props["maxValue"] || 100
+    {min_val, max_val} = Adapter.slider_range_props(assigns.props)
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
@@ -996,7 +998,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       )
 
     # Support both v0.8 "selections" and v0.9 "value" props
-    selections_prop = assigns.props["value"] || assigns.props["selections"]
+    selections_prop = Adapter.choice_selections_prop(assigns.props)
 
     raw_selections =
       Binding.resolve(
@@ -1020,16 +1022,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
     # v0.9 uses "variant" ("mutuallyExclusive" or "multipleSelection")
     # v0.8 uses "maxAllowedSelections" (1 = single select)
-    variant = assigns.props["variant"]
     max_allowed = assigns.props["maxAllowedSelections"]
 
     # Determine if this should be radio (single select) or checkbox (multi select)
-    is_single_select =
-      cond do
-        variant == "mutuallyExclusive" -> true
-        max_allowed == 1 -> true
-        true -> false
-      end
+    is_single_select = Adapter.choice_single_select?(assigns.props)
 
     # Get absolute path for binding
     raw_path = Binding.get_path(selections_prop)
@@ -1167,7 +1163,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :visited, :any, default: nil
 
   def a2ui_tabs(assigns) do
-    tab_items = assigns.props["tabItems"] || []
+    # Support both v0.8 (tabItems) and v0.9 (tabs)
+    tab_items = Adapter.tabs_props(assigns.props)
     opts = binding_opts(assigns.surface)
     assigns = assign(assigns, tab_items: tab_items, binding_opts: opts)
 
@@ -1242,8 +1239,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :visited, :any, default: nil
 
   def a2ui_modal(assigns) do
-    entry_point_child = assigns.props["entryPointChild"]
-    content_child = assigns.props["contentChild"]
+    # Support both v0.8 (entryPointChild/contentChild) and v0.9 (trigger/content)
+    {entry_point_child, content_child} = Adapter.modal_props(assigns.props)
     dialog_id = component_dom_id(assigns.surface.id, assigns.id, assigns.scope_path, "dialog")
 
     # Build the JS commands for opening/closing the modal
