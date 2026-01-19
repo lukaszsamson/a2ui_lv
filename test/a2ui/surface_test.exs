@@ -333,6 +333,38 @@ defmodule A2UI.SurfaceTest do
       surface = Surface.apply_message(surface, render)
       assert surface.protocol_version == :v0_9
     end
+
+    test "stores broadcast_data_model? from v0.9 message" do
+      surface = Surface.new("test")
+
+      render = %BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: "test.catalog",
+        styles: nil,
+        broadcast_data_model?: true,
+        protocol_version: :v0_9
+      }
+
+      surface = Surface.apply_message(surface, render)
+      assert surface.broadcast_data_model? == true
+    end
+
+    test "broadcast_data_model? defaults to false" do
+      surface = Surface.new("test")
+
+      render = %BeginRendering{
+        surface_id: "test",
+        root_id: "root",
+        catalog_id: "test.catalog",
+        styles: nil,
+        broadcast_data_model?: false,
+        protocol_version: :v0_9
+      }
+
+      surface = Surface.apply_message(surface, render)
+      assert surface.broadcast_data_model? == false
+    end
   end
 
   describe "update_data_at_path/3" do

@@ -19,6 +19,12 @@ defmodule A2UI.Surface do
   This affects:
   - Catalog resolution: v0.8 allows nil catalogId, v0.9 requires it
   - Template binding: v0.8 scopes `/path` in templates, v0.9 treats `/path` as absolute
+
+  ## Data Model Broadcasting (v0.9)
+
+  The `broadcast_data_model?` field (from `createSurface.broadcastDataModel`) controls
+  whether the full data model should be included in A2A message metadata. When true,
+  transport implementations should attach the surface data model to outgoing messages.
   """
 
   @type protocol_version :: :v0_8 | :v0_9
@@ -32,7 +38,8 @@ defmodule A2UI.Surface do
     :protocol_version,
     components: %{},
     data_model: %{},
-    ready?: false
+    ready?: false,
+    broadcast_data_model?: false
   ]
 
   @typedoc """
@@ -52,7 +59,8 @@ defmodule A2UI.Surface do
           protocol_version: protocol_version() | nil,
           components: %{String.t() => A2UI.Component.t()},
           data_model: map(),
-          ready?: boolean()
+          ready?: boolean(),
+          broadcast_data_model?: boolean()
         }
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering}
@@ -151,7 +159,8 @@ defmodule A2UI.Surface do
         styles: msg.styles,
         catalog_status: catalog_status,
         protocol_version: msg.protocol_version,
-        ready?: ready
+        ready?: ready,
+        broadcast_data_model?: msg.broadcast_data_model? || false
     }
   end
 

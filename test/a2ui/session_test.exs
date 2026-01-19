@@ -595,5 +595,152 @@ defmodule A2UI.SessionTest do
       assert updated.surfaces["test"].ready? == true
       assert updated.surfaces["test"].protocol_version == :v0_9
     end
+
+    test "v0.9 createSurface stores broadcast_data_model? flag", %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      # Use v0.9 createSurface with broadcastDataModel
+      begin_json =
+        ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}","broadcastDataModel":true}})
+
+      assert {:ok, updated} = Session.apply_json_line(session, begin_json)
+      assert updated.surfaces["test"].broadcast_data_model? == true
+    end
+  end
+
+  describe "v0.9 full message flow integration" do
+    setup do
+      # Use a session with v0.9 standard catalog support
+      session = Session.new()
+      {:ok, session: session}
+    end
+
+    test "complete v0.9 flow: createSurface → updateComponents → updateDataModel → deleteSurface",
+         %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+
+      # 1. createSurface (v0.9 replaces beginRendering)
+      create_json =
+        ~s({"createSurface":{"surfaceId":"main","catalogId":"#{catalog_id}","broadcastDataModel":true}})
+
+      assert {:ok, session} = Session.apply_json_line(session, create_json)
+
+      surface = session.surfaces["main"]
+      assert surface.ready? == true
+      assert surface.protocol_version == :v0_9
+      assert surface.root_id == "root"
+      assert surface.broadcast_data_model? == true
+
+      # 2. updateComponents (v0.9 uses discriminator format)
+      components_json = ~s({"updateComponents":{
+        "surfaceId":"main",
+        "components":[
+          {"id":"root","component":"Column","children":[{"path":"/children"}]},
+          {"id":"greeting","component":"Text","text":"Hello, World!"},
+          {"id":"name_field","component":"TextField","value":{"path":"/form/name","_initialValue":"Alice"}}
+        ]
+      }})
+
+      assert {:ok, session} = Session.apply_json_line(session, components_json)
+
+      surface = session.surfaces["main"]
+      assert map_size(surface.components) == 3
+      assert surface.components["root"].type == "Column"
+      assert surface.components["greeting"].type == "Text"
+      assert surface.components["greeting"].props == %{"text" => "Hello, World!"}
+      # Initializer should have set /form/name
+      assert surface.data_model == %{"form" => %{"name" => "Alice"}}
+
+      # 3. updateDataModel (v0.9 uses native JSON values)
+      data_json = ~s({"updateDataModel":{
+        "surfaceId":"main",
+        "path":"/form/email",
+        "value":"alice@example.com"
+      }})
+
+      assert {:ok, session} = Session.apply_json_line(session, data_json)
+
+      surface = session.surfaces["main"]
+      assert surface.data_model["form"]["email"] == "alice@example.com"
+      assert surface.data_model["form"]["name"] == "Alice"
+
+      # 4. updateDataModel at root (replaces entire data model)
+      root_data_json = ~s({"updateDataModel":{
+        "surfaceId":"main",
+        "value":{"user":{"name":"Bob"},"status":"active"}
+      }})
+
+      assert {:ok, session} = Session.apply_json_line(session, root_data_json)
+
+      surface = session.surfaces["main"]
+      assert surface.data_model == %{"user" => %{"name" => "Bob"}, "status" => "active"}
+
+      # 5. updateDataModel delete operation (no value field)
+      delete_json = ~s({"updateDataModel":{
+        "surfaceId":"main",
+        "path":"/status"
+      }})
+
+      assert {:ok, session} = Session.apply_json_line(session, delete_json)
+
+      surface = session.surfaces["main"]
+      assert surface.data_model == %{"user" => %{"name" => "Bob"}}
+      refute Map.has_key?(surface.data_model, "status")
+
+      # 6. deleteSurface
+      delete_surface_json = ~s({"deleteSurface":{"surfaceId":"main"}})
+
+      assert {:ok, session} = Session.apply_json_line(session, delete_surface_json)
+      assert session.surfaces == %{}
+    end
+
+    test "v0.9 updateComponents with nested children binding", %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+
+      # Create surface first
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      {:ok, session} = Session.apply_json_line(session, create_json)
+
+      # Send components with Template pattern (path binding for children)
+      components_json = ~s({"updateComponents":{
+        "surfaceId":"test",
+        "components":[
+          {"id":"root","component":"Column","children":[{"path":"/items"}]},
+          {"id":"item_tmpl","component":"Text","text":{"path":"./name"}}
+        ]
+      }})
+
+      assert {:ok, session} = Session.apply_json_line(session, components_json)
+
+      surface = session.surfaces["test"]
+      assert surface.components["root"].props["children"] == [%{"path" => "/items"}]
+      assert surface.components["item_tmpl"].props["text"] == %{"path" => "./name"}
+    end
+
+    test "v0.9 data model replace semantics (not merge)", %{session: session} do
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+
+      # Create and set initial data
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      {:ok, session} = Session.apply_json_line(session, create_json)
+
+      initial_data_json = ~s({"updateDataModel":{
+        "surfaceId":"test",
+        "value":{"user":{"name":"Alice","age":30,"email":"alice@test.com"}}
+      }})
+      {:ok, session} = Session.apply_json_line(session, initial_data_json)
+
+      # v0.9: replacing at /user should replace the entire user object
+      update_json = ~s({"updateDataModel":{
+        "surfaceId":"test",
+        "path":"/user",
+        "value":{"name":"Bob"}
+      }})
+
+      {:ok, session} = Session.apply_json_line(session, update_json)
+
+      surface = session.surfaces["test"]
+      # In v0.9, /user is replaced entirely (not merged)
+      assert surface.data_model == %{"user" => %{"name" => "Bob"}}
+    end
   end
 end
