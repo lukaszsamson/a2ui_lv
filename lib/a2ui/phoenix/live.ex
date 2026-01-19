@@ -35,7 +35,7 @@ defmodule A2UI.Phoenix.Live do
   - v0.9: `{"action": {...}}`
   """
 
-  alias A2UI.{Session, Binding, Event}
+  alias A2UI.{Session, Binding, Event, DataBroadcast}
 
   require Logger
 
@@ -448,12 +448,21 @@ defmodule A2UI.Phoenix.Live do
   # Events are single-key envelopes:
   # - v0.8: {"userAction": ...} or {"error": ...}
   # - v0.9: {"action": ...} or {"error": ...}
+  #
+  # For v0.9, also builds and passes the data broadcast payload for surfaces
+  # that have broadcastDataModel enabled.
   defp send_event_to_transport(socket, event_envelope) do
     transport_pid = socket.assigns[:a2ui_event_transport]
     transport_module = socket.assigns[:a2ui_event_transport_module]
 
     if transport_pid && Process.alive?(transport_pid) do
-      case transport_module.send_event(transport_pid, event_envelope, []) do
+      # Build data broadcast payload for surfaces with broadcasting enabled
+      surfaces = socket.assigns[:a2ui_surfaces] || %{}
+      data_broadcast = DataBroadcast.build(surfaces)
+
+      opts = if data_broadcast, do: [data_broadcast: data_broadcast], else: []
+
+      case transport_module.send_event(transport_pid, event_envelope, opts) do
         :ok ->
           :ok
 

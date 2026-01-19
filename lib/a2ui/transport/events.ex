@@ -81,6 +81,23 @@ defmodule A2UI.Transport.Events do
   - **REST**: POST raw `event_envelope` to an endpoint
   - **WebSocket**: Send `event_envelope` as a JSON frame
 
+  ## Data Model Broadcasting (v0.9)
+
+  When surfaces have `broadcastDataModel` enabled, the full data model should be
+  included in A2A message metadata. The `send_event/3` callback receives this via
+  the `:data_broadcast` option:
+
+      opts = [data_broadcast: %{"surfaces" => %{"main" => %{"user" => %{...}}}}]
+
+  A2A transport implementations should include this in message metadata:
+
+      metadata = %{
+        "a2uiDataBroadcast" => opts[:data_broadcast],
+        "a2uiClientCapabilities" => %{...}
+      }
+
+  The broadcast payload is `nil` when no surfaces have broadcasting enabled.
+
   ## Usage
 
       # Send a userAction event
@@ -108,6 +125,9 @@ defmodule A2UI.Transport.Events do
   - `:timeout` - Operation timeout in milliseconds
   - `:headers` - HTTP headers for REST transports
   - `:async` - If true, don't wait for acknowledgment
+  - `:data_broadcast` - Data model broadcast payload for A2A transport (v0.9).
+    When present and not nil, A2A transports should include this in message
+    metadata under the `a2uiDataBroadcast` key.
   """
   @type opts :: keyword()
 
