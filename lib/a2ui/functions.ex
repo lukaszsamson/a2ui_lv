@@ -68,6 +68,8 @@ defmodule A2UI.Functions do
   def required(""), do: false
   def required([]), do: false
   def required(%{} = map) when map_size(map) == 0, do: false
+  # For checkboxes: false means unchecked, which fails required
+  def required(false), do: false
   def required(_), do: true
 
   @doc """

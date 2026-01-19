@@ -36,8 +36,13 @@ defmodule A2UI.FunctionsTest do
       assert Functions.required(0) == true
     end
 
-    test "returns true for false boolean" do
-      assert Functions.required(false) == true
+    test "returns false for false boolean (unchecked checkbox)" do
+      # false represents unchecked checkbox, which fails required
+      assert Functions.required(false) == false
+    end
+
+    test "returns true for true boolean (checked checkbox)" do
+      assert Functions.required(true) == true
     end
 
     test "returns true for whitespace-only string" do

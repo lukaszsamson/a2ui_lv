@@ -39,7 +39,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   use Phoenix.Component
   import A2uiLvWeb.CoreComponents, only: [input: 1, icon: 1]
-  alias A2UI.Binding
+  alias A2UI.{Binding, Checks}
 
   # A2UI standard icon names mapped to Heroicons
   @icon_mapping %{
@@ -249,6 +249,15 @@ defmodule A2UI.Phoenix.Catalog.Standard do
                     id={@id}
                     suppress_events={@suppress_events}
                   />
+                <% "ChoicePicker" -> %>
+                  <%!-- v0.9 renamed MultipleChoice to ChoicePicker --%>
+                  <.a2ui_multiple_choice
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    suppress_events={@suppress_events}
+                  />
                 <% "List" -> %>
                   <.a2ui_list
                     props={@component.props}
@@ -443,18 +452,31 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   attr :visited, :any, default: nil
 
   def a2ui_button(assigns) do
+    opts = binding_opts(assigns.surface)
     primary = assigns.props["primary"] || false
     has_action = assigns.props["action"] != nil and not assigns.suppress_events
-    assigns = assign(assigns, primary: primary, has_action: has_action)
+
+    # v0.9 checks: evaluate to determine if button should be disabled
+    checks = assigns.props["checks"]
+    checks_pass = Checks.all_pass?(checks, assigns.surface.data_model, assigns.scope_path, opts)
+    disabled = not checks_pass
+
+    assigns =
+      assign(assigns,
+        primary: primary,
+        has_action: has_action,
+        disabled: disabled
+      )
 
     ~H"""
     <button
       type="button"
-      class={button_classes(@primary)}
-      phx-click={@has_action && "a2ui:action"}
-      phx-value-surface-id={@has_action && @surface.id}
-      phx-value-component-id={@has_action && @id}
-      phx-value-scope-path={@has_action && (@scope_path || "")}
+      class={button_classes(@primary, @disabled)}
+      phx-click={@has_action && !@disabled && "a2ui:action"}
+      phx-value-surface-id={@has_action && !@disabled && @surface.id}
+      phx-value-component-id={@has_action && !@disabled && @id}
+      phx-value-scope-path={@has_action && !@disabled && (@scope_path || "")}
+      disabled={@disabled}
     >
       <.render_component
         :if={@props["child"]}
@@ -493,17 +515,20 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         opts
       )
 
-    text_prop = assigns.props["text"]
-    text = Binding.resolve(text_prop, assigns.surface.data_model, assigns.scope_path, opts)
-    field_type = assigns.props["textFieldType"] || "shortText"
+    # Support both v0.8 "text" and v0.9 "value" props
+    value_prop = assigns.props["value"] || assigns.props["text"]
+    text = Binding.resolve(value_prop, assigns.surface.data_model, assigns.scope_path, opts)
+    # Support both v0.8 "textFieldType" and v0.9 "variant"
+    field_type = assigns.props["variant"] || assigns.props["textFieldType"] || "shortText"
 
     # Get absolute path for binding (expand if relative)
-    raw_path = Binding.get_path(text_prop)
+    raw_path = Binding.get_path(value_prop)
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
-    # Handle validationRegexp (v0.8 standard catalog)
+    # Build error messages from v0.8 validationRegexp and/or v0.9 checks
     validation_regexp = assigns.props["validationRegexp"]
-    is_valid = validate_text_field(text || "", validation_regexp)
+    checks = assigns.props["checks"]
+    errors = build_text_field_errors(text || "", validation_regexp, checks, assigns.surface.data_model, assigns.scope_path, opts)
 
     assigns =
       assign(assigns,
@@ -511,8 +536,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         text: text || "",
         field_type: field_type,
         path: path,
-        is_valid: is_valid,
-        has_validation: validation_regexp != nil
+        errors: errors
       )
 
     ~H"""
@@ -533,7 +557,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         type={input_type(@field_type)}
         phx-debounce="300"
         disabled={@suppress_events}
-        errors={if @has_validation && !@is_valid && @text != "", do: ["Invalid format"], else: []}
+        errors={@errors}
       />
     </.form>
     """
@@ -571,7 +595,11 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     raw_path = Binding.get_path(assigns.props["value"])
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
-    assigns = assign(assigns, label: label, value: !!value, path: path)
+    # v0.9 checks
+    checks = assigns.props["checks"]
+    errors = Checks.evaluate_checks(checks, assigns.surface.data_model, assigns.scope_path, opts)
+
+    assigns = assign(assigns, label: label, value: !!value, path: path, errors: errors)
 
     ~H"""
     <.form
@@ -590,6 +618,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         value={@value}
         checked={@value}
         disabled={@suppress_events}
+        errors={@errors}
       />
     </.form>
     """
@@ -773,6 +802,14 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   def a2ui_slider(assigns) do
     opts = binding_opts(assigns.surface)
 
+    label =
+      Binding.resolve(
+        assigns.props["label"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
+
     value =
       Binding.resolve(
         assigns.props["value"],
@@ -781,15 +818,27 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         opts
       )
 
-    min_val = assigns.props["minValue"] || 0
-    max_val = assigns.props["maxValue"] || 100
+    # Support both v0.8 "minValue"/"maxValue" and v0.9 "min"/"max"
+    min_val = assigns.props["min"] || assigns.props["minValue"] || 0
+    max_val = assigns.props["max"] || assigns.props["maxValue"] || 100
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
+    # v0.9 checks
+    checks = assigns.props["checks"]
+    errors = Checks.evaluate_checks(checks, assigns.surface.data_model, assigns.scope_path, opts)
+
     assigns =
-      assign(assigns, value: value || min_val, min_val: min_val, max_val: max_val, path: path)
+      assign(assigns,
+        label: label,
+        value: value || min_val,
+        min_val: min_val,
+        max_val: max_val,
+        path: path,
+        errors: errors
+      )
 
     ~H"""
     <.form
@@ -801,18 +850,26 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     >
       <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
       <input type="hidden" name="a2ui_input[path]" value={@path} />
-      <div class="flex items-center gap-3">
-        <input
-          type="range"
-          name="a2ui_input[value]"
-          id={component_dom_id(@surface.id, @id, @scope_path, "range")}
-          value={@value}
-          min={@min_val}
-          max={@max_val}
-          disabled={@suppress_events}
-          class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 dark:bg-zinc-700"
-        />
-        <span class="min-w-[3rem] text-sm text-zinc-600 dark:text-zinc-400">{@value}</span>
+      <div class="space-y-1">
+        <label :if={@label} class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {@label}
+        </label>
+        <div class="flex items-center gap-3">
+          <input
+            type="range"
+            name="a2ui_input[value]"
+            id={component_dom_id(@surface.id, @id, @scope_path, "range")}
+            value={@value}
+            min={@min_val}
+            max={@max_val}
+            disabled={@suppress_events}
+            class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 dark:bg-zinc-700"
+          />
+          <span class="min-w-[3rem] text-sm text-zinc-600 dark:text-zinc-400">{@value}</span>
+        </div>
+        <p :for={error <- @errors} class="mt-1 text-sm text-rose-600 dark:text-rose-400">
+          {error}
+        </p>
       </div>
     </.form>
     """
@@ -829,6 +886,14 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_datetime_input(assigns) do
     opts = binding_opts(assigns.surface)
+
+    label =
+      Binding.resolve(
+        assigns.props["label"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     value =
       Binding.resolve(
@@ -864,8 +929,19 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     raw_path = Binding.get_path(assigns.props["value"])
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
+    # v0.9 checks
+    checks = assigns.props["checks"]
+    errors = Checks.evaluate_checks(checks, assigns.surface.data_model, assigns.scope_path, opts)
+
     assigns =
-      assign(assigns, html_value: html_value, input_type: input_type, path: path, step: step)
+      assign(assigns,
+        label: label,
+        html_value: html_value,
+        input_type: input_type,
+        path: path,
+        step: step,
+        errors: errors
+      )
 
     ~H"""
     <.form
@@ -878,15 +954,23 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       <input type="hidden" name="a2ui_input[surface_id]" value={@surface.id} />
       <input type="hidden" name="a2ui_input[path]" value={@path} />
       <input type="hidden" name="a2ui_input[input_type]" value={@input_type} />
-      <input
-        type={@input_type}
-        name="a2ui_input[value]"
-        id={component_dom_id(@surface.id, @id, @scope_path, "input")}
-        value={@html_value}
-        step={@step}
-        disabled={@suppress_events}
-        class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-      />
+      <div class="space-y-1">
+        <label :if={@label} class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {@label}
+        </label>
+        <input
+          type={@input_type}
+          name="a2ui_input[value]"
+          id={component_dom_id(@surface.id, @id, @scope_path, "input")}
+          value={@html_value}
+          step={@step}
+          disabled={@suppress_events}
+          class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+        />
+        <p :for={error <- @errors} class="mt-1 text-sm text-rose-600 dark:text-rose-400">
+          {error}
+        </p>
+      </div>
     </.form>
     """
   end
@@ -903,9 +987,20 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   def a2ui_multiple_choice(assigns) do
     opts = binding_opts(assigns.surface)
 
+    label =
+      Binding.resolve(
+        assigns.props["label"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
+
+    # Support both v0.8 "selections" and v0.9 "value" props
+    selections_prop = assigns.props["value"] || assigns.props["selections"]
+
     raw_selections =
       Binding.resolve(
-        assigns.props["selections"],
+        selections_prop,
         assigns.surface.data_model,
         assigns.scope_path,
         opts
@@ -922,28 +1017,43 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     selections = Enum.filter(selections, &is_binary/1)
 
     options = assigns.props["options"] || []
+
+    # v0.9 uses "variant" ("mutuallyExclusive" or "multipleSelection")
+    # v0.8 uses "maxAllowedSelections" (1 = single select)
+    variant = assigns.props["variant"]
     max_allowed = assigns.props["maxAllowedSelections"]
 
-    # Get absolute path for binding
-    raw_path = Binding.get_path(assigns.props["selections"])
-    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
-
     # Determine if this should be radio (single select) or checkbox (multi select)
-    is_single_select = max_allowed == 1
+    is_single_select =
+      cond do
+        variant == "mutuallyExclusive" -> true
+        max_allowed == 1 -> true
+        true -> false
+      end
+
+    # Get absolute path for binding
+    raw_path = Binding.get_path(selections_prop)
+    path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
 
     # Check if max selections reached (for disabling unchecked boxes)
     current_count = length(selections)
     max_reached = is_integer(max_allowed) and max_allowed > 1 and current_count >= max_allowed
 
+    # v0.9 checks
+    checks = assigns.props["checks"]
+    errors = Checks.evaluate_checks(checks, assigns.surface.data_model, assigns.scope_path, opts)
+
     assigns =
       assign(assigns,
+        label: label,
         selections: selections,
         options: options,
         max_allowed: max_allowed,
         path: path,
         is_single_select: is_single_select,
         max_reached: max_reached,
-        binding_opts: opts
+        binding_opts: opts,
+        errors: errors
       )
 
     ~H"""
@@ -961,6 +1071,9 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       <%!-- Empty value sentinel for when nothing is selected --%>
       <input type="hidden" name="a2ui_input[values][]" value="" />
       <div class="space-y-2">
+        <label :if={@label} class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          {@label}
+        </label>
         <%= for option <- @options do %>
           <% opt_label =
             Binding.resolve(option["label"], @surface.data_model, @scope_path, @binding_opts)
@@ -996,6 +1109,9 @@ defmodule A2UI.Phoenix.Catalog.Standard do
             <span class="text-sm text-zinc-900 dark:text-zinc-50">{opt_label}</span>
           </label>
         <% end %>
+        <p :for={error <- @errors} class="mt-1 text-sm text-rose-600 dark:text-rose-400">
+          {error}
+        </p>
       </div>
     </.form>
     """
@@ -1490,11 +1606,21 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   defp parse_color(_), do: nil
 
-  defp button_classes(true) do
+  defp button_classes(primary, disabled \\ false)
+
+  defp button_classes(true, true) do
+    "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition opacity-50 cursor-not-allowed"
+  end
+
+  defp button_classes(true, false) do
     "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition"
   end
 
-  defp button_classes(false) do
+  defp button_classes(false, true) do
+    "a2ui-button-secondary inline-flex items-center justify-center rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-400 shadow-sm ring-1 ring-inset ring-zinc-200 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500 dark:ring-zinc-700"
+  end
+
+  defp button_classes(false, false) do
     "a2ui-button-secondary inline-flex items-center justify-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-200 transition hover:bg-zinc-50 active:bg-zinc-100 dark:bg-zinc-900 dark:text-zinc-50 dark:ring-zinc-800 dark:hover:bg-zinc-800"
   end
 
@@ -1586,6 +1712,23 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   end
 
   defp validate_text_field(_, _), do: true
+
+  # Builds error list from v0.8 validationRegexp and/or v0.9 checks
+  defp build_text_field_errors(text, validation_regexp, checks, data_model, scope_path, opts) do
+    errors = []
+
+    # v0.8: validationRegexp produces "Invalid format" error
+    errors =
+      if validation_regexp != nil and text != "" and not validate_text_field(text, validation_regexp) do
+        ["Invalid format" | errors]
+      else
+        errors
+      end
+
+    # v0.9: checks produce their message when failing
+    check_errors = Checks.evaluate_checks(checks, data_model, scope_path, opts)
+    errors ++ check_errors
+  end
 
   defp component_dom_id(surface_id, component_id, scope_path, suffix \\ nil) do
     base = "a2ui-#{surface_id}-#{component_id}"
