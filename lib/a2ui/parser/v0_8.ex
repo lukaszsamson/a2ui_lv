@@ -54,7 +54,8 @@ defmodule A2UI.Parser.V0_8 do
   def parse_map(%{"dataModelUpdate" => data}) do
     # Adapt v0.8 format to v0.9, then parse
     adapted = Adapter.adapt_data_model_update(data)
-    {:data_model_update, DataModelUpdate.from_map(adapted)}
+    msg = DataModelUpdate.from_map(adapted)
+    {:data_model_update, %{msg | protocol_version: :v0_8}}
   end
 
   def parse_map(%{"beginRendering" => data}),

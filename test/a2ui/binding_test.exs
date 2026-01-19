@@ -271,7 +271,9 @@ defmodule A2UI.BindingTest do
     test "v0.8: absolute paths are scoped in template context" do
       # In v0.8, /name inside a template scope becomes scope_path/name
       assert Binding.expand_path("/name", "/items/0", version: :v0_8) == "/items/0/name"
-      assert Binding.expand_path("/user/email", "/products/5", version: :v0_8) == "/products/5/user/email"
+
+      assert Binding.expand_path("/user/email", "/products/5", version: :v0_8) ==
+               "/products/5/user/email"
     end
 
     test "v0.9: absolute paths stay absolute even in template context" do
@@ -283,7 +285,9 @@ defmodule A2UI.BindingTest do
     test "v0.9: relative paths (no leading /) are scoped" do
       # Both versions scope relative paths without leading /
       assert Binding.expand_path("name", "/items/0", version: :v0_9) == "/items/0/name"
-      assert Binding.expand_path("details/price", "/products/5", version: :v0_9) == "/products/5/details/price"
+
+      assert Binding.expand_path("details/price", "/products/5", version: :v0_9) ==
+               "/products/5/details/price"
     end
 
     test "v0.9: ./ relative paths are scoped" do

@@ -183,8 +183,14 @@ defmodule A2UI.V0_8.AdapterTest do
       v0_8 = %{
         "surfaceId" => "main",
         "components" => [
-          %{"id" => "text1", "component" => %{"Text" => %{"text" => %{"literalString" => "Hello"}}}},
-          %{"id" => "text2", "component" => %{"Text" => %{"text" => %{"literalString" => "World"}}}}
+          %{
+            "id" => "text1",
+            "component" => %{"Text" => %{"text" => %{"literalString" => "Hello"}}}
+          },
+          %{
+            "id" => "text2",
+            "component" => %{"Text" => %{"text" => %{"literalString" => "World"}}}
+          }
         ]
       }
 

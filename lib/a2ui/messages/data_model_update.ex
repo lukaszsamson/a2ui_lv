@@ -16,12 +16,13 @@ defmodule A2UI.Messages.DataModelUpdate do
   to this v0.9-native representation at parse time.
   """
 
-  defstruct [:surface_id, :path, :value]
+  defstruct [:surface_id, :path, :value, :protocol_version]
 
   @type t :: %__MODULE__{
           surface_id: String.t(),
           path: String.t() | nil,
-          value: term()
+          value: term(),
+          protocol_version: :v0_8 | :v0_9 | nil
         }
 
   @doc """
@@ -54,7 +55,8 @@ defmodule A2UI.Messages.DataModelUpdate do
     %__MODULE__{
       surface_id: sid,
       path: Map.get(data, "path"),
-      value: value
+      value: value,
+      protocol_version: :v0_9
     }
   end
 end

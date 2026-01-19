@@ -117,7 +117,10 @@ defmodule A2UI.Session do
       {:ok, session} = A2UI.Session.apply_message(session, surface_update)
       {:error, error} = A2UI.Session.apply_message(session, invalid_update)
   """
-  @spec apply_message(t(), SurfaceUpdate.t() | DataModelUpdate.t() | BeginRendering.t() | DeleteSurface.t()) ::
+  @spec apply_message(
+          t(),
+          SurfaceUpdate.t() | DataModelUpdate.t() | BeginRendering.t() | DeleteSurface.t()
+        ) ::
           {:ok, t()} | {:error, map()}
   def apply_message(session, %SurfaceUpdate{surface_id: sid} = msg) do
     case Validator.validate_surface_update(msg) do
@@ -257,7 +260,8 @@ defmodule A2UI.Session do
             {:error, error}
 
           {:error, reason} ->
-            {:error, Error.validation_error("Data validation failed: #{inspect(reason)}", surface_id)}
+            {:error,
+             Error.validation_error("Data validation failed: #{inspect(reason)}", surface_id)}
         end
 
       :error ->

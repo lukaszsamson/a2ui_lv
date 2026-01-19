@@ -150,140 +150,140 @@ defmodule A2UI.Phoenix.Catalog.Standard do
             data-a2ui-scope={@scope_path || ""}
           >
             <%= if @depth > A2UI.Validator.max_depth() do %>
-          <div class="a2ui-error rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
-            Max render depth exceeded
+              <div class="a2ui-error rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
+                Max render depth exceeded
+              </div>
+            <% else %>
+              <%= case @component.type do %>
+                <% "Column" -> %>
+                  <.a2ui_column
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% "Row" -> %>
+                  <.a2ui_row
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% "Card" -> %>
+                  <.a2ui_card
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% "Text" -> %>
+                  <.a2ui_text props={@component.props} surface={@surface} scope_path={@scope_path} />
+                <% "Divider" -> %>
+                  <.a2ui_divider props={@component.props} />
+                <% "Button" -> %>
+                  <.a2ui_button
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% "TextField" -> %>
+                  <.a2ui_text_field
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    suppress_events={@suppress_events}
+                  />
+                <% "CheckBox" -> %>
+                  <.a2ui_checkbox
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    suppress_events={@suppress_events}
+                  />
+                <% "Icon" -> %>
+                  <.a2ui_icon props={@component.props} surface={@surface} scope_path={@scope_path} />
+                <% "Image" -> %>
+                  <.a2ui_image props={@component.props} surface={@surface} scope_path={@scope_path} />
+                <% "AudioPlayer" -> %>
+                  <.a2ui_audio_player
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                  />
+                <% "Video" -> %>
+                  <.a2ui_video props={@component.props} surface={@surface} scope_path={@scope_path} />
+                <% "Slider" -> %>
+                  <.a2ui_slider
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    suppress_events={@suppress_events}
+                  />
+                <% "DateTimeInput" -> %>
+                  <.a2ui_datetime_input
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    suppress_events={@suppress_events}
+                  />
+                <% "MultipleChoice" -> %>
+                  <.a2ui_multiple_choice
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    suppress_events={@suppress_events}
+                  />
+                <% "List" -> %>
+                  <.a2ui_list
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% "Tabs" -> %>
+                  <.a2ui_tabs
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% "Modal" -> %>
+                  <.a2ui_modal
+                    props={@component.props}
+                    surface={@surface}
+                    scope_path={@scope_path}
+                    id={@id}
+                    depth={@depth}
+                    suppress_events={@suppress_events}
+                    visited={@visited}
+                  />
+                <% unknown -> %>
+                  <.a2ui_unknown type={unknown} />
+              <% end %>
+            <% end %>
           </div>
-        <% else %>
-          <%= case @component.type do %>
-            <% "Column" -> %>
-              <.a2ui_column
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% "Row" -> %>
-              <.a2ui_row
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% "Card" -> %>
-              <.a2ui_card
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% "Text" -> %>
-              <.a2ui_text props={@component.props} surface={@surface} scope_path={@scope_path} />
-            <% "Divider" -> %>
-              <.a2ui_divider props={@component.props} />
-            <% "Button" -> %>
-              <.a2ui_button
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% "TextField" -> %>
-              <.a2ui_text_field
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                suppress_events={@suppress_events}
-              />
-            <% "CheckBox" -> %>
-              <.a2ui_checkbox
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                suppress_events={@suppress_events}
-              />
-            <% "Icon" -> %>
-              <.a2ui_icon props={@component.props} surface={@surface} scope_path={@scope_path} />
-            <% "Image" -> %>
-              <.a2ui_image props={@component.props} surface={@surface} scope_path={@scope_path} />
-            <% "AudioPlayer" -> %>
-              <.a2ui_audio_player
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-              />
-            <% "Video" -> %>
-              <.a2ui_video props={@component.props} surface={@surface} scope_path={@scope_path} />
-            <% "Slider" -> %>
-              <.a2ui_slider
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                suppress_events={@suppress_events}
-              />
-            <% "DateTimeInput" -> %>
-              <.a2ui_datetime_input
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                suppress_events={@suppress_events}
-              />
-            <% "MultipleChoice" -> %>
-              <.a2ui_multiple_choice
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                suppress_events={@suppress_events}
-              />
-            <% "List" -> %>
-              <.a2ui_list
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% "Tabs" -> %>
-              <.a2ui_tabs
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% "Modal" -> %>
-              <.a2ui_modal
-                props={@component.props}
-                surface={@surface}
-                scope_path={@scope_path}
-                id={@id}
-                depth={@depth}
-                suppress_events={@suppress_events}
-                visited={@visited}
-              />
-            <% unknown -> %>
-              <.a2ui_unknown type={unknown} />
-          <% end %>
-        <% end %>
-      </div>
-      """
+          """
         else
           ~H"""
           <div class="a2ui-missing rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
@@ -397,7 +397,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_text(assigns) do
     opts = binding_opts(assigns.surface)
-    text = Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    text =
+      Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path, opts)
+
     hint = assigns.props["usageHint"] || "body"
     {style, class} = text_style(hint)
     assigns = assign(assigns, text: text, style: style, class: class)
@@ -483,7 +486,12 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     opts = binding_opts(assigns.surface)
 
     label =
-      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path, opts)
+      Binding.resolve(
+        assigns.props["label"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     text_prop = assigns.props["text"]
     text = Binding.resolve(text_prop, assigns.surface.data_model, assigns.scope_path, opts)
@@ -544,10 +552,20 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     opts = binding_opts(assigns.surface)
 
     label =
-      Binding.resolve(assigns.props["label"], assigns.surface.data_model, assigns.scope_path, opts)
+      Binding.resolve(
+        assigns.props["label"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     value =
-      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path, opts)
+      Binding.resolve(
+        assigns.props["value"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     # Get absolute path for binding
     raw_path = Binding.get_path(assigns.props["value"])
@@ -591,7 +609,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_icon(assigns) do
     opts = binding_opts(assigns.surface)
-    name = Binding.resolve(assigns.props["name"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    name =
+      Binding.resolve(assigns.props["name"], assigns.surface.data_model, assigns.scope_path, opts)
+
     hero_name = Map.get(@icon_mapping, name, "hero-question-mark-circle")
     assigns = assign(assigns, hero_name: hero_name)
 
@@ -612,7 +633,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_image(assigns) do
     opts = binding_opts(assigns.surface)
-    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    raw_url =
+      Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
+
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
     fit = assigns.props["fit"] || "contain"
@@ -663,7 +687,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_audio_player(assigns) do
     opts = binding_opts(assigns.surface)
-    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    raw_url =
+      Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
+
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
 
@@ -706,7 +733,10 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   def a2ui_video(assigns) do
     opts = binding_opts(assigns.surface)
-    raw_url = Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    raw_url =
+      Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
+
     # Sanitize URL - returns nil for unsafe schemes
     url = A2UI.Validator.sanitize_media_url(raw_url)
     assigns = assign(assigns, url: url)
@@ -744,7 +774,12 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     opts = binding_opts(assigns.surface)
 
     value =
-      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path, opts)
+      Binding.resolve(
+        assigns.props["value"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     min_val = assigns.props["minValue"] || 0
     max_val = assigns.props["maxValue"] || 100
@@ -796,7 +831,12 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     opts = binding_opts(assigns.surface)
 
     value =
-      Binding.resolve(assigns.props["value"], assigns.surface.data_model, assigns.scope_path, opts)
+      Binding.resolve(
+        assigns.props["value"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     enable_date = assigns.props["enableDate"] != false
     enable_time = assigns.props["enableTime"] != false
@@ -864,7 +904,12 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     opts = binding_opts(assigns.surface)
 
     raw_selections =
-      Binding.resolve(assigns.props["selections"], assigns.surface.data_model, assigns.scope_path, opts)
+      Binding.resolve(
+        assigns.props["selections"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     # Ensure selections is a list (it might come as a map or nil)
     selections =
@@ -917,7 +962,9 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       <input type="hidden" name="a2ui_input[values][]" value="" />
       <div class="space-y-2">
         <%= for option <- @options do %>
-          <% opt_label = Binding.resolve(option["label"], @surface.data_model, @scope_path, @binding_opts)
+          <% opt_label =
+            Binding.resolve(option["label"], @surface.data_model, @scope_path, @binding_opts)
+
           opt_value = option["value"]
           opt_value = if is_binary(opt_value), do: opt_value, else: ""
           is_selected = opt_value != "" and opt_value in @selections
@@ -1230,7 +1277,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         template_id = template["componentId"]
 
         # Compute base path for template items (version-aware expansion)
-        base_path = Binding.expand_path(data_binding, assigns.scope_path, binding_opts(assigns.surface))
+        base_path =
+          Binding.expand_path(data_binding, assigns.scope_path, binding_opts(assigns.surface))
 
         collection = Binding.get_at_pointer(assigns.surface.data_model, base_path)
         max_items = A2UI.Validator.max_template_items()

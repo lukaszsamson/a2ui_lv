@@ -56,7 +56,7 @@ defmodule A2UI.Surface do
         }
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering}
-  alias A2UI.{Binding, DataPatch, Initializers}
+  alias A2UI.{Binding, DataPatch, Initializers, JsonPointer}
 
   @doc """
   Creates a new surface with the given ID.
@@ -90,9 +90,25 @@ defmodule A2UI.Surface do
   end
 
   def apply_message(%__MODULE__{} = surface, %DataModelUpdate{} = update) do
-    # Convert to internal patch representation and apply
-    patch = DataPatch.from_update(update.path, update.value)
-    new_data = DataPatch.apply_patch(surface.data_model, patch)
+    # Convert to internal patch representation and apply.
+    #
+    # v0.8 `dataModelUpdate` has "merge at path" semantics:
+    # `path: "user", contents: [{key:"email"...}]` updates /user/email without deleting /user/name.
+    # See docs/A2UI/docs/reference/messages.md:217.
+    #
+    # v0.9 `updateDataModel` replaces the value at `path`.
+    version = update.protocol_version || surface.protocol_version || :v0_9
+
+    patches =
+      case {version, update.path, update.value} do
+        {:v0_8, path, %{} = value} when not is_nil(path) ->
+          v0_8_merge_patches(Binding.expand_path(path, nil), value)
+
+        _ ->
+          [DataPatch.from_update(update.path, update.value)]
+      end
+
+    new_data = DataPatch.apply_all(surface.data_model, patches)
     %{surface | data_model: new_data}
   end
 
@@ -154,7 +170,8 @@ defmodule A2UI.Surface do
   def update_data_at_path(%__MODULE__{} = surface, path, value) do
     # Two-way binding uses RFC6901 pointers (same resolver as reads).
     pointer = Binding.expand_path(path, nil)
-    new_data = Binding.set_at_pointer(surface.data_model, pointer, value)
+    # Use v0.9-native container creation semantics (lists for numeric segments).
+    new_data = JsonPointer.upsert(surface.data_model, pointer, value)
     %{surface | data_model: new_data}
   end
 
@@ -196,5 +213,19 @@ defmodule A2UI.Surface do
   def apply_patches(%__MODULE__{} = surface, patches) when is_list(patches) do
     new_data = DataPatch.apply_all(surface.data_model, patches)
     %{surface | data_model: new_data}
+  end
+
+  defp v0_8_merge_patches(base_pointer, %{} = value) do
+    Enum.flat_map(value, fn {key, nested} ->
+      pointer = Binding.append_pointer_segment(base_pointer, key)
+
+      cond do
+        is_map(nested) and map_size(nested) > 0 ->
+          v0_8_merge_patches(pointer, nested)
+
+        true ->
+          [{:set_at, pointer, nested}]
+      end
+    end)
   end
 end

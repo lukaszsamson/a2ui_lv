@@ -174,7 +174,9 @@ defmodule A2UI.ValidatorTest do
     end
 
     test "validate_media_url/1 accepts data URLs" do
-      data_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+      data_url =
+        "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
       assert {:ok, ^data_url} = Validator.validate_media_url(data_url)
     end
 

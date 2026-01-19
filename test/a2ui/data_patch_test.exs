@@ -6,11 +6,16 @@ defmodule A2UI.DataPatchTest do
   describe "apply/2 with :replace_root" do
     test "replaces entire data model with map" do
       data = %{"old" => "data"}
-      assert DataPatch.apply_patch(data, {:replace_root, %{"new" => "data"}}) == %{"new" => "data"}
+
+      assert DataPatch.apply_patch(data, {:replace_root, %{"new" => "data"}}) == %{
+               "new" => "data"
+             }
     end
 
     test "replaces empty data model" do
-      assert DataPatch.apply_patch(%{}, {:replace_root, %{"name" => "Alice"}}) == %{"name" => "Alice"}
+      assert DataPatch.apply_patch(%{}, {:replace_root, %{"name" => "Alice"}}) == %{
+               "name" => "Alice"
+             }
     end
 
     test "non-map replace_root returns empty map" do

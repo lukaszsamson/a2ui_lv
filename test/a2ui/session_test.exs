@@ -167,11 +167,101 @@ defmodule A2UI.SessionTest do
       data_msg = %A2UI.Messages.DataModelUpdate{
         surface_id: "test",
         path: nil,
-        value: %{"count" => 42}
+        value: %{"count" => 42},
+        protocol_version: :v0_9
       }
 
       assert {:ok, updated} = Session.apply_message(session, data_msg)
       assert updated.surfaces["test"].data_model["count"] == 42
+    end
+
+    test "v0.8 DataModelUpdate merges at path" do
+      session = Session.new()
+
+      {:ok, session} =
+        Session.apply_json_line(
+          session,
+          ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
+        )
+
+      {:ok, session} =
+        Session.apply_message(session, %A2UI.Messages.DataModelUpdate{
+          surface_id: "test",
+          path: "/user",
+          value: %{"name" => "Alice", "email" => "old@example.com"},
+          protocol_version: :v0_9
+        })
+
+      {:ok, updated} =
+        Session.apply_json_line(
+          session,
+          ~s({"dataModelUpdate":{"surfaceId":"test","path":"user","contents":[{"key":"email","valueString":"new@example.com"}]}})
+        )
+
+      user = updated.surfaces["test"].data_model["user"]
+      assert user["name"] == "Alice"
+      assert user["email"] == "new@example.com"
+    end
+
+    test "v0.8 DataModelUpdate merges nested maps at path" do
+      session = Session.new()
+
+      {:ok, session} =
+        Session.apply_json_line(
+          session,
+          ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
+        )
+
+      {:ok, session} =
+        Session.apply_message(session, %A2UI.Messages.DataModelUpdate{
+          surface_id: "test",
+          path: "/user",
+          value: %{
+            "name" => "Alice",
+            "address" => %{"street" => "123 Main St", "city" => "Oldtown"}
+          },
+          protocol_version: :v0_9
+        })
+
+      {:ok, updated} =
+        Session.apply_json_line(
+          session,
+          ~s({"dataModelUpdate":{"surfaceId":"test","path":"user","contents":[{"key":"address","valueMap":[{"key":"city","valueString":"Newtown"}]}]}})
+        )
+
+      user = updated.surfaces["test"].data_model["user"]
+      assert user["name"] == "Alice"
+      assert user["address"]["street"] == "123 Main St"
+      assert user["address"]["city"] == "Newtown"
+    end
+
+    test "v0.8 DataModelUpdate overwrites scalar when nested map is required" do
+      session = Session.new()
+
+      {:ok, session} =
+        Session.apply_json_line(
+          session,
+          ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
+        )
+
+      # Existing data has a scalar at /user/address, but the update wants /user/address/city.
+      {:ok, session} =
+        Session.apply_message(session, %A2UI.Messages.DataModelUpdate{
+          surface_id: "test",
+          path: "/user",
+          value: %{"address" => "oops"},
+          protocol_version: :v0_9
+        })
+
+      {:ok, updated} =
+        Session.apply_json_line(
+          session,
+          ~s({"dataModelUpdate":{"surfaceId":"test","path":"user","contents":[{"key":"address","valueMap":[{"key":"city","valueString":"Newtown"}]}]}})
+        )
+
+      address = updated.surfaces["test"].data_model["user"]["address"]
+      assert is_map(address)
+      assert address["city"] == "Newtown"
     end
 
     test "applies BeginRendering message" do

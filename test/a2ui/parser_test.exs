@@ -108,7 +108,9 @@ defmodule A2UI.ParserTest do
     end
 
     test "parses v0.9 createSurface with broadcastDataModel" do
-      json = ~s({"createSurface":{"surfaceId":"main","catalogId":"test","broadcastDataModel":true}})
+      json =
+        ~s({"createSurface":{"surfaceId":"main","catalogId":"test","broadcastDataModel":true}})
+
       assert {:begin_rendering, %BeginRendering{} = msg} = Parser.parse_line(json)
       assert msg.broadcast_data_model? == true
     end

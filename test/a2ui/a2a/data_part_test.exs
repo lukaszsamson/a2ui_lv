@@ -104,9 +104,7 @@ defmodule A2UI.A2A.DataPartTest do
 
     test "includes supportedCatalogIds in capabilities" do
       capabilities =
-        ClientCapabilities.new(
-          supported_catalog_ids: ["custom.catalog.1", "custom.catalog.2"]
-        )
+        ClientCapabilities.new(supported_catalog_ids: ["custom.catalog.1", "custom.catalog.2"])
 
       envelope = %{"userAction" => %{}}
       result = DataPart.build_client_message(envelope, capabilities)

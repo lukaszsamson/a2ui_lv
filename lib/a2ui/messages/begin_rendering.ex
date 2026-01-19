@@ -18,7 +18,14 @@ defmodule A2UI.Messages.BeginRendering do
 
   @type protocol_version :: :v0_8 | :v0_9
 
-  defstruct [:surface_id, :root_id, :catalog_id, :styles, :broadcast_data_model?, :protocol_version]
+  defstruct [
+    :surface_id,
+    :root_id,
+    :catalog_id,
+    :styles,
+    :broadcast_data_model?,
+    :protocol_version
+  ]
 
   @type t :: %__MODULE__{
           surface_id: String.t(),

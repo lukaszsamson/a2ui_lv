@@ -49,8 +49,10 @@ defmodule A2UI.Parser.V0_9 do
   def parse_map(%{"updateComponents" => data}),
     do: {:surface_update, SurfaceUpdate.from_map_v09(data)}
 
-  def parse_map(%{"updateDataModel" => data}),
-    do: {:data_model_update, DataModelUpdate.from_map(data)}
+  def parse_map(%{"updateDataModel" => data}) do
+    msg = DataModelUpdate.from_map(data)
+    {:data_model_update, %{msg | protocol_version: :v0_9}}
+  end
 
   def parse_map(%{"deleteSurface" => data}),
     do: {:delete_surface, DeleteSurface.from_map(data)}
