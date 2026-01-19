@@ -164,11 +164,11 @@ defmodule A2UI.Phoenix.Live do
       end
 
     if action_name do
-      # Resolve all context bindings against current data model
-      resolved_context = resolve_action_context(action_context, surface.data_model, scope_path)
-
       # Determine protocol version from surface (defaults to v0.8 for compatibility)
       version = surface.protocol_version || :v0_8
+
+      # Resolve all context bindings against current data model (version-aware)
+      resolved_context = resolve_action_context(action_context, surface.data_model, scope_path, version)
 
       # Build version-aware action envelope
       action_event =
@@ -414,10 +414,10 @@ defmodule A2UI.Phoenix.Live do
   defp parse_max_allowed(int) when is_integer(int), do: int
   defp parse_max_allowed(_), do: nil
 
-  defp resolve_action_context(context_list, data_model, scope_path) do
+  defp resolve_action_context(context_list, data_model, scope_path, version) do
     Enum.reduce(context_list, %{}, fn
       %{"key" => key, "value" => bound_value}, acc ->
-        resolved = Binding.resolve(bound_value, data_model, scope_path)
+        resolved = Binding.resolve(bound_value, data_model, scope_path, version: version)
         Map.put(acc, key, resolved)
 
       _, acc ->

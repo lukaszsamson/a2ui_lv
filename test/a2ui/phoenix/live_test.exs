@@ -187,6 +187,186 @@ defmodule A2UI.Phoenix.LiveTest do
     end
   end
 
+  describe "v0.9 action context resolution" do
+    test "v0.9 surface uses absolute path scoping in action context" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Set up data model with root and scoped values
+      data_json =
+        ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"root_name","items":[{"name":"item_name"}]}}})
+
+      # Create v0.9 surface with createSurface
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
+
+      # v0.9 component format with action context that uses absolute path /name
+      component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
+        {"id":"root","component":"Column","children":["btn"]},
+        {"id":"btn","component":"Button","action":{
+          "name":"test_action",
+          "context":[
+            {"key":"abs_name","value":{"path":"/name"}},
+            {"key":"rel_name","value":{"path":"name"}}
+          ]
+        }}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Verify the surface has v0.9 protocol version
+      surface = socket.assigns.a2ui_surfaces["test"]
+      assert surface.protocol_version == :v0_9
+
+      # Trigger action with scope_path /items/0
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "btn", "scope-path" => "/items/0"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # v0.9: /name is absolute -> resolves to root "root_name"
+      # v0.9: name (relative) -> scoped to /items/0/name -> "item_name"
+      assert event["action"]["context"]["abs_name"] == "root_name"
+      assert event["action"]["context"]["rel_name"] == "item_name"
+    end
+
+    test "v0.8 surface uses scoped path resolution in action context" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Create v0.8 surface with beginRendering
+      begin_json = ~s({"beginRendering":{"surfaceId":"test","root":"btn"}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, begin_json}, socket)
+
+      # Set up data model - set root value and scoped value at /items/0
+      root_data_json = ~s({"dataModelUpdate":{"surfaceId":"test","contents":[
+        {"key":"name","valueString":"root_name"}
+      ]}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, root_data_json}, socket)
+
+      # Use path-based update to set nested value
+      nested_data_json = ~s({"dataModelUpdate":{"surfaceId":"test","path":"/items/0","contents":[
+        {"key":"name","valueString":"item_name"}
+      ]}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, nested_data_json}, socket)
+
+      # Verify data model structure
+      surface = socket.assigns.a2ui_surfaces["test"]
+      assert surface.data_model["name"] == "root_name"
+      # items is a list, so items/0 creates %{"items" => [%{"name" => "item_name"}]}
+      assert hd(surface.data_model["items"])["name"] == "item_name"
+
+      # v0.8 component with action context using /name (should be scoped in v0.8)
+      component_json = ~s({"surfaceUpdate":{"surfaceId":"test","components":[
+        {"id":"btn","component":{"Button":{"action":{
+          "name":"test_action",
+          "context":[
+            {"key":"scoped_name","value":{"path":"/name"}}
+          ]
+        }}}}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Verify the surface has v0.8 protocol version
+      assert surface.protocol_version == :v0_8
+
+      # Trigger action with scope_path /items/0
+      # In v0.8, /name should be scoped to /items/0/name
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "btn", "scope-path" => "/items/0"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # v0.8 sends userAction envelope
+      assert Map.has_key?(event, "userAction")
+
+      # v0.8: /name is scoped -> resolves to /items/0/name -> "item_name"
+      assert event["userAction"]["context"]["scoped_name"] == "item_name"
+    end
+
+    test "v0.9 sends action envelope instead of userAction" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Create v0.9 surface
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+
+      # v0.9 component format
+      component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
+        {"id":"root","component":"Button","action":"click"}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "root"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # v0.9 uses "action" key, not "userAction"
+      assert Map.has_key?(event, "action")
+      refute Map.has_key?(event, "userAction")
+      assert event["action"]["name"] == "click"
+    end
+  end
+
   describe "error callback" do
     test "emits error on JSON parse failure", %{conn: conn} do
       {:ok, view, _html} = live(conn, "/demo?scenario=basic")
