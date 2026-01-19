@@ -76,9 +76,10 @@ defmodule A2UI.SurfaceTest do
       assert Map.keys(surface.components) |> Enum.sort() == ["a", "b", "c"]
     end
 
-    test "initializer pass sets data model defaults for path+literal bound values" do
+    test "initializer pass sets data model defaults for path+initialValue bound values" do
       surface = Surface.new("test")
 
+      # Props use the v0.9-native format (after adapter conversion)
       update = %SurfaceUpdate{
         surface_id: "test",
         components: [
@@ -86,7 +87,7 @@ defmodule A2UI.SurfaceTest do
             id: "name_field",
             type: "TextField",
             props: %{
-              "text" => %{"path" => "/form/name", "literalString" => "Alice"}
+              "text" => %{"path" => "/form/name", "_initialValue" => "Alice"}
             }
           }
         ]
@@ -96,9 +97,9 @@ defmodule A2UI.SurfaceTest do
       assert surface.data_model == %{"form" => %{"name" => "Alice"}}
     end
 
-    test "initializer pass overwrites existing data model values (per v0.8 spec)" do
-      # Per A2UI v0.8 spec section 4.2: path+literal is an implicit dataModelUpdate
-      # that MUST update the data model at the path with the literal value
+    test "initializer pass overwrites existing data model values (per spec)" do
+      # Per A2UI spec section 4.2: path+initialValue is an implicit dataModelUpdate
+      # that MUST update the data model at the path with the initial value
       surface = %Surface{id: "test", data_model: %{"form" => %{"name" => "Bob"}}}
 
       update = %SurfaceUpdate{
@@ -108,7 +109,7 @@ defmodule A2UI.SurfaceTest do
             id: "name_field",
             type: "TextField",
             props: %{
-              "text" => %{"path" => "/form/name", "literalString" => "Alice"}
+              "text" => %{"path" => "/form/name", "_initialValue" => "Alice"}
             }
           }
         ]
@@ -119,9 +120,9 @@ defmodule A2UI.SurfaceTest do
       assert surface.data_model == %{"form" => %{"name" => "Alice"}}
     end
 
-    test "initializer pass handles numeric segments with v0.8 map semantics" do
-      # In v0.8, collections are map-based (valueMap wire format, not arrays)
-      # So /items/0/name creates %{"items" => %{"0" => %{"name" => "Alice"}}}
+    test "initializer pass handles numeric segments with list semantics" do
+      # Numeric segments create lists (v0.9 semantics)
+      # So /items/0/name creates %{"items" => [%{"name" => "Alice"}]}
       surface = Surface.new("test")
 
       update = %SurfaceUpdate{
@@ -131,14 +132,14 @@ defmodule A2UI.SurfaceTest do
             id: "name",
             type: "Text",
             props: %{
-              "text" => %{"path" => "/items/0/name", "literalString" => "Alice"}
+              "text" => %{"path" => "/items/0/name", "_initialValue" => "Alice"}
             }
           }
         ]
       }
 
       surface = Surface.apply_message(surface, update)
-      assert surface.data_model == %{"items" => %{"0" => %{"name" => "Alice"}}}
+      assert surface.data_model == %{"items" => [%{"name" => "Alice"}]}
     end
 
     test "initializer pass works with root path" do
@@ -151,7 +152,7 @@ defmodule A2UI.SurfaceTest do
             id: "status",
             type: "Text",
             props: %{
-              "text" => %{"path" => "/status", "literalString" => "ready"}
+              "text" => %{"path" => "/status", "_initialValue" => "ready"}
             }
           }
         ]
@@ -169,10 +170,7 @@ defmodule A2UI.SurfaceTest do
       update = %DataModelUpdate{
         surface_id: "test",
         path: nil,
-        contents: [
-          %{"key" => "name", "valueString" => "Alice"},
-          %{"key" => "age", "valueNumber" => 30}
-        ]
+        value: %{"name" => "Alice", "age" => 30}
       }
 
       surface = Surface.apply_message(surface, update)
@@ -185,7 +183,7 @@ defmodule A2UI.SurfaceTest do
       update = %DataModelUpdate{
         surface_id: "test",
         path: nil,
-        contents: [%{"key" => "name", "valueString" => "Alice"}]
+        value: %{"name" => "Alice"}
       }
 
       surface = Surface.apply_message(surface, update)
@@ -198,7 +196,7 @@ defmodule A2UI.SurfaceTest do
       update = %DataModelUpdate{
         surface_id: "test",
         path: "/",
-        contents: [%{"key" => "name", "valueString" => "Alice"}]
+        value: %{"name" => "Alice"}
       }
 
       surface = Surface.apply_message(surface, update)
@@ -211,30 +209,25 @@ defmodule A2UI.SurfaceTest do
       update = %DataModelUpdate{
         surface_id: "test",
         path: "/form",
-        contents: [
-          %{"key" => "email", "valueString" => "test@example.com"}
-        ]
+        value: %{"email" => "test@example.com"}
       }
 
       surface = Surface.apply_message(surface, update)
       assert surface.data_model == %{"form" => %{"email" => "test@example.com"}}
     end
 
-    test "handles valueMap" do
+    test "handles nested maps" do
       surface = Surface.new("test")
 
       update = %DataModelUpdate{
         surface_id: "test",
         path: nil,
-        contents: [
-          %{
-            "key" => "user",
-            "valueMap" => [
-              %{"key" => "name", "valueString" => "Alice"},
-              %{"key" => "email", "valueString" => "alice@example.com"}
-            ]
+        value: %{
+          "user" => %{
+            "name" => "Alice",
+            "email" => "alice@example.com"
           }
-        ]
+        }
       }
 
       surface = Surface.apply_message(surface, update)
@@ -247,41 +240,33 @@ defmodule A2UI.SurfaceTest do
              }
     end
 
-    test "ignores out-of-schema valueArray entries" do
+    test "handles boolean values" do
       surface = Surface.new("test")
 
       update = %DataModelUpdate{
         surface_id: "test",
         path: nil,
-        contents: [
-          %{
-            "key" => "items",
-            "valueArray" => [
-              %{"valueString" => "a"},
-              %{"valueString" => "b"}
-            ]
-          }
-        ]
-      }
-
-      surface = Surface.apply_message(surface, update)
-      assert surface.data_model == %{}
-    end
-
-    test "handles valueBoolean" do
-      surface = Surface.new("test")
-
-      update = %DataModelUpdate{
-        surface_id: "test",
-        path: nil,
-        contents: [
-          %{"key" => "active", "valueBoolean" => true},
-          %{"key" => "disabled", "valueBoolean" => false}
-        ]
+        value: %{"active" => true, "disabled" => false}
       }
 
       surface = Surface.apply_message(surface, update)
       assert surface.data_model == %{"active" => true, "disabled" => false}
+    end
+
+    test "handles delete operation" do
+      surface = %Surface{
+        id: "test",
+        data_model: %{"user" => %{"name" => "Alice", "temp" => "value"}}
+      }
+
+      update = %DataModelUpdate{
+        surface_id: "test",
+        path: "/user/temp",
+        value: :delete
+      }
+
+      surface = Surface.apply_message(surface, update)
+      assert surface.data_model == %{"user" => %{"name" => "Alice"}}
     end
   end
 

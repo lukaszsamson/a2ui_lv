@@ -167,7 +167,7 @@ defmodule A2UI.SessionTest do
       data_msg = %A2UI.Messages.DataModelUpdate{
         surface_id: "test",
         path: nil,
-        contents: [%{"key" => "count", "valueNumber" => 42}]
+        value: %{"count" => 42}
       }
 
       assert {:ok, updated} = Session.apply_message(session, data_msg)

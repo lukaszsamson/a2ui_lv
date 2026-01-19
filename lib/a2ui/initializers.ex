@@ -1,29 +1,30 @@
 defmodule A2UI.Initializers do
   @moduledoc """
-  Applies the v0.8 "initializer pass" for `BoundValue`s with both `path` and `literal*`.
+  Applies initializers from surfaceUpdate components to the data model.
 
-  Per the A2UI v0.8 protocol spec (section 4.2 "Data Binding"):
+  Per A2UI spec section 4.2: BoundValues with both path and literal are
+  implicit dataModelUpdates that must set the path to the literal value.
 
-  > If **both** `path` and a `literal*` value are provided, the client MUST:
-  > 1. Update the data model at the specified `path` with the provided `literal*` value.
-  > 2. Bind the component property to that `path` for rendering and future updates.
+  ## Internal Representation
 
-  This means the literal value **always overwrites** any existing value at the path.
-  This is an "implicit dataModelUpdate" that happens as part of surfaceUpdate processing.
+  After v0.8 adapter conversion, BoundValues with initial values use the
+  `_initialValue` key:
 
-  ## Numeric Segments
+      # v0.9-native format (after adapter conversion)
+      %{"path" => "/form/name", "_initialValue" => "Alice"}
 
-  Paths with numeric segments (e.g., `/items/0/name`) are fully supported. In v0.8,
-  collections are map-based (the wire format uses `valueMap`, not arrays), so paths
-  like `/items/0/name` create `%{"items" => %{"0" => %{"name" => "value"}}}`.
+  ## Example
 
-  This matches the v0.8 wire format where template collections use maps with numeric
-  string keys rather than JSON arrays.
+      # Component with path + initial value binding
+      props = %{
+        "text" => %{"path" => "/form/name", "_initialValue" => "Alice"}
+      }
+
+      # After apply, data_model will have:
+      %{"form" => %{"name" => "Alice"}}
   """
 
   alias A2UI.{Binding, Component, JsonPointer}
-
-  @literal_keys ~w(literalString literalNumber literalBoolean literalArray)
 
   @spec apply(map(), [Component.t()]) :: map()
   def apply(data_model, components) when is_map(data_model) and is_list(components) do
@@ -35,7 +36,7 @@ defmodule A2UI.Initializers do
 
   defp apply_in_term(data_model, %{} = term, path) do
     cond do
-      bound_value_with_literal?(term) ->
+      bound_value_with_initial?(term) ->
         initialize(data_model, term)
 
       true ->
@@ -57,30 +58,17 @@ defmodule A2UI.Initializers do
 
   defp apply_in_term(data_model, _term, _path), do: data_model
 
-  defp bound_value_with_literal?(%{"path" => path} = term) when is_binary(path) do
-    Enum.any?(@literal_keys, &Map.has_key?(term, &1))
+  # After adapter conversion, path bindings with initial values have _initialValue
+  defp bound_value_with_initial?(%{"path" => path, "_initialValue" => _}) when is_binary(path) do
+    true
   end
 
-  defp bound_value_with_literal?(_), do: false
+  defp bound_value_with_initial?(_), do: false
 
-  defp initialize(data_model, %{"path" => raw_path} = term) do
+  defp initialize(data_model, %{"path" => raw_path, "_initialValue" => value}) do
     pointer = Binding.expand_path(raw_path, nil)
 
-    # Per spec: always overwrite with the literal value (implicit dataModelUpdate)
-    # Use v0.8 semantics: creates maps for missing containers (matches valueMap wire format)
-    case literal_value(term) do
-      {:ok, value} -> JsonPointer.upsert(data_model, pointer, value, version: :v0_8)
-      :error -> data_model
-    end
-  end
-
-  defp literal_value(term) do
-    cond do
-      Map.has_key?(term, "literalString") -> {:ok, term["literalString"]}
-      Map.has_key?(term, "literalNumber") -> {:ok, term["literalNumber"]}
-      Map.has_key?(term, "literalBoolean") -> {:ok, term["literalBoolean"]}
-      Map.has_key?(term, "literalArray") -> {:ok, term["literalArray"]}
-      true -> :error
-    end
+    # Per spec: always overwrite with the initial value (implicit dataModelUpdate)
+    JsonPointer.upsert(data_model, pointer, value)
   end
 end

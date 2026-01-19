@@ -45,37 +45,10 @@ defmodule A2UI.DataPatchTest do
       data = %{"count" => 10}
       assert DataPatch.apply_patch(data, {:set_at, "/count", 20}) == %{"count" => 20}
     end
-  end
 
-  describe "apply/2 with :merge_at" do
-    test "merges map at path" do
-      data = %{"user" => %{"name" => "Alice"}}
-      result = DataPatch.apply_patch(data, {:merge_at, "/user", %{"age" => 30}})
-      assert result == %{"user" => %{"name" => "Alice", "age" => 30}}
-    end
-
-    test "overwrites existing keys during merge" do
-      data = %{"user" => %{"name" => "Alice", "age" => 25}}
-      result = DataPatch.apply_patch(data, {:merge_at, "/user", %{"age" => 30}})
-      assert result == %{"user" => %{"name" => "Alice", "age" => 30}}
-    end
-
-    test "creates path if missing" do
-      result = DataPatch.apply_patch(%{}, {:merge_at, "/user", %{"name" => "Alice"}})
-      assert result == %{"user" => %{"name" => "Alice"}}
-    end
-
-    test "replaces non-map with merged value" do
-      data = %{"user" => "old_string"}
-      result = DataPatch.apply_patch(data, {:merge_at, "/user", %{"name" => "Alice"}})
-      assert result == %{"user" => %{"name" => "Alice"}}
-    end
-
-    test "non-map merge value is a no-op" do
-      data = %{"user" => %{"name" => "Alice"}}
-      assert DataPatch.apply_patch(data, {:merge_at, "/user", "string"}) == data
-      assert DataPatch.apply_patch(data, {:merge_at, "/user", 42}) == data
-      assert DataPatch.apply_patch(data, {:merge_at, "/user", nil}) == data
+    test "creates list containers for numeric segments" do
+      result = DataPatch.apply_patch(%{}, {:set_at, "/items/0", "first"})
+      assert result == %{"items" => ["first"]}
     end
   end
 
@@ -96,6 +69,12 @@ defmodule A2UI.DataPatchTest do
       data = %{"a" => 1}
       result = DataPatch.apply_patch(data, {:delete_at, "/missing"})
       assert result == %{"a" => 1}
+    end
+
+    test "deletes element from list" do
+      data = %{"items" => ["a", "b", "c"]}
+      result = DataPatch.apply_patch(data, {:delete_at, "/items/1"})
+      assert result == %{"items" => ["a", "c"]}
     end
   end
 
@@ -128,172 +107,69 @@ defmodule A2UI.DataPatchTest do
     test "combines different patch types" do
       patches = [
         {:replace_root, %{"base" => "data"}},
-        {:set_at, "/user/name", "Alice"},
-        {:merge_at, "/user", %{"email" => "alice@example.com"}}
+        {:set_at, "/user/name", "Alice"}
       ]
 
       result = DataPatch.apply_all(%{}, patches)
 
       assert result == %{
                "base" => "data",
-               "user" => %{"name" => "Alice", "email" => "alice@example.com"}
+               "user" => %{"name" => "Alice"}
              }
     end
   end
 
-  describe "from_v0_8_contents/2" do
-    test "root path produces replace_root patch" do
-      contents = [%{"key" => "name", "valueString" => "Alice"}]
-
-      assert DataPatch.from_v0_8_contents(nil, contents) ==
-               {:replace_root, %{"name" => "Alice"}}
-
-      assert DataPatch.from_v0_8_contents("", contents) ==
-               {:replace_root, %{"name" => "Alice"}}
-
-      assert DataPatch.from_v0_8_contents("/", contents) ==
-               {:replace_root, %{"name" => "Alice"}}
-    end
-
-    test "nested path produces merge_at patch" do
-      contents = [%{"key" => "name", "valueString" => "Alice"}]
-
-      assert DataPatch.from_v0_8_contents("/user", contents) ==
-               {:merge_at, "/user", %{"name" => "Alice"}}
-    end
-
-    test "decodes valueString" do
-      contents = [%{"key" => "name", "valueString" => "Alice"}]
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{"name" => "Alice"}
-    end
-
-    test "decodes valueNumber" do
-      contents = [%{"key" => "age", "valueNumber" => 30}]
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{"age" => 30}
-    end
-
-    test "decodes valueBoolean" do
-      contents = [%{"key" => "active", "valueBoolean" => true}]
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{"active" => true}
-    end
-
-    test "decodes valueMap with nested scalar entries" do
-      contents = [
-        %{
-          "key" => "profile",
-          "valueMap" => [
-            %{"key" => "name", "valueString" => "Alice"},
-            %{"key" => "age", "valueNumber" => 30}
-          ]
-        }
-      ]
-
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{"profile" => %{"name" => "Alice", "age" => 30}}
-    end
-
-    test "decodes multiple entries" do
-      contents = [
-        %{"key" => "name", "valueString" => "Alice"},
-        %{"key" => "age", "valueNumber" => 30},
-        %{"key" => "active", "valueBoolean" => true}
-      ]
-
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{"name" => "Alice", "age" => 30, "active" => true}
-    end
-
-    test "skips invalid entries" do
-      contents = [
-        %{"key" => "valid", "valueString" => "value"},
-        %{"invalid" => "no key"},
-        %{"key" => "also_valid", "valueNumber" => 42}
-      ]
-
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{"valid" => "value", "also_valid" => 42}
-    end
-
-    test "skips entries with multiple value types" do
-      contents = [
-        %{"key" => "ambiguous", "valueString" => "str", "valueNumber" => 42}
-      ]
-
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{}
-    end
-
-    test "skips entries with no value type" do
-      contents = [%{"key" => "no_value"}]
-      {:replace_root, result} = DataPatch.from_v0_8_contents(nil, contents)
-      assert result == %{}
-    end
-
-    test "non-list contents returns empty replace_root" do
-      assert DataPatch.from_v0_8_contents(nil, "not a list") == {:replace_root, %{}}
-      assert DataPatch.from_v0_8_contents(nil, nil) == {:replace_root, %{}}
-    end
-
-    test "normalizes path without leading slash" do
-      contents = [%{"key" => "name", "valueString" => "Alice"}]
-      assert DataPatch.from_v0_8_contents("user", contents) == {:merge_at, "/user", %{"name" => "Alice"}}
-    end
-  end
-
-  describe "from_v0_9_update/2" do
+  describe "from_update/2" do
     test "root path with map produces replace_root" do
-      assert DataPatch.from_v0_9_update(nil, %{"name" => "Alice"}) ==
+      assert DataPatch.from_update(nil, %{"name" => "Alice"}) ==
                {:replace_root, %{"name" => "Alice"}}
 
-      assert DataPatch.from_v0_9_update("", %{"name" => "Alice"}) ==
+      assert DataPatch.from_update("", %{"name" => "Alice"}) ==
                {:replace_root, %{"name" => "Alice"}}
 
-      assert DataPatch.from_v0_9_update("/", %{"name" => "Alice"}) ==
+      assert DataPatch.from_update("/", %{"name" => "Alice"}) ==
                {:replace_root, %{"name" => "Alice"}}
     end
 
     test "root path with non-map wraps in _root" do
-      assert DataPatch.from_v0_9_update(nil, "string") ==
+      assert DataPatch.from_update(nil, "string") ==
                {:replace_root, %{"_root" => "string"}}
 
-      assert DataPatch.from_v0_9_update(nil, 42) ==
+      assert DataPatch.from_update(nil, 42) ==
                {:replace_root, %{"_root" => 42}}
     end
 
     test "nested path produces set_at" do
-      assert DataPatch.from_v0_9_update("/user", %{"name" => "Alice"}) ==
+      assert DataPatch.from_update("/user", %{"name" => "Alice"}) ==
                {:set_at, "/user", %{"name" => "Alice"}}
 
-      assert DataPatch.from_v0_9_update("/user/name", "Alice") ==
+      assert DataPatch.from_update("/user/name", "Alice") ==
                {:set_at, "/user/name", "Alice"}
     end
 
     test "supports all JSON value types at nested paths" do
-      assert DataPatch.from_v0_9_update("/str", "hello") == {:set_at, "/str", "hello"}
-      assert DataPatch.from_v0_9_update("/num", 42) == {:set_at, "/num", 42}
-      assert DataPatch.from_v0_9_update("/bool", true) == {:set_at, "/bool", true}
-      assert DataPatch.from_v0_9_update("/arr", [1, 2]) == {:set_at, "/arr", [1, 2]}
-      assert DataPatch.from_v0_9_update("/obj", %{"a" => 1}) == {:set_at, "/obj", %{"a" => 1}}
-      assert DataPatch.from_v0_9_update("/null", nil) == {:set_at, "/null", nil}
+      assert DataPatch.from_update("/str", "hello") == {:set_at, "/str", "hello"}
+      assert DataPatch.from_update("/num", 42) == {:set_at, "/num", 42}
+      assert DataPatch.from_update("/bool", true) == {:set_at, "/bool", true}
+      assert DataPatch.from_update("/arr", [1, 2]) == {:set_at, "/arr", [1, 2]}
+      assert DataPatch.from_update("/obj", %{"a" => 1}) == {:set_at, "/obj", %{"a" => 1}}
+      assert DataPatch.from_update("/null", nil) == {:set_at, "/null", nil}
     end
 
     test "normalizes path without leading slash" do
-      assert DataPatch.from_v0_9_update("user/name", "Alice") ==
+      assert DataPatch.from_update("user/name", "Alice") ==
                {:set_at, "/user/name", "Alice"}
     end
 
     test ":delete at root produces empty replace_root" do
-      assert DataPatch.from_v0_9_update(nil, :delete) == {:replace_root, %{}}
-      assert DataPatch.from_v0_9_update("", :delete) == {:replace_root, %{}}
-      assert DataPatch.from_v0_9_update("/", :delete) == {:replace_root, %{}}
+      assert DataPatch.from_update(nil, :delete) == {:replace_root, %{}}
+      assert DataPatch.from_update("", :delete) == {:replace_root, %{}}
+      assert DataPatch.from_update("/", :delete) == {:replace_root, %{}}
     end
 
     test ":delete at nested path produces delete_at" do
-      assert DataPatch.from_v0_9_update("/user/name", :delete) == {:delete_at, "/user/name"}
-      assert DataPatch.from_v0_9_update("/temp", :delete) == {:delete_at, "/temp"}
+      assert DataPatch.from_update("/user/name", :delete) == {:delete_at, "/user/name"}
+      assert DataPatch.from_update("/temp", :delete) == {:delete_at, "/temp"}
     end
   end
 end

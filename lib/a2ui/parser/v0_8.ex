@@ -13,9 +13,15 @@ defmodule A2UI.Parser.V0_8 do
   - Single-key envelope pattern (one top-level key per message)
   - Typed value encoding in data model: `valueString`, `valueNumber`, `valueBoolean`, `valueMap`
   - Component wrapper objects: `{"Text": {...}}` instead of `"component": "Text"`
+
+  ## Internal Representation
+
+  This parser adapts v0.8 wire format to v0.9-native internal representation at parse time.
+  All downstream code works with v0.9 structures exclusively.
   """
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
+  alias A2UI.V0_8.Adapter
 
   @type message ::
           {:surface_update, SurfaceUpdate.t()}
@@ -28,6 +34,7 @@ defmodule A2UI.Parser.V0_8 do
   Parses a decoded JSON map as a v0.8 message.
 
   Returns a tagged tuple with the parsed message struct.
+  Adapts v0.8 wire format to v0.9-native internal representation.
 
   ## Examples
 
@@ -38,11 +45,17 @@ defmodule A2UI.Parser.V0_8 do
       {:error, :unknown_message_type}
   """
   @spec parse_map(map()) :: message()
-  def parse_map(%{"surfaceUpdate" => data}),
-    do: {:surface_update, SurfaceUpdate.from_map(data)}
+  def parse_map(%{"surfaceUpdate" => data}) do
+    # Adapt v0.8 format to v0.9, then parse as v0.9
+    adapted = Adapter.adapt_surface_update(data)
+    {:surface_update, SurfaceUpdate.from_map_v09(adapted)}
+  end
 
-  def parse_map(%{"dataModelUpdate" => data}),
-    do: {:data_model_update, DataModelUpdate.from_map(data)}
+  def parse_map(%{"dataModelUpdate" => data}) do
+    # Adapt v0.8 format to v0.9, then parse
+    adapted = Adapter.adapt_data_model_update(data)
+    {:data_model_update, DataModelUpdate.from_map(adapted)}
+  end
 
   def parse_map(%{"beginRendering" => data}),
     do: {:begin_rendering, BeginRendering.from_map(data)}

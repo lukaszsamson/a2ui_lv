@@ -14,6 +14,7 @@ defmodule A2UI.ParserTest do
     end
 
     test "parses v0.8 surfaceUpdate with components" do
+      # v0.8 wire format is adapted to v0.9-native internal representation
       json =
         ~s({"surfaceUpdate":{"surfaceId":"main","components":[{"id":"root","component":{"Text":{"text":{"literalString":"Hello"}}}}]}})
 
@@ -23,17 +24,20 @@ defmodule A2UI.ParserTest do
       [comp] = msg.components
       assert comp.id == "root"
       assert comp.type == "Text"
-      assert comp.props == %{"text" => %{"literalString" => "Hello"}}
+      # Props are adapted: literalString unwrapped to native string
+      assert comp.props == %{"text" => "Hello"}
     end
 
     test "parses v0.8 dataModelUpdate" do
+      # v0.8 wire format is adapted to v0.9-native internal representation
       json =
         ~s({"dataModelUpdate":{"surfaceId":"main","contents":[{"key":"name","valueString":"Alice"}]}})
 
       assert {:data_model_update, %DataModelUpdate{} = msg} = Parser.parse_line(json)
       assert msg.surface_id == "main"
       assert msg.path == nil
-      assert msg.contents == [%{"key" => "name", "valueString" => "Alice"}]
+      # Contents adapted to native JSON value
+      assert msg.value == %{"name" => "Alice"}
     end
 
     test "parses v0.8 dataModelUpdate with path" do
@@ -135,7 +139,6 @@ defmodule A2UI.ParserTest do
       assert msg.surface_id == "main"
       assert msg.path == "/user/name"
       assert msg.value == "Alice"
-      assert msg.format == :v0_9
     end
 
     test "parses v0.9 updateDataModel root replacement" do
@@ -143,7 +146,6 @@ defmodule A2UI.ParserTest do
       assert {:data_model_update, %DataModelUpdate{} = msg} = Parser.parse_line(json)
       assert msg.path == nil
       assert msg.value == %{"name" => "Alice"}
-      assert msg.format == :v0_9
     end
 
     test "parses v0.9 updateDataModel delete (no value)" do
@@ -151,7 +153,6 @@ defmodule A2UI.ParserTest do
       assert {:data_model_update, %DataModelUpdate{} = msg} = Parser.parse_line(json)
       assert msg.path == "/user/temp"
       assert msg.value == :delete
-      assert msg.format == :v0_9
     end
 
     test "parses v0.9 deleteSurface" do

@@ -50,7 +50,7 @@ defmodule A2UI.Parser.V0_9 do
     do: {:surface_update, SurfaceUpdate.from_map_v09(data)}
 
   def parse_map(%{"updateDataModel" => data}),
-    do: {:data_model_update, DataModelUpdate.from_map_v09(data)}
+    do: {:data_model_update, DataModelUpdate.from_map(data)}
 
   def parse_map(%{"deleteSurface" => data}),
     do: {:delete_surface, DeleteSurface.from_map(data)}
