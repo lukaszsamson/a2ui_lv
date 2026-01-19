@@ -2,18 +2,24 @@ defmodule A2UI.Transport.Events do
   @moduledoc """
   Behaviour for client→server event envelope delivery.
 
-  Per the A2UI v0.8 protocol (section 5), clients send single-event envelopes
-  where the payload has exactly one top-level key: `userAction` or `error`.
-  This behaviour abstracts the transport layer from the event sending logic.
+  Per the A2UI protocol, clients send single-event envelopes where the payload
+  has exactly one top-level key. This behaviour abstracts the transport layer
+  from the event sending logic.
 
   ## Event Envelope Format
 
   Per `client_to_server.json`, event envelopes must have exactly one of:
 
-  ### userAction
+  ### v0.8 userAction / v0.9 action
+
+  The envelope key changed between versions:
+  - v0.8: `"userAction"`
+  - v0.9: `"action"`
+
+  The internal structure is identical:
 
       %{
-        "userAction" => %{
+        "action" => %{  # or "userAction" in v0.8
           "name" => "submit_form",
           "surfaceId" => "main",
           "sourceComponentId" => "submit_btn",
@@ -24,6 +30,8 @@ defmodule A2UI.Transport.Events do
 
   ### error
 
+  v0.8 format (with `type`):
+
       %{
         "error" => %{
           "type" => "validation_error",
@@ -31,6 +39,17 @@ defmodule A2UI.Transport.Events do
           "surfaceId" => "main",
           "timestamp" => "2024-01-15T10:30:00Z",
           "details" => %{...}
+        }
+      }
+
+  v0.9 format (with `code`):
+
+      %{
+        "error" => %{
+          "code" => "VALIDATION_FAILED",
+          "surfaceId" => "main",
+          "path" => "/email",
+          "message" => "Invalid email format"
         }
       }
 
@@ -93,9 +112,11 @@ defmodule A2UI.Transport.Events do
   @type opts :: keyword()
 
   @typedoc """
-  Event envelope containing either a userAction or error.
+  Event envelope containing either an action/userAction or error.
 
-  Must have exactly one top-level key: `"userAction"` or `"error"`.
+  Must have exactly one top-level key:
+  - `"action"` (v0.9) or `"userAction"` (v0.8) for user-initiated actions
+  - `"error"` for client-side errors
   """
   @type event_envelope :: %{String.t() => map()}
 
@@ -129,9 +150,14 @@ defmodule A2UI.Transport.Events do
 
   Returns `:ok` if valid, or `{:error, reason}` if invalid.
 
+  Accepts both v0.8 (`userAction`) and v0.9 (`action`) envelope keys.
+
   ## Examples
 
       iex> A2UI.Transport.Events.validate_envelope(%{"userAction" => %{"name" => "test"}})
+      :ok
+
+      iex> A2UI.Transport.Events.validate_envelope(%{"action" => %{"name" => "test"}})
       :ok
 
       iex> A2UI.Transport.Events.validate_envelope(%{"error" => %{"type" => "parse_error"}})
@@ -151,6 +177,11 @@ defmodule A2UI.Transport.Events do
       length(keys) != 1 ->
         {:error, :multiple_envelope_keys}
 
+      # v0.9 action key
+      "action" in keys ->
+        :ok
+
+      # v0.8 userAction key
       "userAction" in keys ->
         :ok
 
@@ -167,10 +198,15 @@ defmodule A2UI.Transport.Events do
   @doc """
   Returns the type of event in the envelope.
 
+  Recognizes both v0.8 (`userAction`) and v0.9 (`action`) as `:action` type.
+
   ## Examples
 
       iex> A2UI.Transport.Events.envelope_type(%{"userAction" => %{}})
-      :user_action
+      :action
+
+      iex> A2UI.Transport.Events.envelope_type(%{"action" => %{}})
+      :action
 
       iex> A2UI.Transport.Events.envelope_type(%{"error" => %{}})
       :error
@@ -178,8 +214,9 @@ defmodule A2UI.Transport.Events do
       iex> A2UI.Transport.Events.envelope_type(%{"invalid" => %{}})
       :unknown
   """
-  @spec envelope_type(event_envelope()) :: :user_action | :error | :unknown
-  def envelope_type(%{"userAction" => _}), do: :user_action
+  @spec envelope_type(event_envelope()) :: :action | :error | :unknown
+  def envelope_type(%{"action" => _}), do: :action
+  def envelope_type(%{"userAction" => _}), do: :action
   def envelope_type(%{"error" => _}), do: :error
   def envelope_type(_), do: :unknown
 end

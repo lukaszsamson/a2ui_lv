@@ -4,9 +4,23 @@ defmodule A2UI.Transport.EventsTest do
   alias A2UI.Transport.Events
 
   describe "validate_envelope/1" do
-    test "accepts valid userAction envelope" do
+    test "accepts valid v0.8 userAction envelope" do
       envelope = %{
         "userAction" => %{
+          "name" => "click",
+          "surfaceId" => "test",
+          "sourceComponentId" => "btn",
+          "timestamp" => "2024-01-15T10:00:00Z",
+          "context" => %{}
+        }
+      }
+
+      assert :ok = Events.validate_envelope(envelope)
+    end
+
+    test "accepts valid v0.9 action envelope" do
+      envelope = %{
+        "action" => %{
           "name" => "click",
           "surfaceId" => "test",
           "sourceComponentId" => "btn",
@@ -25,6 +39,19 @@ defmodule A2UI.Transport.EventsTest do
           "message" => "Something went wrong",
           "surfaceId" => "test",
           "timestamp" => "2024-01-15T10:00:00Z"
+        }
+      }
+
+      assert :ok = Events.validate_envelope(envelope)
+    end
+
+    test "accepts valid v0.9 VALIDATION_FAILED error envelope" do
+      envelope = %{
+        "error" => %{
+          "code" => "VALIDATION_FAILED",
+          "surfaceId" => "test",
+          "path" => "/email",
+          "message" => "Invalid email format"
         }
       }
 
@@ -58,9 +85,14 @@ defmodule A2UI.Transport.EventsTest do
   end
 
   describe "envelope_type/1" do
-    test "returns :user_action for userAction envelope" do
+    test "returns :action for v0.8 userAction envelope" do
       envelope = %{"userAction" => %{"name" => "click"}}
-      assert :user_action = Events.envelope_type(envelope)
+      assert :action = Events.envelope_type(envelope)
+    end
+
+    test "returns :action for v0.9 action envelope" do
+      envelope = %{"action" => %{"name" => "click"}}
+      assert :action = Events.envelope_type(envelope)
     end
 
     test "returns :error for error envelope" do

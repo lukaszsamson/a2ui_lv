@@ -6,7 +6,7 @@ defmodule A2UI.Phoenix.Live do
   - Message ingestion via handle_info
   - User events via handle_event
   - Two-way binding for input components
-  - userAction construction and dispatch
+  - Version-aware action event construction and dispatch
   - Event transport integration for client→server communication
 
   Per LiveView docs on bindings:
@@ -16,8 +16,8 @@ defmodule A2UI.Phoenix.Live do
 
   ## Event Transport
 
-  Per the A2UI v0.8 spec (Section 5), client events (`userAction` and `error`)
-  should be sent back to the server. Configure an event transport to enable this:
+  Per the A2UI spec, client events should be sent back to the server.
+  Configure an event transport to enable this:
 
       socket = A2UI.Phoenix.Live.init(socket,
         event_transport: my_transport_pid,
@@ -26,9 +26,16 @@ defmodule A2UI.Phoenix.Live do
 
   When configured, all user actions and errors will be sent via the transport
   in addition to invoking any configured callbacks.
+
+  ## Protocol Versions
+
+  The module automatically detects the protocol version from each surface
+  and uses the appropriate envelope format:
+  - v0.8: `{"userAction": {...}}`
+  - v0.9: `{"action": {...}}`
   """
 
-  alias A2UI.{Session, Binding}
+  alias A2UI.{Session, Binding, Event}
 
   require Logger
 
@@ -160,23 +167,25 @@ defmodule A2UI.Phoenix.Live do
       # Resolve all context bindings against current data model
       resolved_context = resolve_action_context(action_context, surface.data_model, scope_path)
 
-      user_action = %{
-        "userAction" => %{
-          "name" => action_name,
-          "surfaceId" => surface_id,
-          "sourceComponentId" => component_id,
-          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
-          "context" => resolved_context
-        }
-      }
+      # Determine protocol version from surface (defaults to v0.8 for compatibility)
+      version = surface.protocol_version || :v0_8
 
-      # Send via transport if configured (per v0.8 spec Section 5)
-      send_event_to_transport(socket, user_action)
+      # Build version-aware action envelope
+      action_event =
+        Event.build_action(version,
+          name: action_name,
+          surface_id: surface_id,
+          component_id: component_id,
+          context: resolved_context
+        )
+
+      # Send via transport if configured
+      send_event_to_transport(socket, action_event)
 
       # Dispatch to callback if configured (for local handling)
       socket =
         if callback = socket.assigns[:a2ui_action_callback] do
-          case callback.(user_action, socket) do
+          case callback.(action_event, socket) do
             %Phoenix.LiveView.Socket{} = updated_socket -> updated_socket
             {:noreply, %Phoenix.LiveView.Socket{} = updated_socket} -> updated_socket
             _ -> socket
@@ -185,7 +194,7 @@ defmodule A2UI.Phoenix.Live do
           socket
         end
 
-      {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, user_action)}
+      {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, action_event)}
     else
       Logger.warning("A2UI action event for component without valid action: #{component_id}")
       {:noreply, socket}
@@ -435,8 +444,10 @@ defmodule A2UI.Phoenix.Live do
     end
   end
 
-  # Sends an event envelope to the configured transport
-  # Per v0.8 spec Section 5, events are single-key envelopes: {"userAction": ...} or {"error": ...}
+  # Sends an event envelope to the configured transport.
+  # Events are single-key envelopes:
+  # - v0.8: {"userAction": ...} or {"error": ...}
+  # - v0.9: {"action": ...} or {"error": ...}
   defp send_event_to_transport(socket, event_envelope) do
     transport_pid = socket.assigns[:a2ui_event_transport]
     transport_module = socket.assigns[:a2ui_event_transport_module]
