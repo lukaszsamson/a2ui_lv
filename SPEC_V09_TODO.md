@@ -72,57 +72,36 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 - ✅ checks evaluation engine exists (`A2UI.Checks`)
 - ✅ string interpolation engine exists (`A2UI.Functions.string_format/4`)
 
----
+### Dynamic values: FunctionCall evaluation
 
-## P0 — Still missing / incorrect (v0.9 conformance)
+- ✅ `A2UI.DynamicValue` module evaluates FunctionCall dynamic values
+- ✅ `A2UI.Binding.resolve/4` detects `%{"call" => ...}` and delegates to `DynamicValue.evaluate/4`
+- ✅ Recursive arg resolution for nested FunctionCalls
+- ✅ All standard functions supported: `required`, `email`, `regex`, `length`, `numeric`, `string_format`, `now`
 
-### P0.1 Dynamic values: FunctionCall evaluation is not wired
+### v0.9 `action.context` shape
 
-Per `docs/A2UI/specification/v0_9/json/common_types.json`, `DynamicString`, `DynamicNumber`, `DynamicBoolean`, and `DynamicStringList` may be:
-- literal values
-- `{ "path": "..." }`
-- **FunctionCall** (`%{"call" => ..., "args" => ..., "returnType" => ...}`)
+- ✅ `A2UI.Phoenix.Live.resolve_action_context/4` supports both:
+  - v0.8 list-of-entries (`[%{"key" => ..., "value" => ...}]`)
+  - v0.9 map-of-values (`%{"key" => <DynamicValue>}`)
+- ✅ v0.9 map values resolved via `DynamicValue.evaluate/4` (supports FunctionCalls, paths, literals)
 
-**Current gap:**
-- `A2UI.Binding.resolve/4` does not evaluate `FunctionCall` dynamic values; catalog renderers frequently call `Binding.resolve/4`, so FunctionCall values can leak into HEEx and crash (non-HTML-safe maps), and required v0.9 behaviors like `string_format` won’t run.
+### `now()` function
 
-**TODO:**
-- Introduce a versioned dynamic-value evaluator (either in `A2UI.Binding` or a dedicated `A2UI.DynamicValue`) that:
-  - detects `%{"call" => ...}` and evaluates via the negotiated catalog functions (at minimum the standard functions)
-  - resolves `args` recursively as `DynamicValue` (path/literal/nested call)
-  - validates `returnType` consistency (especially for `DynamicBoolean`/`LogicExpression`)
-
-### P0.2 v0.9 `action.context` shape is not handled
-
-Per the v0.9 protocol examples, a component’s `action.context` is an **object map** of `DynamicValue`s (not the v0.8 adjacency-list array).
-
-**Current gap:**
-- `A2UI.Phoenix.Live` resolves v0.8 list-style context entries (`[%{"key" => ..., "value" => ...}]`) but ignores the v0.9 map form, producing an empty context for v0.9 actions.
-
-**TODO:**
-- Support both shapes:
-  - v0.8 list-of-entries
-  - v0.9 map-of-values
-- When resolving v0.9 map values, use the dynamic-value evaluator (P0.1) so context can include `FunctionCall`s (e.g., `now`) and `{path: ...}`.
-
-### P0.3 `now()` support
-
-The v0.9 protocol docs use `now()` in examples:
-- as a `FunctionCall` dynamic value (`%{"call":"now","returnType":"string"}`)
-- inside `${...}` interpolation examples
-
-**TODO:**
-- Decide whether `now` is treated as a built-in function (not listed in `standard_catalog.json`) and implement it accordingly.
+- ✅ Implemented as built-in function in `A2UI.DynamicValue` and `A2UI.Functions`
+- ✅ Returns ISO 8601 timestamp string
 
 ---
 
-## P1 — Remaining “strict renderer” items (not blocked by transports)
+## P1 — Remaining "strict renderer" items (not blocked by transports)
 
 ### P1.1 Property-level schema validation
 
 Current validation focuses on:
 - unknown component types
 - safety limits (count/depth/data size)
+
+**Status:** Not implemented.
 
 **TODO:**
 - Validate incoming v0.9 components against the negotiated catalog schemas:
@@ -134,18 +113,20 @@ Current validation focuses on:
 
 v0.9 docs state `Text` supports simple Markdown (no HTML/images/links).
 
+**Status:** Not implemented. Requires design decision on markdown subset and adding a markdown library.
+
 **TODO:** render a restricted subset (or explicitly document the unsupported status).
 
-### P1.3 v0.9 “VALIDATION_FAILED” error format (recommended by docs)
+### P1.3 v0.9 "VALIDATION_FAILED" error format
 
 The v0.9 protocol docs recommend a standard payload for validation feedback loops:
 `%{"error" => %{"code" => "VALIDATION_FAILED", "surfaceId" => ..., "path" => ..., "message" => ...}}`
 
-**Status:**
-- `A2UI.Event.validation_failed/3` exists.
+**Status:** ✅ Implemented.
+- `A2UI.Event.validation_failed/3` builds the correct format
+- `A2UI.Event.generic_error/4` handles other error types
 
-**TODO:**
-- Ensure renderer-generated validation errors for v0.9 surfaces can be emitted in this format (where applicable), and decide how to map internal validation failures to `{path, message}`.
+**Note:** Usage of `VALIDATION_FAILED` in response to input validation is a design decision - currently validation errors are displayed locally via component checks without emitting to transport.
 
 ### P1.4 Create-surface ordering (optional strictness)
 
@@ -153,13 +134,15 @@ The v0.9 protocol says `updateComponents` must not be sent before `createSurface
 
 **Current behavior:** updates can arrive early and are buffered implicitly (surface not ready until `createSurface`).
 
+**Status:** Not implemented (optional strictness).
+
 **TODO (strict mode only):** reject or flag updates for unknown surfaces until `createSurface` is received.
 
 ---
 
 ## Test gaps
 
-- Add tests exercising:
-  - `DynamicString` with FunctionCall (`string_format`) in `Text.text`
-  - v0.9 `action.context` as a map with both `{path: ...}` and `FunctionCall` values
-  - `now()` behavior (once decided/implemented)
+- ✅ `DynamicValue` tests: `test/a2ui/dynamic_value_test.exs`
+- ✅ v0.9 `action.context` map tests: `test/a2ui/phoenix/live_test.exs`
+- ✅ `now()` tests: `test/a2ui/dynamic_value_test.exs`
+- ✅ `DynamicString` with FunctionCall (`string_format`) in `Text.text` component rendering: `test/a2ui/dynamic_value_test.exs` "Text component integration" section

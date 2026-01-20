@@ -250,4 +250,92 @@ defmodule A2UI.DynamicValueTest do
       assert A2UI.Binding.resolve(value, data, nil, []) == true
     end
   end
+
+  describe "Text component integration (DynamicString with FunctionCall)" do
+    @moduledoc """
+    Tests that simulate how the Text component resolves its text prop.
+    Text component calls: Binding.resolve(props["text"], data_model, scope_path, opts)
+    When text prop is a FunctionCall, it should be evaluated.
+    """
+
+    test "string_format FunctionCall in text prop" do
+      # Simulates: {"text": {"call": "string_format", "args": {"template": "Hello, ${/name}!"}, "returnType": "string"}}
+      text_prop = %{
+        "call" => "string_format",
+        "args" => %{"template" => "Hello, ${/name}!"},
+        "returnType" => "string"
+      }
+      data_model = %{"name" => "Alice"}
+
+      # This is what Text component does:
+      result = A2UI.Binding.resolve(text_prop, data_model, nil, [])
+      assert result == "Hello, Alice!"
+    end
+
+    test "string_format FunctionCall with scoped path in template context" do
+      # Simulates rendering Text inside a template with scope_path
+      text_prop = %{
+        "call" => "string_format",
+        "args" => %{"template" => "Item: ${name}"},
+        "returnType" => "string"
+      }
+      data_model = %{"items" => [%{"name" => "First"}, %{"name" => "Second"}]}
+
+      # v0.9: relative path "name" is scoped to template item
+      result = A2UI.Binding.resolve(text_prop, data_model, "/items/0", version: :v0_9)
+      assert result == "Item: First"
+
+      result = A2UI.Binding.resolve(text_prop, data_model, "/items/1", version: :v0_9)
+      assert result == "Item: Second"
+    end
+
+    test "now FunctionCall in text prop" do
+      # Simulates: {"text": {"call": "now", "returnType": "string"}}
+      text_prop = %{
+        "call" => "now",
+        "returnType" => "string"
+      }
+
+      result = A2UI.Binding.resolve(text_prop, %{}, nil, [])
+      assert is_binary(result)
+      assert String.contains?(result, "T")
+      # Verify it's a valid ISO 8601 timestamp
+      assert {:ok, _, _} = DateTime.from_iso8601(result)
+    end
+
+    test "nested FunctionCall: required wrapping string_format" do
+      # Simulates a validation-like pattern with nested calls
+      text_prop = %{
+        "call" => "string_format",
+        "args" => %{
+          "template" => "Status: ${/status} - Valid: ${/isValid}"
+        },
+        "returnType" => "string"
+      }
+      data_model = %{"status" => "active", "isValid" => true}
+
+      result = A2UI.Binding.resolve(text_prop, data_model, nil, [])
+      assert result == "Status: active - Valid: true"
+    end
+
+    test "FunctionCall with multiple path interpolations" do
+      text_prop = %{
+        "call" => "string_format",
+        "args" => %{
+          "template" => "${/user/firstName} ${/user/lastName} <${/user/email}>"
+        },
+        "returnType" => "string"
+      }
+      data_model = %{
+        "user" => %{
+          "firstName" => "John",
+          "lastName" => "Doe",
+          "email" => "john@example.com"
+        }
+      }
+
+      result = A2UI.Binding.resolve(text_prop, data_model, nil, [])
+      assert result == "John Doe <john@example.com>"
+    end
+  end
 end

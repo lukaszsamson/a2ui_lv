@@ -365,6 +365,214 @@ defmodule A2UI.Phoenix.LiveTest do
       refute Map.has_key?(event, "userAction")
       assert event["action"]["name"] == "click"
     end
+
+    test "v0.9 action.context as map with literal values" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Create v0.9 surface
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+
+      # v0.9 action.context as a map (not a list)
+      component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
+        {"id":"root","component":"Button","action":{
+          "name":"submit",
+          "context":{
+            "stringVal":"hello",
+            "numVal":42,
+            "boolVal":true
+          }
+        }}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "root"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # v0.9 map context should be resolved
+      assert event["action"]["context"]["stringVal"] == "hello"
+      assert event["action"]["context"]["numVal"] == 42
+      assert event["action"]["context"]["boolVal"] == true
+    end
+
+    test "v0.9 action.context as map with path bindings" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Create v0.9 surface with data
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"user":{"name":"Alice","age":30}}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
+
+      # v0.9 action.context as a map with path bindings
+      component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
+        {"id":"root","component":"Button","action":{
+          "name":"submit",
+          "context":{
+            "userName":{"path":"/user/name"},
+            "userAge":{"path":"/user/age"}
+          }
+        }}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "root"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # Path bindings should be resolved
+      assert event["action"]["context"]["userName"] == "Alice"
+      assert event["action"]["context"]["userAge"] == 30
+    end
+
+    test "v0.9 action.context as map with FunctionCall values" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Create v0.9 surface with data
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"World"}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
+
+      # v0.9 action.context with FunctionCall (string_format)
+      component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
+        {"id":"root","component":"Button","action":{
+          "name":"greet",
+          "context":{
+            "greeting":{"call":"string_format","args":{"template":"Hello, ${/name}!"},"returnType":"string"},
+            "timestamp":{"call":"now","returnType":"string"}
+          }
+        }}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "root"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # FunctionCall should be evaluated
+      assert event["action"]["context"]["greeting"] == "Hello, World!"
+      # now() returns ISO 8601 timestamp
+      timestamp = event["action"]["context"]["timestamp"]
+      assert is_binary(timestamp)
+      assert String.contains?(timestamp, "T")
+    end
+
+    test "v0.9 action.context as map with nested FunctionCall in path arg" do
+      test_pid = self()
+
+      {:ok, transport} =
+        Local.start_link(
+          event_handler: fn event ->
+            send(test_pid, {:transport_event, event})
+            :ok
+          end
+        )
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}}
+      }
+
+      socket = Live.init(socket, event_transport: transport)
+
+      # Create v0.9 surface with data
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"email":"test@example.com"}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
+
+      # v0.9 action.context with FunctionCall that has path binding in args
+      component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
+        {"id":"root","component":"Button","action":{
+          "name":"validate",
+          "context":{
+            "isValidEmail":{"call":"email","args":{"value":{"path":"/email"}},"returnType":"boolean"}
+          }
+        }}
+      ]}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      {:noreply, _socket} =
+        Live.handle_a2ui_event(
+          "a2ui:action",
+          %{"surface-id" => "test", "component-id" => "root"},
+          socket
+        )
+
+      assert_receive {:transport_event, event}
+
+      # FunctionCall with path arg should evaluate correctly
+      assert event["action"]["context"]["isValidEmail"] == true
+    end
   end
 
   describe "error callback" do

@@ -35,7 +35,7 @@ defmodule A2UI.Phoenix.Live do
   - v0.9: `{"action": {...}}`
   """
 
-  alias A2UI.{Session, Binding, Event, DataBroadcast}
+  alias A2UI.{Session, Binding, Event, DataBroadcast, DynamicValue}
 
   require Logger
 
@@ -414,16 +414,38 @@ defmodule A2UI.Phoenix.Live do
   defp parse_max_allowed(int) when is_integer(int), do: int
   defp parse_max_allowed(_), do: nil
 
-  defp resolve_action_context(context_list, data_model, scope_path, version) do
-    Enum.reduce(context_list, %{}, fn
+  # Resolves action context to a map of key => resolved_value.
+  # Supports both:
+  # - v0.8 format: list of %{"key" => "k", "value" => <BoundValue>}
+  # - v0.9 format: map of %{"k" => <DynamicValue>}
+  defp resolve_action_context(context, data_model, scope_path, version)
+
+  # v0.9 format: context is a map of DynamicValues
+  defp resolve_action_context(context, data_model, scope_path, version) when is_map(context) do
+    opts = [version: version]
+
+    Map.new(context, fn {key, value} ->
+      resolved = DynamicValue.evaluate(value, data_model, scope_path, opts)
+      {key, resolved}
+    end)
+  end
+
+  # v0.8 format: context is a list of %{"key" => k, "value" => v} entries
+  defp resolve_action_context(context, data_model, scope_path, version) when is_list(context) do
+    opts = [version: version]
+
+    Enum.reduce(context, %{}, fn
       %{"key" => key, "value" => bound_value}, acc ->
-        resolved = Binding.resolve(bound_value, data_model, scope_path, version: version)
+        resolved = Binding.resolve(bound_value, data_model, scope_path, opts)
         Map.put(acc, key, resolved)
 
       _, acc ->
         acc
     end)
   end
+
+  # Fallback for nil or invalid context
+  defp resolve_action_context(_, _data_model, _scope_path, _version), do: %{}
 
   # Emits an error to the configured callback and stores in assigns for debugging
   # Also sends via transport if configured (per v0.8 spec Section 5)
