@@ -42,7 +42,8 @@ Spec requirement (v0.8 protocol section "Path and Literal Value (Initialization 
 **Resolution:**
 - `A2UI.Initializers` now **always overwrites** the data model at the specified path with the literal value, per spec.
 - Root pointers (`""` and `"/"`) are now supported.
-- Pointers containing numeric segments (e.g., `/items/0/name`) are still skipped as a safety measure to avoid creating maps with string-numeric keys where arrays were intended. Array structures should be initialized via explicit `dataModelUpdate` messages.
+- Pointers containing numeric segments (e.g., `/items/0/name`) are supported via `A2UI.JsonPointer` container creation (lists for numeric segments).
+- Note: v0.8 wire messages cannot directly encode JSON arrays in `dataModelUpdate.contents` (see P3.1), but the data model itself may still contain arrays (e.g., via user input / local binding or future v0.9 updates).
 
 ### ~~P0.2 Server→client "single-key envelope" is not enforced~~ ✅ ACCEPTABLE
 
@@ -235,8 +236,7 @@ The implementation now supports all known v0.8 standard catalog ID aliases for m
 - `A2UI.ClientCapabilities.new/1` defaults to all aliases in `supportedCatalogIds`
 - Application startup registers the standard catalog module for all aliases
 
-**TODO (v0.9):** When v0.9 support is added, create `A2UI.V0_9.standard_catalog_ids/0` for the v0.9 catalog ID:
-`"https://a2ui.dev/specification/v0_9/standard_catalog.json"`
+**v0.9 note:** v0.9 standard catalog ID support now exists in `A2UI.V0_9.Adapter.standard_catalog_id/0`.
 
 ### P2.3 Catalog-schema property validation is not implemented
 
@@ -279,11 +279,14 @@ This produces a data model structure:
 ```
 
 **Implementation:**
-- The renderer (`lib/a2ui/phoenix/catalog/standard.ex`) now only iterates maps in template expansion.
-- `stable_template_keys()` detects numeric-key maps and sorts them numerically (0, 1, 2, ...) rather than lexicographically.
-- The non-spec-compliant list fallback has been removed from `render_children`.
-- `A2UI.Binding.get_at_pointer/2` works correctly with numeric string keys for paths like `/items/0/name`.
-- The wire decoder (`lib/a2ui/surface.ex`) correctly builds maps (not lists) for all `dataModelUpdate` messages.
+- Template expansion supports **both**:
+  - v0.8 canonical numeric-key maps (`%{"0" => ..., "1" => ...}`), sorted numerically via `stable_template_keys/1`
+  - v0.9/native JSON arrays (lists), rendered by index (0, 1, 2, ...)
+- `A2UI.Binding.get_at_pointer/2` supports both numeric string keys in maps and numeric indices in lists.
+- v0.8 wire decoding still produces maps for nested `valueMap` values per `server_to_client.json` (no `valueArray` type).
+
+**Important limitation (schema-defined):**
+- In v0.8 `server_to_client.json`, `valueMap` entries only allow scalar typed values (`valueString|valueNumber|valueBoolean`); nested `valueMap` inside a `valueMap` entry is not allowed by the schema.
 
 ---
 

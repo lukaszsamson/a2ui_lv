@@ -62,13 +62,19 @@ defmodule A2UI.Binding do
   def resolve(%{"literalBoolean" => value}, _data, _scope, _opts), do: value
   def resolve(%{"literalArray" => value}, _data, _scope, _opts), do: value
 
+  # v0.9 FunctionCall - delegate to DynamicValue evaluator
+  # Must be checked before the generic map catch-all
+  def resolve(%{"call" => _} = value, data, scope, opts) do
+    A2UI.DynamicValue.evaluate(value, data, scope, opts)
+  end
+
   # v0.9 simplified format: direct values
   def resolve(value, _data, _scope, _opts) when is_binary(value), do: value
   def resolve(value, _data, _scope, _opts) when is_number(value), do: value
   def resolve(value, _data, _scope, _opts) when is_boolean(value), do: value
   def resolve(nil, _data, _scope, _opts), do: nil
 
-  # Map without path - could be nested structure, return as-is
+  # Map without path or call - could be nested structure, return as-is
   def resolve(%{} = value, _data, _scope, _opts), do: value
 
   @doc """

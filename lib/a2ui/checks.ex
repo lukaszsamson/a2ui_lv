@@ -36,7 +36,7 @@ defmodule A2UI.Checks do
       #=> false
   """
 
-  alias A2UI.{Binding, Functions}
+  alias A2UI.{DynamicValue, Functions}
 
   @type check_rule :: map()
   @type logic_expression :: map()
@@ -162,27 +162,13 @@ defmodule A2UI.Checks do
   # Function Execution
   # ============================================
 
-  # Resolve function arguments from the args map
+  # Resolve function arguments from the args map using DynamicValue evaluator
+  # This supports nested FunctionCalls in args
   defp resolve_function_args(args, data, scope, opts) when is_map(args) do
-    version = Keyword.get(opts, :version, :v0_8)
-
     Map.new(args, fn {key, value} ->
-      resolved = resolve_arg_value(value, data, scope, version)
-      {key, resolved}
+      {key, DynamicValue.evaluate(value, data, scope, opts)}
     end)
   end
-
-  # Resolve a single argument value (can be literal, path binding, or nested expression)
-  defp resolve_arg_value(%{"path" => path}, data, scope, version) when is_binary(path) do
-    Binding.resolve_path(path, data, scope, version: version)
-  end
-
-  defp resolve_arg_value(value, _data, _scope, _version) when is_binary(value), do: value
-  defp resolve_arg_value(value, _data, _scope, _version) when is_number(value), do: value
-  defp resolve_arg_value(value, _data, _scope, _version) when is_boolean(value), do: value
-  defp resolve_arg_value(value, _data, _scope, _version) when is_nil(value), do: nil
-  defp resolve_arg_value(value, _data, _scope, _version) when is_list(value), do: value
-  defp resolve_arg_value(%{} = value, _data, _scope, _version), do: value
 
   # Execute a standard catalog check function
   defp execute_check_function("required", args) do
