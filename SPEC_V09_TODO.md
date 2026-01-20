@@ -70,7 +70,8 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 ### Checks + `string_format` implementation
 
 - ✅ checks evaluation engine exists (`A2UI.Checks`)
-- ✅ string interpolation engine exists (`A2UI.Functions.string_format/4`) (see P0.2 for missing `${now()}` support)
+- ✅ string interpolation engine exists (`A2UI.Functions.string_format/4`)
+- ✅ `${now()}` function call support in string interpolation
 
 ### Dynamic values: FunctionCall evaluation
 
@@ -107,15 +108,17 @@ Per the v0.9 standard catalog schema, `string_format` uses `args.value` (not `ar
 - All tests updated to use `args.value` per spec
 - Added explicit test for legacy `args.template` fallback
 
-### P0.2 `string_format` interpolation missing `${now()}` support
+### P0.2 `string_format` interpolation `${now()}` support
+
+**Status:** ✅ Fixed.
 
 The v0.9 standard catalog description for `string_format` explicitly includes function calls such as `${now()}`.
 
-**Current behavior:** `A2UI.Functions.string_format/4` can parse `now()` but does not implement/dispatch it (it returns `nil` → interpolates as `""`).
-
-**TODO:**
-- Implement `now()` in `A2UI.Functions` interpolation function execution (and decide whether to support additional registered functions or only a safe allowlist).
-- Add tests for `${now()}` (and for unknown functions) so behavior is deterministic.
+**Implementation:**
+- Added `execute_function("now", [], ...)` handler in `A2UI.Functions` that returns ISO 8601 timestamp
+- Updated moduledoc to document supported function calls in interpolation
+- Added tests for `${now()}` interpolation (standalone, mixed with text, combined with paths)
+- Unknown functions return `nil` (interpolated as empty string) - this is documented and tested
 
 ---
 
@@ -178,4 +181,4 @@ The v0.9 protocol says `updateComponents` must not be sent before `createSurface
 - ✅ `DynamicString` with FunctionCall (`string_format`) in `Text.text` component rendering: `test/a2ui/dynamic_value_test.exs` "Text component integration" section
 - ✅ `string_format` FunctionCall args using spec-correct `args.value`: `test/a2ui/dynamic_value_test.exs`
 - ✅ Legacy `args.template` fallback for backward compatibility: `test/a2ui/dynamic_value_test.exs`
-- ❌ Missing: coverage for `${now()}` inside `A2UI.Functions.string_format/4` (see P0.2)
+- ✅ `${now()}` inside `A2UI.Functions.string_format/4`: `test/a2ui/functions_test.exs` "string_format/4 - function calls" section

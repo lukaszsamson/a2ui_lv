@@ -336,11 +336,36 @@ defmodule A2UI.FunctionsTest do
 
     test "handles unknown functions as empty" do
       assert Functions.string_format("${unknownFunc()}", %{}, nil) == ""
+      assert Functions.string_format("${unknownFunc('arg')}", %{}, nil) == ""
     end
 
     test "handles nested string_format call" do
       data = %{"template" => "Hi ${/name}", "name" => "Bob"}
       assert Functions.string_format("${string_format(${/template})}", data, nil) == "Hi Bob"
+    end
+
+    test "calls now() function - returns ISO 8601 timestamp" do
+      result = Functions.string_format("${now()}", %{}, nil)
+      # Should be an ISO 8601 timestamp
+      assert is_binary(result)
+      assert String.contains?(result, "T")
+      assert String.contains?(result, "Z") or String.contains?(result, "+")
+      # Verify it's a valid timestamp
+      assert {:ok, _, _} = DateTime.from_iso8601(result)
+    end
+
+    test "calls now() function - in mixed template" do
+      result = Functions.string_format("Generated at: ${now()}", %{}, nil)
+      assert String.starts_with?(result, "Generated at: 20")
+      # Extract the timestamp part and verify it's valid
+      timestamp = String.replace_prefix(result, "Generated at: ", "")
+      assert {:ok, _, _} = DateTime.from_iso8601(timestamp)
+    end
+
+    test "calls now() function - combined with path interpolation" do
+      data = %{"name" => "Report"}
+      result = Functions.string_format("${/name} - ${now()}", data, nil)
+      assert String.starts_with?(result, "Report - 20")
     end
   end
 

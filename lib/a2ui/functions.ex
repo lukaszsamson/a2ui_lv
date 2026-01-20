@@ -20,8 +20,20 @@ defmodule A2UI.Functions do
   The `string_format/3` function performs interpolation of `${expression}` patterns:
   - `${/path}` - absolute JSON Pointer path
   - `${path}` - relative JSON Pointer path (scoped)
-  - `${functionName(args)}` - function call
+  - `${functionName(args)}` - function call (see supported functions below)
   - `\\${` - escaped literal `${`
+
+  ### Supported Function Calls in Interpolation
+
+  - `${now()}` - current ISO 8601 timestamp
+  - `${required(value)}` - returns boolean
+  - `${email(value)}` - returns boolean
+  - `${regex(value, pattern)}` - returns boolean
+  - `${length(value, min?, max?)}` - returns boolean
+  - `${numeric(value, min?, max?)}` - returns boolean
+  - `${string_format(template)}` - nested interpolation
+
+  Unknown functions return `nil` (interpolated as empty string).
 
   ## Usage
 
@@ -33,6 +45,11 @@ defmodule A2UI.Functions do
 
       iex> A2UI.Functions.string_format("Hello, ${/name}!", %{"name" => "Alice"}, nil)
       "Hello, Alice!"
+
+      # Function calls in interpolation
+      iex> result = A2UI.Functions.string_format("Time: ${now()}", %{}, nil)
+      iex> String.starts_with?(result, "Time: 20")
+      true
   """
 
   alias A2UI.Binding
@@ -562,6 +579,11 @@ defmodule A2UI.Functions do
 
   defp execute_function("string_format", [template], data, scope, version) do
     string_format(template, data, scope, version: version)
+  end
+
+  # Built-in: now() - returns current ISO 8601 timestamp
+  defp execute_function("now", [], _data, _scope, _version) do
+    DateTime.utc_now() |> DateTime.to_iso8601()
   end
 
   # Unknown function - return nil
