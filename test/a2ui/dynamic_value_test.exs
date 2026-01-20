@@ -124,7 +124,17 @@ defmodule A2UI.DynamicValueTest do
       assert DynamicValue.evaluate(value_out, %{}, nil, []) == false
     end
 
-    test "evaluates string_format function" do
+    test "evaluates string_format function with args.value (v0.9 spec)" do
+      value = %{
+        "call" => "string_format",
+        "args" => %{"value" => "Hello, ${/name}!"},
+        "returnType" => "string"
+      }
+      data = %{"name" => "Alice"}
+      assert DynamicValue.evaluate(value, data, nil, []) == "Hello, Alice!"
+    end
+
+    test "evaluates string_format function with args.template (legacy fallback)" do
       value = %{
         "call" => "string_format",
         "args" => %{"template" => "Hello, ${/name}!"},
@@ -170,7 +180,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{
           "value" => %{
             "call" => "string_format",
-            "args" => %{"template" => "${/greeting}"},
+            "args" => %{"value" => "${/greeting}"},
             "returnType" => "string"
           }
         },
@@ -233,7 +243,7 @@ defmodule A2UI.DynamicValueTest do
     test "Binding.resolve delegates FunctionCall to DynamicValue" do
       value = %{
         "call" => "string_format",
-        "args" => %{"template" => "Count: ${/count}"},
+        "args" => %{"value" => "Count: ${/count}"},
         "returnType" => "string"
       }
       data = %{"count" => 42}
@@ -259,10 +269,10 @@ defmodule A2UI.DynamicValueTest do
     """
 
     test "string_format FunctionCall in text prop" do
-      # Simulates: {"text": {"call": "string_format", "args": {"template": "Hello, ${/name}!"}, "returnType": "string"}}
+      # Simulates: {"text": {"call": "string_format", "args": {"value": "Hello, ${/name}!"}, "returnType": "string"}}
       text_prop = %{
         "call" => "string_format",
-        "args" => %{"template" => "Hello, ${/name}!"},
+        "args" => %{"value" => "Hello, ${/name}!"},
         "returnType" => "string"
       }
       data_model = %{"name" => "Alice"}
@@ -276,7 +286,7 @@ defmodule A2UI.DynamicValueTest do
       # Simulates rendering Text inside a template with scope_path
       text_prop = %{
         "call" => "string_format",
-        "args" => %{"template" => "Item: ${name}"},
+        "args" => %{"value" => "Item: ${name}"},
         "returnType" => "string"
       }
       data_model = %{"items" => [%{"name" => "First"}, %{"name" => "Second"}]}
@@ -308,7 +318,7 @@ defmodule A2UI.DynamicValueTest do
       text_prop = %{
         "call" => "string_format",
         "args" => %{
-          "template" => "Status: ${/status} - Valid: ${/isValid}"
+          "value" => "Status: ${/status} - Valid: ${/isValid}"
         },
         "returnType" => "string"
       }
@@ -322,7 +332,7 @@ defmodule A2UI.DynamicValueTest do
       text_prop = %{
         "call" => "string_format",
         "args" => %{
-          "template" => "${/user/firstName} ${/user/lastName} <${/user/email}>"
+          "value" => "${/user/firstName} ${/user/lastName} <${/user/email}>"
         },
         "returnType" => "string"
       }

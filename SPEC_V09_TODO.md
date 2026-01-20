@@ -70,14 +70,14 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 ### Checks + `string_format` implementation
 
 - ✅ checks evaluation engine exists (`A2UI.Checks`)
-- ✅ string interpolation engine exists (`A2UI.Functions.string_format/4`)
+- ✅ string interpolation engine exists (`A2UI.Functions.string_format/4`) (see P0.2 for missing `${now()}` support)
 
 ### Dynamic values: FunctionCall evaluation
 
 - ✅ `A2UI.DynamicValue` module evaluates FunctionCall dynamic values
 - ✅ `A2UI.Binding.resolve/4` detects `%{"call" => ...}` and delegates to `DynamicValue.evaluate/4`
 - ✅ Recursive arg resolution for nested FunctionCalls
-- ✅ All standard functions supported: `required`, `email`, `regex`, `length`, `numeric`, `string_format`, `now`
+- ✅ Standard functions supported: `required`, `email`, `regex`, `length`, `numeric`, `string_format` (see P0.1), plus built-in `now`
 
 ### v0.9 `action.context` shape
 
@@ -88,14 +88,40 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 
 ### `now()` function
 
-- ✅ Implemented as built-in function in `A2UI.DynamicValue` and `A2UI.Functions`
+- ✅ Implemented as built-in function in `A2UI.DynamicValue` (FunctionCall evaluation)
 - ✅ Returns ISO 8601 timestamp string
+
+---
+
+## P0 — Spec / schema mismatches (must-fix for v0.9 conformance)
+
+### P0.1 `string_format` FunctionCall args key
+
+**Status:** ✅ Fixed.
+
+Per the v0.9 standard catalog schema, `string_format` uses `args.value` (not `args.template`).
+
+**Implementation:**
+- `A2UI.DynamicValue.execute_function("string_format", ...)` now uses `args["value"]` as the canonical key
+- `args["template"]` is supported as a legacy fallback for backward compatibility
+- All tests updated to use `args.value` per spec
+- Added explicit test for legacy `args.template` fallback
+
+### P0.2 `string_format` interpolation missing `${now()}` support
+
+The v0.9 standard catalog description for `string_format` explicitly includes function calls such as `${now()}`.
+
+**Current behavior:** `A2UI.Functions.string_format/4` can parse `now()` but does not implement/dispatch it (it returns `nil` → interpolates as `""`).
+
+**TODO:**
+- Implement `now()` in `A2UI.Functions` interpolation function execution (and decide whether to support additional registered functions or only a safe allowlist).
+- Add tests for `${now()}` (and for unknown functions) so behavior is deterministic.
 
 ---
 
 ## P1 — Remaining "strict renderer" items (not blocked by transports)
 
-### P1.1 Property-level schema validation
+### P1.1 Schema + structural validation
 
 Current validation focuses on:
 - unknown component types
@@ -108,6 +134,10 @@ Current validation focuses on:
   - required fields (including the `component` discriminator)
   - enums (`Icon.name`, justify/align, variants, etc.)
   - `unevaluatedProperties` / `additionalProperties: false`
+- Validate protocol-level and structural rules called out in `docs/A2UI/specification/v0_9/docs/a2ui_protocol.md`:
+  - envelope must contain exactly one of: `createSurface`, `updateComponents`, `updateDataModel`, `deleteSurface`
+  - at least one component must have `id: "root"` to serve as the root of the component tree
+  - optional strict ordering: reject/flag `updateComponents` for unknown `surfaceId` (see P1.4)
 
 ### P1.2 Markdown rendering for `Text`
 
@@ -146,3 +176,6 @@ The v0.9 protocol says `updateComponents` must not be sent before `createSurface
 - ✅ v0.9 `action.context` map tests: `test/a2ui/phoenix/live_test.exs`
 - ✅ `now()` tests: `test/a2ui/dynamic_value_test.exs`
 - ✅ `DynamicString` with FunctionCall (`string_format`) in `Text.text` component rendering: `test/a2ui/dynamic_value_test.exs` "Text component integration" section
+- ✅ `string_format` FunctionCall args using spec-correct `args.value`: `test/a2ui/dynamic_value_test.exs`
+- ✅ Legacy `args.template` fallback for backward compatibility: `test/a2ui/dynamic_value_test.exs`
+- ❌ Missing: coverage for `${now()}` inside `A2UI.Functions.string_format/4` (see P0.2)

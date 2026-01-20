@@ -15,8 +15,7 @@ defmodule A2UI.DynamicValue do
       %{
         "call" => "string_format",
         "args" => %{
-          "template" => "Hello ${/name}",
-          "other" => %{"path" => "/value"}
+          "value" => "Hello ${/name}"
         },
         "returnType" => "string"
       }
@@ -29,7 +28,7 @@ defmodule A2UI.DynamicValue do
   - `length(value, min?, max?)` - checks string/array length
   - `numeric(value, min?, max?)` - checks numeric range
   - `email(value)` - checks valid email format
-  - `string_format(template)` - string interpolation
+  - `string_format(value)` - string interpolation
 
   Built-in functions:
   - `now()` - returns current ISO 8601 timestamp
@@ -46,7 +45,7 @@ defmodule A2UI.DynamicValue do
 
       # Evaluate a FunctionCall
       DynamicValue.evaluate(
-        %{"call" => "string_format", "args" => %{"template" => "Hi ${/name}"}, "returnType" => "string"},
+        %{"call" => "string_format", "args" => %{"value" => "Hi ${/name}"}, "returnType" => "string"},
         %{"name" => "Bob"},
         nil,
         []
@@ -197,9 +196,11 @@ defmodule A2UI.DynamicValue do
     Functions.numeric(args["value"], opts)
   end
 
-  # Standard catalog: string_format(template)
+  # Standard catalog: string_format(value)
+  # Per v0.9 spec, the parameter is "value" (accepts "template" as legacy fallback)
   defp execute_function("string_format", args, data, scope, opts) do
-    template = args["template"]
+    # v0.9 spec uses "value", keep "template" as fallback for backward compatibility
+    template = args["value"] || args["template"]
     version = Keyword.get(opts, :version, :v0_8)
     Functions.string_format(template, data, scope, version: version)
   end

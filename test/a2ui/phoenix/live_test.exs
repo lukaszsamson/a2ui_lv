@@ -494,12 +494,12 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
 
-      # v0.9 action.context with FunctionCall (string_format)
+      # v0.9 action.context with FunctionCall (string_format) - uses args.value per v0.9 spec
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Button","action":{
           "name":"greet",
           "context":{
-            "greeting":{"call":"string_format","args":{"template":"Hello, ${/name}!"},"returnType":"string"},
+            "greeting":{"call":"string_format","args":{"value":"Hello, ${/name}!"},"returnType":"string"},
             "timestamp":{"call":"now","returnType":"string"}
           }
         }}
