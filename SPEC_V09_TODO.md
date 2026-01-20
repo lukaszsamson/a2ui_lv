@@ -129,17 +129,24 @@ The v0.9 standard catalog description for `string_format` explicitly includes fu
 Current validation focuses on:
 - unknown component types
 - safety limits (count/depth/data size)
+- ✅ root component validation (v0.9 only)
 
-**Status:** Not implemented.
+**Status:** Partially implemented.
 
-**TODO:**
+**Implemented:**
+- ✅ v0.9 requires component with `id: "root"` - validated during `createSurface`/BeginRendering
+  - `A2UI.Validator.validate_has_root/1` checks for root component
+  - `A2UI.Session.apply_message/2` for BeginRendering validates root exists (v0.9 only)
+  - v0.8 surfaces allow any component as root (specified by `root_id` in beginRendering)
+  - Returns `{:error, :missing_root_component}` if validation fails
+
+**TODO (remaining):**
 - Validate incoming v0.9 components against the negotiated catalog schemas:
   - required fields (including the `component` discriminator)
   - enums (`Icon.name`, justify/align, variants, etc.)
   - `unevaluatedProperties` / `additionalProperties: false`
-- Validate protocol-level and structural rules called out in `docs/A2UI/specification/v0_9/docs/a2ui_protocol.md`:
+- Validate protocol-level and structural rules:
   - envelope must contain exactly one of: `createSurface`, `updateComponents`, `updateDataModel`, `deleteSurface`
-  - at least one component must have `id: "root"` to serve as the root of the component tree
   - optional strict ordering: reject/flag `updateComponents` for unknown `surfaceId` (see P1.4)
 
 ### P1.2 Markdown rendering for `Text`
@@ -182,3 +189,4 @@ The v0.9 protocol says `updateComponents` must not be sent before `createSurface
 - ✅ `string_format` FunctionCall args using spec-correct `args.value`: `test/a2ui/dynamic_value_test.exs`
 - ✅ Legacy `args.template` fallback for backward compatibility: `test/a2ui/dynamic_value_test.exs`
 - ✅ `${now()}` inside `A2UI.Functions.string_format/4`: `test/a2ui/functions_test.exs` "string_format/4 - function calls" section
+- ✅ Root component validation: `test/a2ui/validator_test.exs` "validate_has_root/1" section + `test/a2ui/session_test.exs` "root component validation on beginRendering" section

@@ -107,6 +107,53 @@ defmodule A2UI.Validator do
   end
 
   @doc """
+  Validates that a component with id "root" exists.
+
+  Per v0.9 protocol: "at least one component must have `id: \"root\"`
+  to serve as the root of the component tree."
+
+  This validation is typically performed when a surface becomes ready
+  (during BeginRendering processing), not on individual updates, since
+  incremental updates may not include the root component.
+
+  ## Parameters
+
+  - `components` - Map or list of components to check
+
+  ## Returns
+
+  - `:ok` - A root component exists
+  - `{:error, :missing_root_component}` - No component with id "root"
+
+  ## Examples
+
+      iex> components = %{"root" => %A2UI.Component{id: "root", type: "Column"}}
+      iex> A2UI.Validator.validate_has_root(components)
+      :ok
+
+      iex> components = %{"other" => %A2UI.Component{id: "other", type: "Text"}}
+      iex> A2UI.Validator.validate_has_root(components)
+      {:error, :missing_root_component}
+  """
+  @spec validate_has_root(%{String.t() => A2UI.Component.t()} | [A2UI.Component.t()]) ::
+          :ok | {:error, :missing_root_component}
+  def validate_has_root(components) when is_map(components) do
+    if Map.has_key?(components, "root") do
+      :ok
+    else
+      {:error, :missing_root_component}
+    end
+  end
+
+  def validate_has_root(components) when is_list(components) do
+    if Enum.any?(components, &(&1.id == "root")) do
+      :ok
+    else
+      {:error, :missing_root_component}
+    end
+  end
+
+  @doc """
   Validates render depth hasn't been exceeded.
   """
   @spec validate_depth(non_neg_integer()) :: :ok | {:error, term()}

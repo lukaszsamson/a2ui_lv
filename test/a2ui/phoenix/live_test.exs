@@ -205,18 +205,8 @@ defmodule A2UI.Phoenix.LiveTest do
 
       socket = Live.init(socket, event_transport: transport)
 
-      # Set up data model with root and scoped values
-      data_json =
-        ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"root_name","items":[{"name":"item_name"}]}}})
-
-      # Create v0.9 surface with createSurface
-      catalog_id = A2UI.V0_8.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
-
       # v0.9 component format with action context that uses absolute path /name
+      # Note: Components must be sent BEFORE createSurface (which validates root exists)
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Column","children":["btn"]},
         {"id":"btn","component":"Button","action":{
@@ -229,6 +219,18 @@ defmodule A2UI.Phoenix.LiveTest do
       ]}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Create v0.9 surface with createSurface (validates root exists)
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+
+      # Set up data model with root and scoped values
+      data_json =
+        ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"root_name","items":[{"name":"item_name"}]}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
 
       # Verify the surface has v0.9 protocol version
       surface = socket.assigns.a2ui_surfaces["test"]
@@ -339,17 +341,17 @@ defmodule A2UI.Phoenix.LiveTest do
 
       socket = Live.init(socket, event_transport: transport)
 
-      # Create v0.9 surface
-      catalog_id = A2UI.V0_8.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
-
-      # v0.9 component format
+      # v0.9 component format (sent before createSurface)
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Button","action":"click"}
       ]}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Create v0.9 surface (validates root exists)
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
 
       {:noreply, _socket} =
         Live.handle_a2ui_event(
@@ -383,12 +385,7 @@ defmodule A2UI.Phoenix.LiveTest do
 
       socket = Live.init(socket, event_transport: transport)
 
-      # Create v0.9 surface
-      catalog_id = A2UI.V0_8.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
-
-      # v0.9 action.context as a map (not a list)
+      # v0.9 action.context as a map (sent before createSurface)
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Button","action":{
           "name":"submit",
@@ -401,6 +398,11 @@ defmodule A2UI.Phoenix.LiveTest do
       ]}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Create v0.9 surface (validates root exists)
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
 
       {:noreply, _socket} =
         Live.handle_a2ui_event(
@@ -434,15 +436,7 @@ defmodule A2UI.Phoenix.LiveTest do
 
       socket = Live.init(socket, event_transport: transport)
 
-      # Create v0.9 surface with data
-      catalog_id = A2UI.V0_8.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"user":{"name":"Alice","age":30}}}})
-
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
-
-      # v0.9 action.context as a map with path bindings
+      # v0.9 action.context as a map with path bindings (components sent first)
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Button","action":{
           "name":"submit",
@@ -454,6 +448,14 @@ defmodule A2UI.Phoenix.LiveTest do
       ]}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Create v0.9 surface with data
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"user":{"name":"Alice","age":30}}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
 
       {:noreply, _socket} =
         Live.handle_a2ui_event(
@@ -486,15 +488,7 @@ defmodule A2UI.Phoenix.LiveTest do
 
       socket = Live.init(socket, event_transport: transport)
 
-      # Create v0.9 surface with data
-      catalog_id = A2UI.V0_8.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"World"}}})
-
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
-
-      # v0.9 action.context with FunctionCall (string_format) - uses args.value per v0.9 spec
+      # v0.9 action.context with FunctionCall (string_format) - components sent first
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Button","action":{
           "name":"greet",
@@ -506,6 +500,14 @@ defmodule A2UI.Phoenix.LiveTest do
       ]}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Create v0.9 surface then set data
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"World"}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
 
       {:noreply, _socket} =
         Live.handle_a2ui_event(
@@ -541,15 +543,7 @@ defmodule A2UI.Phoenix.LiveTest do
 
       socket = Live.init(socket, event_transport: transport)
 
-      # Create v0.9 surface with data
-      catalog_id = A2UI.V0_8.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"email":"test@example.com"}}})
-
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
-      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
-
-      # v0.9 action.context with FunctionCall that has path binding in args
+      # v0.9 action.context with FunctionCall that has path binding in args (components first)
       component_json = ~s({"updateComponents":{"surfaceId":"test","components":[
         {"id":"root","component":"Button","action":{
           "name":"validate",
@@ -560,6 +554,14 @@ defmodule A2UI.Phoenix.LiveTest do
       ]}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
+
+      # Create v0.9 surface then set data
+      catalog_id = A2UI.V0_8.standard_catalog_id()
+      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"email":"test@example.com"}}})
+
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
+      {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
 
       {:noreply, _socket} =
         Live.handle_a2ui_event(

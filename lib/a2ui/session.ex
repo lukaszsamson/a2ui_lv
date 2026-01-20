@@ -179,10 +179,32 @@ defmodule A2UI.Session do
 
     case Resolver.resolve(catalog_id, session.client_capabilities, version) do
       {:ok, resolved_catalog_id} ->
-        # Use the resolved catalog ID (canonical form)
-        updated_msg = %{msg | catalog_id: resolved_catalog_id}
-        updated = update_surface_with_catalog(session, sid, updated_msg, :ok)
-        {:ok, updated}
+        # For v0.9: validate surface has a component with id "root"
+        # Per v0.9 spec: "at least one component must have id: 'root'"
+        # v0.8 allows any component to be the root (specified by root_id in beginRendering)
+        surface = Map.get(session.surfaces, sid) || Surface.new(sid)
+
+        root_valid? =
+          case version do
+            :v0_9 -> Validator.validate_has_root(surface.components) == :ok
+            :v0_8 -> true
+          end
+
+        if root_valid? do
+          # Use the resolved catalog ID (canonical form)
+          updated_msg = %{msg | catalog_id: resolved_catalog_id}
+          updated = update_surface_with_catalog(session, sid, updated_msg, :ok)
+          {:ok, updated}
+        else
+          error =
+            Error.validation_error(
+              "Surface must have a component with id \"root\"",
+              sid,
+              %{"reason" => "missing_root_component"}
+            )
+
+          {:error, error}
+        end
 
       {:error, reason} ->
         # Catalog resolution failed - return error without updating session

@@ -162,6 +162,60 @@ defmodule A2UI.ValidatorTest do
     end
   end
 
+  describe "validate_has_root/1" do
+    test "accepts component map with root" do
+      components = %{
+        "root" => %Component{id: "root", type: "Column", props: %{}},
+        "child" => %Component{id: "child", type: "Text", props: %{}}
+      }
+
+      assert :ok = Validator.validate_has_root(components)
+    end
+
+    test "accepts component list with root" do
+      components = [
+        %Component{id: "root", type: "Column", props: %{}},
+        %Component{id: "child", type: "Text", props: %{}}
+      ]
+
+      assert :ok = Validator.validate_has_root(components)
+    end
+
+    test "accepts component map with only root" do
+      components = %{
+        "root" => %Component{id: "root", type: "Column", props: %{}}
+      }
+
+      assert :ok = Validator.validate_has_root(components)
+    end
+
+    test "rejects component map without root" do
+      components = %{
+        "header" => %Component{id: "header", type: "Text", props: %{}},
+        "body" => %Component{id: "body", type: "Column", props: %{}}
+      }
+
+      assert {:error, :missing_root_component} = Validator.validate_has_root(components)
+    end
+
+    test "rejects component list without root" do
+      components = [
+        %Component{id: "header", type: "Text", props: %{}},
+        %Component{id: "body", type: "Column", props: %{}}
+      ]
+
+      assert {:error, :missing_root_component} = Validator.validate_has_root(components)
+    end
+
+    test "rejects empty component map" do
+      assert {:error, :missing_root_component} = Validator.validate_has_root(%{})
+    end
+
+    test "rejects empty component list" do
+      assert {:error, :missing_root_component} = Validator.validate_has_root([])
+    end
+  end
+
   describe "URL scheme validation" do
     test "validate_media_url/1 accepts https URLs" do
       assert {:ok, "https://example.com/image.png"} =
