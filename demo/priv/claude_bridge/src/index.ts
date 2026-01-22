@@ -66,6 +66,7 @@ Components can display values two ways:
    {"text": {"literalString": "Welcome"}}
    {"value": {"literalNumber": 42}}
    {"checked": {"literalBoolean": true}}
+   {"selections": {"literalArray": ["option1", "option2"]}}  // MultipleChoice only
 
 2. **Path (dynamic)**: Bound to data model, updates automatically
    {"text": {"path": "/userName"}}
@@ -151,8 +152,8 @@ folder, help, home, info, locationOn, lock, lockOpen, mail, menu, moreVert, more
 notificationsOff, notifications, payment, person, phone, photo, print, refresh, search,
 send, settings, share, shoppingCart, star, starHalf, starOff, upload, visibility, visibilityOff, warning
 
-### Divider - Separator line
-{"id": "sep", "component": {"Divider": {"axis": "horizontal"}}}
+### Divider - Separator line (all properties optional)
+{"id": "sep", "component": {"Divider": {"axis": "horizontal"}}}  // horizontal|vertical
 
 ### Video - Video player
 {"id": "vid", "component": {"Video": {"url": {"literalString": "https://example.com/video.mp4"}}}}
@@ -227,13 +228,13 @@ Note: Button needs a separate Text component for its label!
 
 ### MultipleChoice - Selection from options
 {"id": "country", "component": {"MultipleChoice": {
-  "selections": {"path": "/form/countries"},  // Array of selected values
+  "selections": {"path": "/form/countries"},  // Dynamic: {"path": "/..."} or static: {"literalArray": ["us"]}
   "options": [
     {"label": {"literalString": "USA"}, "value": "us"},
     {"label": {"literalString": "Canada"}, "value": "ca"},
     {"label": {"literalString": "UK"}, "value": "uk"}
   ],
-  "maxAllowedSelections": 1  // 1 for radio, >1 for checkboxes
+  "maxAllowedSelections": 1  // 1 for single select (radio), >1 for multi-select (checkboxes)
 }}}
 
 # COMPONENT WEIGHT (Flex)

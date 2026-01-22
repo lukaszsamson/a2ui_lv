@@ -200,14 +200,15 @@ defmodule A2UIDemo.Demo.Ollama.PromptBuilder do
       usageHint options: "h1", "h2", "h3", "h4", "h5", "body", "caption"
 
     - Divider: Horizontal or vertical line
-      {"Divider": {"axis": "horizontal"}}
+      {"Divider": {"axis": "horizontal"}}  // horizontal|vertical
 
     ### Interactive Components
     - Button: Clickable button
       {"Button": {"child": "button_text_id", "primary": true, "action": {"name": "action_name"}}}
 
     - TextField: Text input field
-      {"TextField": {"label": {"literalString": "Label"}, "text": {"path": "/fieldPath"}}}
+      {"TextField": {"label": {"literalString": "Label"}, "text": {"path": "/fieldPath"}, "textFieldType": "shortText"}}
+      textFieldType options: "shortText", "longText", "number", "date", "obscured"
 
     - CheckBox: Boolean toggle
       {"CheckBox": {"label": {"literalString": "Option"}, "value": {"path": "/booleanPath"}}}
