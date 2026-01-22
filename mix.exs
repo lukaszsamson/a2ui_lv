@@ -1,33 +1,55 @@
-defmodule A2uiLv.MixProject do
+defmodule A2UI.MixProject do
   use Mix.Project
+
+  @version "0.1.0"
+  @source_url "https://github.com/lukaszsamson/a2ui_lv"
 
   def project do
     [
       app: :a2ui_lv,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      aliases: aliases(),
       deps: deps(),
-      compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      description: description(),
+      package: package(),
+      docs: docs(),
+      name: "A2UI",
+      source_url: @source_url
     ]
   end
 
-  # Configuration for the OTP application.
-  #
-  # Type `mix help compile.app` for more information.
+  # Library has no OTP application - it's just modules
   def application do
     [
-      mod: {A2uiLv.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger]
     ]
   end
 
-  def cli do
+  defp description do
+    """
+    A2UI protocol renderer for Phoenix LiveView. Renders AI-generated user interfaces
+    using the A2UI (Agent-to-UI) specification for LLM-friendly UI rendering.
+    """
+  end
+
+  defp package do
     [
-      preferred_envs: [precommit: :test]
+      maintainers: ["Lukasz Samson"],
+      licenses: ["Apache-2.0"],
+      links: %{
+        "GitHub" => @source_url
+      },
+      files: ~w(lib priv .formatter.exs mix.exs README.md LICENSE)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md"],
+      source_ref: "v#{@version}"
     ]
   end
 
@@ -35,56 +57,16 @@ defmodule A2uiLv.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
-  # Specifies your project dependencies.
-  #
-  # Type `mix help deps` for examples and options.
+  # Library dependencies only - demo app has its own deps
   defp deps do
     [
-      {:phoenix, "~> 1.8.3"},
+      {:phoenix, "~> 1.8"},
       {:phoenix_html, "~> 4.1"},
-      {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 1.1.0"},
-      {:lazy_html, ">= 0.1.0", only: :test},
-      {:phoenix_live_dashboard, "~> 0.8.3"},
-      {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.3", runtime: Mix.env() == :dev},
-      {:heroicons,
-       github: "tailwindlabs/heroicons",
-       tag: "v2.2.0",
-       sparse: "optimized",
-       app: false,
-       compile: false,
-       depth: 1},
-      {:swoosh, "~> 1.16"},
-      {:req, "~> 0.5"},
-      {:telemetry_metrics, "~> 1.0"},
-      {:telemetry_poller, "~> 1.0"},
-      {:gettext, "~> 1.0"},
+      {:phoenix_live_view, "~> 1.1"},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.2.0"},
-      {:bandit, "~> 1.5"},
-      # ZeroMQ for Claude Agent SDK bridge
-      {:erlzmq, path: "/Users/lukaszsamson/erlzmq"}
-    ]
-  end
-
-  # Aliases are shortcuts or tasks specific to the current project.
-  # For example, to install project dependencies and perform other setup tasks, run:
-  #
-  #     $ mix setup
-  #
-  # See the documentation for `Mix` for more info on aliases.
-  defp aliases do
-    [
-      setup: ["deps.get", "assets.setup", "assets.build"],
-      "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["compile", "tailwind a2ui_lv", "esbuild a2ui_lv"],
-      "assets.deploy": [
-        "tailwind a2ui_lv --minify",
-        "esbuild a2ui_lv --minify",
-        "phx.digest"
-      ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      # Dev/test only
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 end

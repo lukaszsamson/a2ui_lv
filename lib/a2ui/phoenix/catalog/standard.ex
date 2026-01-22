@@ -38,7 +38,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   """
 
   use Phoenix.Component
-  import A2uiLvWeb.CoreComponents, only: [input: 1, icon: 1]
+  import A2UI.Phoenix.Components, only: [input: 1, icon: 1]
   alias A2UI.{Binding, Checks}
   alias A2UI.Props.Adapter
 
@@ -1603,7 +1603,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   defp parse_color(_), do: nil
 
-  defp button_classes(primary, disabled \\ false)
+  defp button_classes(primary, disabled)
 
   defp button_classes(true, true) do
     "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition opacity-50 cursor-not-allowed"

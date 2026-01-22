@@ -70,10 +70,11 @@ defmodule A2UI.Checks do
       []
   """
   @spec evaluate_checks(list(check_rule()), data_model(), scope_path(), keyword()) :: [String.t()]
+  def evaluate_checks(checks, data_model, scope_path, opts \\ [])
   def evaluate_checks(nil, _data_model, _scope_path, _opts), do: []
   def evaluate_checks([], _data_model, _scope_path, _opts), do: []
 
-  def evaluate_checks(checks, data_model, scope_path, opts \\ []) when is_list(checks) do
+  def evaluate_checks(checks, data_model, scope_path, opts) when is_list(checks) do
     checks
     |> Enum.filter(fn check ->
       # A check fails if its expression evaluates to false
@@ -100,10 +101,11 @@ defmodule A2UI.Checks do
       false
   """
   @spec all_pass?(list(check_rule()) | nil, data_model(), scope_path(), keyword()) :: boolean()
+  def all_pass?(checks, data_model, scope_path, opts \\ [])
   def all_pass?(nil, _data_model, _scope_path, _opts), do: true
   def all_pass?([], _data_model, _scope_path, _opts), do: true
 
-  def all_pass?(checks, data_model, scope_path, opts \\ []) when is_list(checks) do
+  def all_pass?(checks, data_model, scope_path, opts) when is_list(checks) do
     Enum.all?(checks, fn check ->
       evaluate_expression(check, data_model, scope_path, opts)
     end)

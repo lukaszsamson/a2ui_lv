@@ -1,4 +1,4 @@
-# A2uiLv
+# A2UI
 
 To start your Phoenix server:
 

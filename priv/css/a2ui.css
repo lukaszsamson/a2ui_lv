@@ -1,0 +1,79 @@
+/*
+ * A2UI Library CSS
+ *
+ * Include this CSS in your application's stylesheet when using the A2UI library.
+ * These styles are used by the standard catalog components.
+ *
+ * Usage in Tailwind CSS v4:
+ *   @import "../../deps/a2ui_lv/priv/css/a2ui.css";
+ *
+ * Or include via esbuild/bundler.
+ */
+
+/* A2UI Surface Container */
+.a2ui-surface {
+  font-family: var(--a2ui-font, ui-sans-serif, system-ui, sans-serif);
+  --a2ui-primary-rgb: 79 70 229;
+}
+
+/* Primary Button Styles */
+.a2ui-button-primary {
+  background-color: var(--a2ui-primary-color, #4f46e5);
+}
+
+.a2ui-button-primary:hover {
+  filter: brightness(1.05);
+}
+
+.a2ui-button-primary:active {
+  filter: brightness(0.98);
+}
+
+.a2ui-button-primary:focus-visible {
+  outline: 2px solid var(--a2ui-primary-color, #4f46e5);
+  outline-offset: 2px;
+}
+
+/* Secondary Button Styles */
+.a2ui-button-secondary:focus-visible {
+  outline: 2px solid var(--a2ui-primary-color, #4f46e5);
+  outline-offset: 2px;
+}
+
+/* Form Input Styles */
+.a2ui-surface :is(input, textarea, select):focus {
+  border-color: var(--a2ui-primary-color, #4f46e5) !important;
+  --tw-ring-color: rgba(var(--a2ui-primary-rgb, 79 70 229), 0.2) !important;
+}
+
+.a2ui-surface :is(input, textarea, select):focus-visible {
+  border-color: var(--a2ui-primary-color, #4f46e5) !important;
+  --tw-ring-color: rgba(var(--a2ui-primary-rgb, 79 70 229), 0.2) !important;
+}
+
+/* Checkbox, Radio, and Range Input Styles */
+.a2ui-surface input[type="checkbox"],
+.a2ui-surface input[type="radio"],
+.a2ui-surface input[type="range"] {
+  accent-color: var(--a2ui-primary-color, #4f46e5);
+}
+
+/* Tabs Active State */
+.a2ui-surface .a2ui-tab-active {
+  border-bottom-color: var(--a2ui-primary-color, #4f46e5) !important;
+  color: var(--a2ui-primary-color, #4f46e5) !important;
+}
+
+/*
+ * CSS Custom Properties (CSS Variables) for theming:
+ *
+ * --a2ui-font: Font family for A2UI surfaces
+ * --a2ui-primary-color: Primary accent color (default: #4f46e5 / Indigo-600)
+ * --a2ui-primary-rgb: RGB values for primary color (for alpha variations)
+ *
+ * Example customization:
+ *   .a2ui-surface {
+ *     --a2ui-primary-color: #2563eb;
+ *     --a2ui-primary-rgb: 37 99 235;
+ *   }
+ */
