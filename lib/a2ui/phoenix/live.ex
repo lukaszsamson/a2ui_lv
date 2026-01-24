@@ -96,6 +96,35 @@ defmodule A2UI.Phoenix.Live do
   end
 
   @doc """
+  Resets the A2UI session, clearing all surfaces and state.
+
+  Use this when you need to start fresh (e.g., switching between demos/scenarios).
+  Preserves the configured callbacks and transport settings.
+
+  ## Example
+
+      socket = A2UI.Phoenix.Live.reset_session(socket)
+  """
+  @spec reset_session(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+  def reset_session(socket) do
+    # Get existing client_capabilities from the current session if available
+    client_capabilities =
+      case socket.assigns[:a2ui_session] do
+        %Session{} = session -> session.client_capabilities
+        _ -> nil
+      end
+
+    session = Session.new(client_capabilities: client_capabilities)
+
+    Phoenix.Component.assign(socket,
+      a2ui_session: session,
+      a2ui_surfaces: session.surfaces,
+      a2ui_last_action: nil,
+      a2ui_last_error: nil
+    )
+  end
+
+  @doc """
   Handle incoming A2UI JSONL messages.
   Call from your LiveView's handle_info/2.
 

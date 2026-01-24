@@ -901,13 +901,9 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
     """
   end
 
-  # Clear all surfaces
+  # Clear all surfaces by resetting the A2UI session
   defp clear_surfaces(socket) do
-    Phoenix.Component.assign(socket,
-      a2ui_surfaces: %{},
-      a2ui_last_action: nil,
-      a2ui_last_error: nil
-    )
+    A2UI.Phoenix.Live.reset_session(socket)
   end
 
   # Load scenario-specific content
