@@ -53,7 +53,7 @@ defmodule A2UI.DynamicValue do
       #=> "Hi Bob"
   """
 
-  alias A2UI.{Binding, BoundValue, Functions}
+  alias A2UI.Value
 
   @type dynamic_value :: term()
   @type data_model :: map()
@@ -89,42 +89,9 @@ defmodule A2UI.DynamicValue do
       true
   """
   @spec evaluate(dynamic_value(), data_model(), scope_path(), keyword()) :: term()
-
-  # FunctionCall - detect before other map handlers
-  def evaluate(%{"call" => func_name} = value, data_model, scope_path, opts)
-      when is_binary(func_name) do
-    args = value["args"] || %{}
-    # Recursively evaluate args as DynamicValues
-    resolved_args = resolve_args(args, data_model, scope_path, opts)
-    Functions.call(func_name, resolved_args, data_model, scope_path, opts)
+  def evaluate(value, data_model, scope_path, opts \\ []) do
+    Value.resolve(value, data_model, scope_path, opts)
   end
-
-  # Path binding with optional literal fallback
-  def evaluate(%{"path" => path} = bound, data_model, scope_path, opts) when is_binary(path) do
-    version = Keyword.get(opts, :version, :v0_8)
-
-    case Binding.resolve_path(path, data_model, scope_path, version: version) do
-      nil -> get_literal_fallback(bound)
-      value -> value
-    end
-  end
-
-  # v0.8 literal wrappers
-  def evaluate(%{"literalString" => value}, _data, _scope, _opts), do: value
-  def evaluate(%{"literalNumber" => value}, _data, _scope, _opts), do: value
-  def evaluate(%{"literalBoolean" => value}, _data, _scope, _opts), do: value
-  def evaluate(%{"literalArray" => value}, _data, _scope, _opts), do: value
-
-  # Native literals (v0.9 simplified format)
-  def evaluate(value, _data, _scope, _opts) when is_binary(value), do: value
-  def evaluate(value, _data, _scope, _opts) when is_number(value), do: value
-  def evaluate(value, _data, _scope, _opts) when is_boolean(value), do: value
-  def evaluate(nil, _data, _scope, _opts), do: nil
-  def evaluate(value, _data, _scope, _opts) when is_list(value), do: value
-
-  # Map without path or call - could be nested structure, return as-is
-  # This should be after FunctionCall and path binding checks
-  def evaluate(%{} = value, _data, _scope, _opts), do: value
 
   @doc """
   Checks if a value is a FunctionCall dynamic value.
@@ -143,23 +110,4 @@ defmodule A2UI.DynamicValue do
   @spec function_call?(term()) :: boolean()
   def function_call?(%{"call" => _}), do: true
   def function_call?(_), do: false
-
-  # ============================================
-  # Private Helpers
-  # ============================================
-
-  # Recursively resolve function arguments
-  defp resolve_args(args, data_model, scope_path, opts) when is_map(args) do
-    Map.new(args, fn {key, value} ->
-      {key, evaluate(value, data_model, scope_path, opts)}
-    end)
-  end
-
-  # Get literal fallback from v0.8 format bound value
-  defp get_literal_fallback(term) do
-    case BoundValue.extract_literal(term) do
-      {:ok, value} -> value
-      :error -> nil
-    end
-  end
 end

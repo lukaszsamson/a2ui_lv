@@ -14,7 +14,7 @@ defmodule A2UI.Binding do
   @type data_model :: map()
   @type scope_path :: String.t() | nil
 
-  alias A2UI.BoundValue
+  alias A2UI.Value
 
   @doc """
   Resolves a BoundValue to its actual value.
@@ -48,36 +48,9 @@ defmodule A2UI.Binding do
       "default"
   """
   @spec resolve(bound_value(), data_model(), scope_path(), keyword()) :: term()
-  def resolve(bound_value, data_model, scope_path \\ nil, opts \\ [])
-
-  # Path with optional literal fallback - try path first, fall back to literal if path returns nil
-  def resolve(%{"path" => path} = bound, data_model, scope_path, opts) when is_binary(path) do
-    case resolve_path(path, data_model, scope_path, opts) do
-      nil -> get_literal_fallback(bound)
-      value -> value
-    end
+  def resolve(bound_value, data_model, scope_path \\ nil, opts \\ []) do
+    Value.resolve(bound_value, data_model, scope_path, opts)
   end
-
-  # Literal-only values (v0.8 format) - no path key present
-  def resolve(%{"literalString" => value}, _data, _scope, _opts), do: value
-  def resolve(%{"literalNumber" => value}, _data, _scope, _opts), do: value
-  def resolve(%{"literalBoolean" => value}, _data, _scope, _opts), do: value
-  def resolve(%{"literalArray" => value}, _data, _scope, _opts), do: value
-
-  # v0.9 FunctionCall - delegate to DynamicValue evaluator
-  # Must be checked before the generic map catch-all
-  def resolve(%{"call" => _} = value, data, scope, opts) do
-    A2UI.DynamicValue.evaluate(value, data, scope, opts)
-  end
-
-  # v0.9 simplified format: direct values
-  def resolve(value, _data, _scope, _opts) when is_binary(value), do: value
-  def resolve(value, _data, _scope, _opts) when is_number(value), do: value
-  def resolve(value, _data, _scope, _opts) when is_boolean(value), do: value
-  def resolve(nil, _data, _scope, _opts), do: nil
-
-  # Map without path or call - could be nested structure, return as-is
-  def resolve(%{} = value, _data, _scope, _opts), do: value
 
   @doc """
   Resolves a JSON Pointer path against data model.
@@ -416,13 +389,6 @@ defmodule A2UI.Binding do
       true ->
         current = Map.get(data || %{}, key, %{})
         Map.put(data || %{}, key, put_at_path(current, rest, value))
-    end
-  end
-
-  defp get_literal_fallback(term) do
-    case BoundValue.extract_literal(term) do
-      {:ok, value} -> value
-      :error -> nil
     end
   end
 
