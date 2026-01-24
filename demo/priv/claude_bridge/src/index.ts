@@ -71,6 +71,11 @@ Components can display values two ways:
    {"text": {"path": "/userName"}}
    {"value": {"path": "/cart/total"}}
 
+Paths use JSON Pointer syntax (RFC 6901). Examples:
+- "/user" → references dataModel.user
+- "/user/name" → references dataModel.user.name
+- "/items/0/price" → references dataModel.items["0"].price
+
 When data at a path changes (via dataModelUpdate), the UI updates automatically!
 
 Use literals for static labels. Use paths for dynamic content the user might change.
@@ -112,7 +117,8 @@ Gets converted to contents format automatically.
 ### List - Scrollable list (static or dynamic)
 {"id": "items", "component": {"List": {
   "children": {"explicitList": ["item1", "item2"]},
-  "direction": "vertical"     // vertical|horizontal
+  "direction": "vertical",    // vertical|horizontal
+  "alignment": "stretch"      // start|center|end|stretch (cross-axis alignment)
 }}}
 
 Dynamic list from data (template):
@@ -195,7 +201,8 @@ Note: Button needs a separate Text component for its label!
 {"id": "email-field", "component": {"TextField": {
   "label": {"literalString": "Email"},
   "text": {"path": "/form/email"},  // Two-way binding
-  "textFieldType": "shortText"      // shortText|longText|number|date|obscured
+  "textFieldType": "shortText",     // shortText|longText|number|date|obscured
+  "validationRegexp": "^[^@]+@[^@]+$"  // Optional regex for client-side validation
 }}}
 
 ### CheckBox - Boolean toggle
