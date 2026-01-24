@@ -96,7 +96,7 @@ defmodule A2UI.DynamicValue do
     args = value["args"] || %{}
     # Recursively evaluate args as DynamicValues
     resolved_args = resolve_args(args, data_model, scope_path, opts)
-    execute_function(func_name, resolved_args, data_model, scope_path, opts)
+    Functions.call(func_name, resolved_args, data_model, scope_path, opts)
   end
 
   # Path binding with optional literal fallback
@@ -161,63 +161,5 @@ defmodule A2UI.DynamicValue do
       {:ok, value} -> value
       :error -> nil
     end
-  end
-
-  # ============================================
-  # Function Execution
-  # ============================================
-
-  # Built-in: now() - returns current ISO 8601 timestamp
-  defp execute_function("now", _args, _data, _scope, _opts) do
-    DateTime.utc_now() |> DateTime.to_iso8601()
-  end
-
-  # Standard catalog: required(value)
-  defp execute_function("required", args, _data, _scope, _opts) do
-    Functions.required(args["value"])
-  end
-
-  # Standard catalog: email(value)
-  defp execute_function("email", args, _data, _scope, _opts) do
-    Functions.email(args["value"])
-  end
-
-  # Standard catalog: regex(value, pattern)
-  defp execute_function("regex", args, _data, _scope, _opts) do
-    Functions.regex(args["value"], args["pattern"])
-  end
-
-  # Standard catalog: length(value, min?, max?)
-  defp execute_function("length", args, _data, _scope, _opts) do
-    opts = build_min_max_opts(args)
-    Functions.length(args["value"], opts)
-  end
-
-  # Standard catalog: numeric(value, min?, max?)
-  defp execute_function("numeric", args, _data, _scope, _opts) do
-    opts = build_min_max_opts(args)
-    Functions.numeric(args["value"], opts)
-  end
-
-  # Standard catalog: string_format(value)
-  # Per v0.9 spec, the parameter is "value" (accepts "template" as legacy fallback)
-  defp execute_function("string_format", args, data, scope, opts) do
-    # v0.9 spec uses "value", keep "template" as fallback for backward compatibility
-    template = args["value"] || args["template"]
-    version = Keyword.get(opts, :version, :v0_8)
-    Functions.string_format(template, data, scope, version: version)
-  end
-
-  # Unknown function - return nil (safe default)
-  defp execute_function(_func_name, _args, _data, _scope, _opts) do
-    nil
-  end
-
-  # Build keyword list with min/max from args
-  defp build_min_max_opts(args) do
-    opts = []
-    opts = if args["min"], do: [{:min, args["min"]} | opts], else: opts
-    opts = if args["max"], do: [{:max, args["max"]} | opts], else: opts
-    opts
   end
 end

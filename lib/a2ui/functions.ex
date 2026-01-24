@@ -55,6 +55,48 @@ defmodule A2UI.Functions do
   alias A2UI.Binding
 
   # ============================================
+  # Unified Function Dispatch
+  # ============================================
+
+  @doc """
+  Executes a standard catalog function call.
+
+  Returns `nil` for unknown functions.
+  """
+  @spec call(String.t(), map() | list(), map(), String.t() | nil, keyword()) :: term()
+  def call(name, args, data_model, scope_path, opts \\ []) when is_binary(name) do
+    case name do
+      "required" ->
+        required(arg_from(args, "value", 0))
+
+      "email" ->
+        email(arg_from(args, "value", 0))
+
+      "regex" ->
+        regex(arg_from(args, "value", 0), arg_from(args, "pattern", 1))
+
+      "length" ->
+        {value, opts} = min_max_args(args)
+        length(value, opts)
+
+      "numeric" ->
+        {value, opts} = min_max_args(args)
+        numeric(value, opts)
+
+      "string_format" ->
+        template = arg_from(args, "value", 0) || arg_from(args, "template", 1)
+        version = Keyword.get(opts, :version, :v0_8)
+        string_format(template, data_model, scope_path, version: version)
+
+      "now" ->
+        DateTime.utc_now() |> DateTime.to_iso8601()
+
+      _name ->
+        nil
+    end
+  end
+
+  # ============================================
   # Validation Functions
   # ============================================
 
@@ -447,7 +489,7 @@ defmodule A2UI.Functions do
     case parse_function_call(expr) do
       {:ok, func_name, args} ->
         resolved_args = Enum.map(args, &resolve_arg(&1, data, scope, version))
-        execute_function(func_name, resolved_args, data, scope, version)
+        call(func_name, resolved_args, data, scope, version: version)
 
       :error ->
         nil
@@ -569,50 +611,36 @@ defmodule A2UI.Functions do
     end
   end
 
-  # Execute a standard catalog function
-  defp execute_function("required", [value], _data, _scope, _version) do
-    required(value)
+  defp arg_from(args, key, _index) when is_map(args), do: Map.get(args, key)
+  defp arg_from(args, _key, index) when is_list(args), do: Enum.at(args, index)
+  defp arg_from(_args, _key, _index), do: nil
+
+  defp min_max_args(args) when is_map(args) do
+    value = Map.get(args, "value")
+    opts = min_max_opts(Map.get(args, "min"), Map.get(args, "max"))
+    {value, opts}
   end
 
-  defp execute_function("regex", [value, pattern], _data, _scope, _version) do
-    regex(value, pattern)
+  defp min_max_args(args) when is_list(args) do
+    value = Enum.at(args, 0)
+
+    opts =
+      case args do
+        [_value, min, max] -> min_max_opts(min, max)
+        [_value, constraint] when is_number(constraint) -> min_max_opts(constraint, nil)
+        [_value] -> []
+        _ -> []
+      end
+
+    {value, opts}
   end
 
-  defp execute_function("length", args, _data, _scope, _version) do
-    case args do
-      [value, min, max] -> length(value, min: min, max: max)
-      [value, constraint] when is_integer(constraint) -> length(value, min: constraint)
-      [value] -> length(value, [])
-      _ -> false
-    end
-  end
+  defp min_max_args(_args), do: {nil, []}
 
-  defp execute_function("numeric", args, _data, _scope, _version) do
-    case args do
-      [value, min, max] -> numeric(value, min: min, max: max)
-      [value, constraint] when is_number(constraint) -> numeric(value, min: constraint)
-      [value] -> numeric(value, [])
-      _ -> false
-    end
-  end
-
-  defp execute_function("email", [value], _data, _scope, _version) do
-    email(value)
-  end
-
-  defp execute_function("string_format", [template], data, scope, version) do
-    string_format(template, data, scope, version: version)
-  end
-
-  # Built-in: now() - returns current ISO 8601 timestamp
-  defp execute_function("now", [], _data, _scope, _version) do
-    DateTime.utc_now() |> DateTime.to_iso8601()
-  end
-
-  # Unknown function - return nil
-  defp execute_function(_name, _args, _data, _scope, _version) do
-    nil
-  end
+  defp min_max_opts(nil, nil), do: []
+  defp min_max_opts(min, nil), do: [{:min, min}]
+  defp min_max_opts(nil, max), do: [{:max, max}]
+  defp min_max_opts(min, max), do: [{:min, min}, {:max, max}]
 
   # Convert value to string for interpolation output
   defp to_string_value(nil), do: ""

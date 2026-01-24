@@ -156,7 +156,7 @@ defmodule A2UI.Checks do
       when is_binary(func_name) do
     args = expr["args"] || %{}
     resolved_args = resolve_function_args(args, data, scope, opts)
-    execute_check_function(func_name, resolved_args)
+    Functions.call(func_name, resolved_args, data, scope, opts) != false
   end
 
   # Unknown expression - treat as true (fail-safe)
@@ -172,39 +172,5 @@ defmodule A2UI.Checks do
     Map.new(args, fn {key, value} ->
       {key, DynamicValue.evaluate(value, data, scope, opts)}
     end)
-  end
-
-  # Execute a standard catalog check function
-  defp execute_check_function("required", args) do
-    Functions.required(args["value"])
-  end
-
-  defp execute_check_function("email", args) do
-    Functions.email(args["value"])
-  end
-
-  defp execute_check_function("regex", args) do
-    Functions.regex(args["value"], args["pattern"])
-  end
-
-  defp execute_check_function("length", args) do
-    opts = build_min_max_opts(args)
-    Functions.length(args["value"], opts)
-  end
-
-  defp execute_check_function("numeric", args) do
-    opts = build_min_max_opts(args)
-    Functions.numeric(args["value"], opts)
-  end
-
-  # Unknown function - treat as passing (fail-safe)
-  defp execute_check_function(_func_name, _args), do: true
-
-  # Build keyword list with min/max from args
-  defp build_min_max_opts(args) do
-    opts = []
-    opts = if args["min"], do: [{:min, args["min"]} | opts], else: opts
-    opts = if args["max"], do: [{:max, args["max"]} | opts], else: opts
-    opts
   end
 end
