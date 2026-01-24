@@ -22,7 +22,7 @@ import "phoenix_html"
 // Establish Phoenix Socket and LiveView configuration.
 import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
-import {hooks as colocatedHooks} from "phoenix-colocated/a2ui_lv"
+import {hooks as colocatedHooks} from "phoenix-colocated/a2ui_demo"
 import topbar from "../vendor/topbar"
 
 // Tailwind v4 only emits heroicon classes it can see in sources.
