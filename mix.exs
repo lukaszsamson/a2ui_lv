@@ -36,7 +36,7 @@ defmodule A2UI.MixProject do
 
   defp package do
     [
-      maintainers: ["Lukasz Samson"],
+      maintainers: ["Łukasz Samson"],
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url
