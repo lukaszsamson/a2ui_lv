@@ -20,6 +20,7 @@ defmodule A2UI.V0_9.Adapter do
   See `A2UI.A2A.Protocol.extension_uri(:v0_9)`.
   """
 
+  alias A2UI.JSON
   alias A2UI.Parser
   alias A2UI.Parser.V0_9, as: ParserV09
 
@@ -60,7 +61,7 @@ defmodule A2UI.V0_9.Adapter do
   """
   @spec parse_line(String.t()) :: message()
   def parse_line(jsonl_line) do
-    case Jason.decode(jsonl_line) do
+    case JSON.decode_line(jsonl_line) do
       {:ok, decoded} ->
         try do
           ParserV09.parse_map(decoded)
@@ -69,8 +70,8 @@ defmodule A2UI.V0_9.Adapter do
             {:error, {:parse_exception, exception}}
         end
 
-      {:error, reason} ->
-        {:error, {:json_decode, reason}}
+      {:error, _} = error ->
+        error
     end
   end
 

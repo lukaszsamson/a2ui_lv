@@ -24,6 +24,7 @@ defmodule A2UI.Parser do
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
   alias A2UI.Parser.{V0_8, V0_9}
+  alias A2UI.JSON
   alias A2UI.Protocol
 
   @type message ::
@@ -53,7 +54,7 @@ defmodule A2UI.Parser do
   """
   @spec parse_line(String.t()) :: message()
   def parse_line(json_line) do
-    case Jason.decode(json_line) do
+    case JSON.decode_line(json_line) do
       {:ok, decoded} ->
         try do
           dispatch_message(decoded)
@@ -62,8 +63,8 @@ defmodule A2UI.Parser do
             {:error, {:parse_exception, exception}}
         end
 
-      {:error, reason} ->
-        {:error, {:json_decode, reason}}
+      {:error, _} = error ->
+        error
     end
   end
 

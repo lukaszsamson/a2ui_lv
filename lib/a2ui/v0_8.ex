@@ -14,6 +14,7 @@ defmodule A2UI.V0_8 do
   Use `standard_catalog_ids/0` to get all known aliases.
   """
 
+  alias A2UI.JSON
   alias A2UI.Parser
   alias A2UI.Parser.V0_8, as: ParserV08
 
@@ -65,7 +66,7 @@ defmodule A2UI.V0_8 do
   """
   @spec parse_line(String.t()) :: message()
   def parse_line(jsonl_line) do
-    case Jason.decode(jsonl_line) do
+    case JSON.decode_line(jsonl_line) do
       {:ok, decoded} ->
         try do
           ParserV08.parse_map(decoded)
@@ -74,8 +75,8 @@ defmodule A2UI.V0_8 do
             {:error, {:parse_exception, exception}}
         end
 
-      {:error, reason} ->
-        {:error, {:json_decode, reason}}
+      {:error, _} = error ->
+        error
     end
   end
 
