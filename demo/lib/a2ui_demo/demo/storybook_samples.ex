@@ -590,6 +590,7 @@ defmodule A2UIDemo.Demo.StorybookSamples do
   end
 
   defp template_list do
+    # Using v0.9 format: updateDataModel with path and value (raw JSON)
     [
       ~s({"surfaceUpdate":{"surfaceId":"template","components":[
         {"id":"root","component":{"Column":{"children":{"explicitList":["title","list"]}}}},
@@ -600,14 +601,7 @@ defmodule A2UIDemo.Demo.StorybookSamples do
         {"id":"item-icon","component":{"Icon":{"name":{"path":"/icon"}}}},
         {"id":"item-text","component":{"Text":{"text":{"path":"/name"}}}}
       ]}}),
-      ~s({"dataModelUpdate":{"surfaceId":"template","contents":[
-        {"key":"items","valueMap":[
-          {"key":"0","valueMap":[{"key":"name","valueString":"Home"},{"key":"icon","valueString":"home"}]},
-          {"key":"1","valueMap":[{"key":"name","valueString":"Settings"},{"key":"icon","valueString":"settings"}]},
-          {"key":"2","valueMap":[{"key":"name","valueString":"Profile"},{"key":"icon","valueString":"person"}]},
-          {"key":"3","valueMap":[{"key":"name","valueString":"Messages"},{"key":"icon","valueString":"mail"}]}
-        ]}
-      ]}}),
+      ~s({"updateDataModel":{"surfaceId":"template","path":"/items","value":{"0":{"name":"Home","icon":"home"},"1":{"name":"Settings","icon":"settings"},"2":{"name":"Profile","icon":"person"},"3":{"name":"Messages","icon":"mail"}}}}),
       ~s({"beginRendering":{"surfaceId":"template","root":"root"}})
     ]
   end
@@ -691,9 +685,11 @@ defmodule A2UIDemo.Demo.StorybookSamples do
   end
 
   defp gallery_weather do
+    # Using v0.9 format for nested forecast data
     [
       ~S|{"surfaceUpdate":{"surfaceId":"gallery-weather","components":[{"id":"root","component":{"Card":{"child":"main-column"}}},{"id":"main-column","component":{"Column":{"children":{"explicitList":["temp-row","location","description","forecast-row"]},"gap":"small","alignment":"center"}}},{"id":"temp-row","component":{"Row":{"children":{"explicitList":["temp-high","temp-low"]},"gap":"small","alignment":"baseline"}}},{"id":"temp-high","component":{"Text":{"text":{"path":"/tempHigh"},"usageHint":"h1"}}},{"id":"temp-low","component":{"Text":{"text":{"path":"/tempLow"},"usageHint":"h2"}}},{"id":"location","component":{"Text":{"text":{"path":"/location"},"usageHint":"h3"}}},{"id":"description","component":{"Text":{"text":{"path":"/description"},"usageHint":"caption"}}},{"id":"forecast-row","component":{"Row":{"children":{"explicitList":["day1","day2","day3","day4","day5"]},"distribution":"spaceAround","gap":"small"}}},{"id":"day1","component":{"Column":{"children":{"explicitList":["day1-icon","day1-temp"]},"alignment":"center"}}},{"id":"day1-icon","component":{"Text":{"text":{"path":"/forecast/0/icon"},"usageHint":"h3"}}},{"id":"day1-temp","component":{"Text":{"text":{"path":"/forecast/0/temp"},"usageHint":"caption"}}},{"id":"day2","component":{"Column":{"children":{"explicitList":["day2-icon","day2-temp"]},"alignment":"center"}}},{"id":"day2-icon","component":{"Text":{"text":{"path":"/forecast/1/icon"},"usageHint":"h3"}}},{"id":"day2-temp","component":{"Text":{"text":{"path":"/forecast/1/temp"},"usageHint":"caption"}}},{"id":"day3","component":{"Column":{"children":{"explicitList":["day3-icon","day3-temp"]},"alignment":"center"}}},{"id":"day3-icon","component":{"Text":{"text":{"path":"/forecast/2/icon"},"usageHint":"h3"}}},{"id":"day3-temp","component":{"Text":{"text":{"path":"/forecast/2/temp"},"usageHint":"caption"}}},{"id":"day4","component":{"Column":{"children":{"explicitList":["day4-icon","day4-temp"]},"alignment":"center"}}},{"id":"day4-icon","component":{"Text":{"text":{"path":"/forecast/3/icon"},"usageHint":"h3"}}},{"id":"day4-temp","component":{"Text":{"text":{"path":"/forecast/3/temp"},"usageHint":"caption"}}},{"id":"day5","component":{"Column":{"children":{"explicitList":["day5-icon","day5-temp"]},"alignment":"center"}}},{"id":"day5-icon","component":{"Text":{"text":{"path":"/forecast/4/icon"},"usageHint":"h3"}}},{"id":"day5-temp","component":{"Text":{"text":{"path":"/forecast/4/temp"},"usageHint":"caption"}}}]}}|,
-      ~S|{"dataModelUpdate":{"surfaceId":"gallery-weather","contents":[{"key":"tempHigh","valueString":"72°"},{"key":"tempLow","valueString":"58°"},{"key":"location","valueString":"Austin, TX"},{"key":"description","valueString":"Clear skies with light breeze"},{"key":"forecast","valueMap":[{"key":"0","valueMap":[{"key":"icon","valueString":"☀️"},{"key":"temp","valueString":"74°"}]},{"key":"1","valueMap":[{"key":"icon","valueString":"☀️"},{"key":"temp","valueString":"76°"}]},{"key":"2","valueMap":[{"key":"icon","valueString":"⛅"},{"key":"temp","valueString":"71°"}]},{"key":"3","valueMap":[{"key":"icon","valueString":"☀️"},{"key":"temp","valueString":"73°"}]},{"key":"4","valueMap":[{"key":"icon","valueString":"☀️"},{"key":"temp","valueString":"75°"}]}]}]}}|,
+      ~S|{"dataModelUpdate":{"surfaceId":"gallery-weather","contents":[{"key":"tempHigh","valueString":"72°"},{"key":"tempLow","valueString":"58°"},{"key":"location","valueString":"Austin, TX"},{"key":"description","valueString":"Clear skies with light breeze"}]}}|,
+      ~S|{"updateDataModel":{"surfaceId":"gallery-weather","path":"/forecast","value":{"0":{"icon":"☀️","temp":"74°"},"1":{"icon":"☀️","temp":"76°"},"2":{"icon":"⛅","temp":"71°"},"3":{"icon":"☀️","temp":"73°"},"4":{"icon":"☀️","temp":"75°"}}}}|,
       ~s({"beginRendering":{"surfaceId":"gallery-weather","root":"root"}})
     ]
   end
