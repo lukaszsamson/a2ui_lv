@@ -16,13 +16,14 @@ defmodule A2UI.Messages.DataModelUpdate do
   to this v0.9-native representation at parse time.
   """
 
-  defstruct [:surface_id, :path, :value, :protocol_version]
+  defstruct [:surface_id, :path, :value, :protocol_version, :patches]
 
   @type t :: %__MODULE__{
           surface_id: String.t(),
           path: String.t() | nil,
           value: term(),
-          protocol_version: :v0_8 | :v0_9 | nil
+          protocol_version: :v0_8 | :v0_9 | nil,
+          patches: [A2UI.DataPatch.patch()]
         }
 
   @doc """
@@ -52,11 +53,21 @@ defmodule A2UI.Messages.DataModelUpdate do
         :delete
       end
 
+    patches =
+      case Map.get(data, "patches") do
+        patches when is_list(patches) ->
+          patches
+
+        _ ->
+          [A2UI.DataPatch.from_update(Map.get(data, "path"), value)]
+      end
+
     %__MODULE__{
       surface_id: sid,
       path: Map.get(data, "path"),
       value: value,
-      protocol_version: :v0_9
+      protocol_version: :v0_9,
+      patches: patches
     }
   end
 end

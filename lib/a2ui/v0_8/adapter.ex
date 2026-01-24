@@ -24,7 +24,9 @@ defmodule A2UI.V0_8.Adapter do
   - v0.9: Native JSON `value`
   """
 
+  alias A2UI.Binding
   alias A2UI.BoundValue
+  alias A2UI.DataPatch
 
   # ============================================
   # Component Adaptation
@@ -96,10 +98,12 @@ defmodule A2UI.V0_8.Adapter do
   def adapt_data_model_update(%{"surfaceId" => sid} = data) do
     contents = Map.get(data, "contents", [])
     value = adapt_contents_to_value(contents)
+    path = Map.get(data, "path")
+    patches = data_model_patches(path, value)
 
-    result = %{"surfaceId" => sid, "value" => value}
+    result = %{"surfaceId" => sid, "value" => value, "patches" => patches}
 
-    case Map.get(data, "path") do
+    case path do
       nil -> result
       path -> Map.put(result, "path", path)
     end
@@ -243,6 +247,28 @@ defmodule A2UI.V0_8.Adapter do
   end
 
   defp bound_value?(_), do: false
+
+  defp data_model_patches(path, %{} = value) when not is_nil(path) do
+    v0_8_merge_patches(Binding.expand_path(path, nil), value)
+  end
+
+  defp data_model_patches(path, value) do
+    [DataPatch.from_update(path, value)]
+  end
+
+  defp v0_8_merge_patches(base_pointer, %{} = value) do
+    Enum.flat_map(value, fn {key, nested} ->
+      pointer = Binding.append_pointer_segment(base_pointer, key)
+
+      cond do
+        is_map(nested) and map_size(nested) > 0 ->
+          v0_8_merge_patches(pointer, nested)
+
+        true ->
+          [{:set_at, pointer, nested}]
+      end
+    end)
+  end
 
   # ============================================
   # Private: Contents Decoding

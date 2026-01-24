@@ -278,7 +278,8 @@ defmodule A2UI.V0_8.AdapterTest do
 
       assert Adapter.adapt_data_model_update(v0_8) == %{
                "surfaceId" => "main",
-               "value" => %{"name" => "Alice"}
+               "value" => %{"name" => "Alice"},
+               "patches" => [{:replace_root, %{"name" => "Alice"}}]
              }
     end
 
@@ -292,7 +293,8 @@ defmodule A2UI.V0_8.AdapterTest do
       assert Adapter.adapt_data_model_update(v0_8) == %{
                "surfaceId" => "main",
                "path" => "/user",
-               "value" => %{"name" => "Alice"}
+               "value" => %{"name" => "Alice"},
+               "patches" => [{:set_at, "/user/name", "Alice"}]
              }
     end
 
@@ -301,7 +303,8 @@ defmodule A2UI.V0_8.AdapterTest do
 
       assert Adapter.adapt_data_model_update(v0_8) == %{
                "surfaceId" => "main",
-               "value" => %{}
+               "value" => %{},
+               "patches" => [{:replace_root, %{}}]
              }
     end
   end

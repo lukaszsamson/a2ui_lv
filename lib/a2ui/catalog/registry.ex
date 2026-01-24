@@ -89,6 +89,7 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec register(String.t(), module()) :: :ok
   def register(catalog_id, module) when is_binary(catalog_id) and is_atom(module) do
+    ensure_table()
     :ets.insert(@table_name, {catalog_id, module})
     :ok
   end
@@ -151,9 +152,15 @@ defmodule A2UI.Catalog.Registry do
   def lookup(nil), do: lookup(default_catalog_id())
 
   def lookup(catalog_id) when is_binary(catalog_id) do
-    case :ets.lookup(@table_name, catalog_id) do
-      [{^catalog_id, module}] -> {:ok, module}
-      [] -> {:error, :not_found}
+    case :ets.whereis(@table_name) do
+      :undefined ->
+        {:error, :not_found}
+
+      _ref ->
+        case :ets.lookup(@table_name, catalog_id) do
+          [{^catalog_id, module}] -> {:ok, module}
+          [] -> {:error, :not_found}
+        end
     end
   end
 
@@ -243,6 +250,17 @@ defmodule A2UI.Catalog.Registry do
         @table_name
         |> :ets.tab2list()
         |> Map.new()
+    end
+  end
+
+  defp ensure_table do
+    case :ets.whereis(@table_name) do
+      :undefined ->
+        :ets.new(@table_name, [:named_table, :public, :set, read_concurrency: true])
+        :ok
+
+      _ref ->
+        :ok
     end
   end
 
