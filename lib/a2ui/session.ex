@@ -201,7 +201,7 @@ defmodule A2UI.Session do
           Error.catalog_error(
             Resolver.format_error(reason),
             sid,
-            Resolver.error_details(catalog_id, reason)
+            Resolver.error_details(catalog_id, reason, version)
           )
 
         {:error, error}

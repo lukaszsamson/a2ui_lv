@@ -221,7 +221,7 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
 
       # Create v0.9 surface with createSurface (validates root exists)
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
@@ -349,7 +349,7 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
 
       # Create v0.9 surface (validates root exists)
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
 
@@ -400,7 +400,7 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
 
       # Create v0.9 surface (validates root exists)
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
 
@@ -450,7 +450,7 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
 
       # Create v0.9 surface with data
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
       data_json =
@@ -504,7 +504,7 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
 
       # Create v0.9 surface then set data
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
       data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"name":"World"}}})
 
@@ -558,7 +558,7 @@ defmodule A2UI.Phoenix.LiveTest do
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, component_json}, socket)
 
       # Create v0.9 surface then set data
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
       data_json =

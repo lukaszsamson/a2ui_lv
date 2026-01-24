@@ -72,12 +72,11 @@ defmodule A2UI.Catalog.ResolverTest do
       assert {:error, :missing_catalog_id} = Resolver.resolve(nil, caps, :v0_9)
     end
 
-    test "v0.8 standard catalog still resolves in v0.9 mode" do
+    test "v0.8 standard catalog returns error in v0.9 mode" do
       caps = ClientCapabilities.default()
       catalog_id = A2UI.V0_8.standard_catalog_id()
 
-      assert {:ok, resolved} = Resolver.resolve(catalog_id, caps, :v0_9)
-      assert resolved == A2UI.V0_8.standard_catalog_id()
+      assert {:error, :unsupported_catalog} = Resolver.resolve(catalog_id, caps, :v0_9)
     end
 
     test "v0.9 standard catalog resolves successfully" do
@@ -106,19 +105,29 @@ defmodule A2UI.Catalog.ResolverTest do
     end
   end
 
-  describe "error_details/2" do
-    test "includes catalog ID and supported catalogs (v0.8 and v0.9)" do
-      details = Resolver.error_details("test.catalog", :unsupported_catalog)
+  describe "error_details/3" do
+    test "includes catalog ID and supported catalogs for v0.8" do
+      details = Resolver.error_details("test.catalog", :unsupported_catalog, :v0_8)
 
       assert details["catalogId"] == "test.catalog"
       assert details["reason"] == "unsupported_catalog"
       assert is_list(details["supportedCatalogIds"])
       assert A2UI.V0_8.standard_catalog_id() in details["supportedCatalogIds"]
+      refute A2UI.V0_9.standard_catalog_id() in details["supportedCatalogIds"]
+    end
+
+    test "includes catalog ID and supported catalogs for v0.9" do
+      details = Resolver.error_details("test.catalog", :unsupported_catalog, :v0_9)
+
+      assert details["catalogId"] == "test.catalog"
+      assert details["reason"] == "unsupported_catalog"
+      assert is_list(details["supportedCatalogIds"])
       assert A2UI.V0_9.standard_catalog_id() in details["supportedCatalogIds"]
+      refute A2UI.V0_8.standard_catalog_id() in details["supportedCatalogIds"]
     end
 
     test "handles nil catalog ID" do
-      details = Resolver.error_details(nil, :missing_catalog_id)
+      details = Resolver.error_details(nil, :missing_catalog_id, :v0_8)
 
       assert details["catalogId"] == nil
       assert details["reason"] == "missing_catalog_id"

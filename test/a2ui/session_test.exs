@@ -551,7 +551,7 @@ defmodule A2UI.SessionTest do
       {:ok, session} = Session.apply_json_line(session, surface_json)
 
       # v0.9 createSurface - should succeed (root validation deferred)
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
       assert {:ok, updated} = Session.apply_json_line(session, create_json)
@@ -580,7 +580,7 @@ defmodule A2UI.SessionTest do
       # aren't present yet. Root validation happens at render time, not here.
       session = Session.new()
 
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
 
       begin_msg = %A2UI.Messages.BeginRendering{
         surface_id: "test",
@@ -606,7 +606,7 @@ defmodule A2UI.SessionTest do
 
       {:ok, session} = Session.apply_json_line(session, surface_json)
 
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
 
       begin_msg = %A2UI.Messages.BeginRendering{
         surface_id: "test",
@@ -642,7 +642,7 @@ defmodule A2UI.SessionTest do
     end
 
     test "v0.9 createSurface stores protocol_version :v0_9", %{session: session} do
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       # Use v0.9 createSurface format (requires catalogId)
       begin_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
@@ -666,7 +666,7 @@ defmodule A2UI.SessionTest do
     end
 
     test "v0.9 catalogId resolves successfully", %{session: session} do
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
 
       begin_msg = %A2UI.Messages.BeginRendering{
         surface_id: "test",
@@ -682,7 +682,7 @@ defmodule A2UI.SessionTest do
     end
 
     test "v0.9 createSurface stores broadcast_data_model? flag", %{session: session} do
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
       # Use v0.9 createSurface with broadcastDataModel
       begin_json =
         ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}","broadcastDataModel":true}})
@@ -701,7 +701,7 @@ defmodule A2UI.SessionTest do
 
     test "complete v0.9 flow: updateComponents → createSurface → updateDataModel → deleteSurface",
          %{session: session} do
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
 
       # 1. updateComponents first (v0.9 uses discriminator format)
       # Note: Components including root must be sent BEFORE createSurface
@@ -780,7 +780,7 @@ defmodule A2UI.SessionTest do
     end
 
     test "v0.9 updateComponents with nested children binding", %{session: session} do
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
 
       # Send components first (with root) - Template pattern with path binding for children
       components_json = ~s({"updateComponents":{
@@ -803,7 +803,7 @@ defmodule A2UI.SessionTest do
     end
 
     test "v0.9 data model replace semantics (not merge)", %{session: session} do
-      catalog_id = A2UI.V0_8.standard_catalog_id()
+      catalog_id = A2UI.V0_9.standard_catalog_id()
 
       # Send root component first
       components_json = ~s({"updateComponents":{

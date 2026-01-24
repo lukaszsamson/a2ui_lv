@@ -10,9 +10,9 @@ defmodule A2UI.Catalog.Resolver do
 
   ## Current Implementation (Standard Catalog Only)
 
-  This implementation only supports the v0.8 standard catalog:
-  - If `catalogId` is nil, defaults to standard catalog
-  - If `catalogId` is a known standard catalog alias, resolves to standard catalog
+  This implementation only supports the standard catalog for the given version:
+  - If `catalogId` is nil, defaults to standard catalog in v0.8
+  - If `catalogId` is a known standard catalog alias for the version, resolves to standard catalog
   - All other catalog IDs are rejected with an error
 
   Inline catalogs are not supported and will return an error.
@@ -80,21 +80,11 @@ defmodule A2UI.Catalog.Resolver do
   end
 
   # Check if it's a standard catalog alias
-  def resolve(catalog_id, capabilities, _version) when is_binary(catalog_id) do
+  def resolve(catalog_id, capabilities, version) when is_binary(catalog_id) do
     cond do
-      # Check if it's a known v0.8 standard catalog alias
-      Protocol.standard_catalog_id?(:v0_8, catalog_id) ->
-        # Verify client supports it (should always be true for standard)
+      Protocol.standard_catalog_id?(version, catalog_id) ->
         if ClientCapabilities.supports_catalog?(capabilities, catalog_id) do
-          {:ok, Protocol.standard_catalog_id(:v0_8)}
-        else
-          {:error, :catalog_not_in_capabilities}
-        end
-
-      # Check if it's the v0.9 standard catalog
-      Protocol.standard_catalog_id?(:v0_9, catalog_id) ->
-        if ClientCapabilities.supports_catalog?(capabilities, catalog_id) do
-          {:ok, Protocol.standard_catalog_id(:v0_9)}
+          {:ok, Protocol.standard_catalog_id(version)}
         else
           {:error, :catalog_not_in_capabilities}
         end
@@ -144,14 +134,14 @@ defmodule A2UI.Catalog.Resolver do
   @doc """
   Returns details map for error reporting.
 
-  Includes the problematic catalog ID and list of supported catalogs.
+  Includes the problematic catalog ID and list of supported catalogs for the version.
   """
-  @spec error_details(String.t() | nil, error_reason()) :: map()
-  def error_details(catalog_id, reason) do
+  @spec error_details(String.t() | nil, error_reason(), version()) :: map()
+  def error_details(catalog_id, reason, version) do
     %{
       "catalogId" => catalog_id,
       "reason" => to_string(reason),
-      "supportedCatalogIds" => Protocol.standard_catalog_ids()
+      "supportedCatalogIds" => Protocol.standard_catalog_ids(version)
     }
   end
 
