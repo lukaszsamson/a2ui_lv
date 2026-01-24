@@ -90,6 +90,14 @@ defmodule A2UI.Catalog.Resolver do
           {:error, :catalog_not_in_capabilities}
         end
 
+      # Check if it's the v0.9 standard catalog
+      A2UI.V0_9.standard_catalog_id?(catalog_id) ->
+        if ClientCapabilities.supports_catalog?(capabilities, catalog_id) do
+          {:ok, A2UI.V0_9.standard_catalog_id()}
+        else
+          {:error, :catalog_not_in_capabilities}
+        end
+
       # Check if it's an inline catalog (not supported)
       inline_catalog?(capabilities, catalog_id) ->
         {:error, :inline_catalog_not_supported}
@@ -139,13 +147,11 @@ defmodule A2UI.Catalog.Resolver do
   """
   @spec error_details(String.t() | nil, error_reason()) :: map()
   def error_details(catalog_id, reason) do
-    base = %{
+    %{
       "catalogId" => catalog_id,
       "reason" => to_string(reason),
-      "supportedCatalogIds" => A2UI.V0_8.standard_catalog_ids()
+      "supportedCatalogIds" => A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
     }
-
-    base
   end
 
   # Private helpers

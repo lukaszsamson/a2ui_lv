@@ -7,9 +7,10 @@ defmodule A2UI.SessionTest do
     test "creates empty session with default capabilities" do
       session = Session.new()
       assert session.surfaces == %{}
-      # Defaults to ClientCapabilities.default() with v0.8 standard catalogs
+      # Defaults to ClientCapabilities.default() with v0.8 and v0.9 standard catalogs
       assert %A2UI.ClientCapabilities{} = session.client_capabilities
-      assert session.client_capabilities.supported_catalog_ids == A2UI.V0_8.standard_catalog_ids()
+      expected = A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
+      assert session.client_capabilities.supported_catalog_ids == expected
     end
 
     test "accepts client_capabilities option" do
@@ -538,7 +539,9 @@ defmodule A2UI.SessionTest do
   end
 
   describe "root component validation on beginRendering" do
-    test "v0.9 BeginRendering returns error when surface has no root component" do
+    test "v0.9 createSurface succeeds without root (root validation deferred to render)" do
+      # In v0.9, createSurface comes BEFORE updateComponents, so root validation
+      # cannot happen at createSurface time. It's deferred to render time.
       session = Session.new()
 
       # Create a surface WITHOUT a root component
@@ -547,16 +550,13 @@ defmodule A2UI.SessionTest do
 
       {:ok, session} = Session.apply_json_line(session, surface_json)
 
-      # v0.9 createSurface - should fail due to missing root
-      # Note: Root validation only applies to v0.9 surfaces
+      # v0.9 createSurface - should succeed (root validation deferred)
       catalog_id = A2UI.V0_8.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
-      assert {:error, error} = Session.apply_json_line(session, create_json)
-      assert error["error"]["type"] == "validation_error"
-      assert error["error"]["message"] =~ "root"
-      assert error["error"]["surfaceId"] == "test"
-      assert error["error"]["details"]["reason"] == "missing_root_component"
+      assert {:ok, updated} = Session.apply_json_line(session, create_json)
+      assert updated.surfaces["test"].ready? == true
+      assert updated.surfaces["test"].protocol_version == :v0_9
     end
 
     test "BeginRendering succeeds when surface has root component" do
@@ -575,11 +575,11 @@ defmodule A2UI.SessionTest do
       assert updated.surfaces["test"].ready? == true
     end
 
-    test "v0.9 createSurface returns error for empty surface" do
+    test "v0.9 createSurface succeeds even for empty surface (root validation deferred)" do
+      # In v0.9, createSurface comes BEFORE updateComponents, so components
+      # aren't present yet. Root validation happens at render time, not here.
       session = Session.new()
 
-      # Create an empty surface (no components)
-      # v0.9 requires a component with id "root"
       catalog_id = A2UI.V0_8.standard_catalog_id()
 
       begin_msg = %A2UI.Messages.BeginRendering{
@@ -590,22 +590,22 @@ defmodule A2UI.SessionTest do
         protocol_version: :v0_9
       }
 
-      assert {:error, error} = Session.apply_message(session, begin_msg)
-      assert error["error"]["type"] == "validation_error"
-      assert error["error"]["message"] =~ "root"
-      assert error["error"]["details"]["reason"] == "missing_root_component"
+      # Should succeed - root validation is deferred to render time
+      assert {:ok, updated} = Session.apply_message(session, begin_msg)
+      assert updated.surfaces["test"].ready? == true
+      assert updated.surfaces["test"].protocol_version == :v0_9
     end
 
-    test "v0.9 createSurface returns error when surface has no root" do
+    test "v0.9 createSurface succeeds even without root component (validation deferred)" do
       session = Session.new()
 
-      # Create a surface without root
+      # Create a surface without root - this is the normal v0.9 flow
+      # where createSurface comes first, then updateComponents adds root
       surface_json =
         ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"child","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
 
       {:ok, session} = Session.apply_json_line(session, surface_json)
 
-      # v0.9 createSurface should fail due to missing root
       catalog_id = A2UI.V0_8.standard_catalog_id()
 
       begin_msg = %A2UI.Messages.BeginRendering{
@@ -616,9 +616,9 @@ defmodule A2UI.SessionTest do
         protocol_version: :v0_9
       }
 
-      assert {:error, error} = Session.apply_message(session, begin_msg)
-      assert error["error"]["type"] == "validation_error"
-      assert error["error"]["message"] =~ "root"
+      # Should succeed - root validation is deferred to render time
+      assert {:ok, updated} = Session.apply_message(session, begin_msg)
+      assert updated.surfaces["test"].ready? == true
     end
   end
 

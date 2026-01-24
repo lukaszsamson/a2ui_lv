@@ -1343,7 +1343,47 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     children_spec = assigns.props["children"]
 
     cond do
-      # Explicit list of component IDs
+      # v0.9: children is a plain array of IDs
+      is_list(children_spec) ->
+        child_ids = children_spec
+
+        child_entries =
+          Enum.map(child_ids, fn child_id ->
+            {child_id, assigns.apply_weight && component_weight(assigns.surface, child_id)}
+          end)
+
+        assigns = assign(assigns, child_entries: child_entries)
+
+        ~H"""
+        <%= for {child_id, weight} <- @child_entries do %>
+          <%= if is_number(weight) do %>
+            <div
+              class="a2ui-weighted"
+              style={"flex: #{weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
+            >
+              <.render_component
+                id={child_id}
+                surface={@surface}
+                scope_path={@scope_path}
+                depth={@depth + 1}
+                suppress_events={@suppress_events}
+                visited={@visited}
+              />
+            </div>
+          <% else %>
+            <.render_component
+              id={child_id}
+              surface={@surface}
+              scope_path={@scope_path}
+              depth={@depth + 1}
+              suppress_events={@suppress_events}
+              visited={@visited}
+            />
+          <% end %>
+        <% end %>
+        """
+
+      # v0.8: Explicit list of component IDs wrapped in object
       is_map(children_spec) && Map.has_key?(children_spec, "explicitList") ->
         child_ids = children_spec["explicitList"]
 
@@ -1623,7 +1663,9 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
   defp input_type("number"), do: "number"
   defp input_type("date"), do: "date"
+  defp input_type("email"), do: "email"
   defp input_type("obscured"), do: "password"
+  defp input_type("password"), do: "password"
   defp input_type("longText"), do: "textarea"
   defp input_type(_), do: "text"
 
@@ -1723,9 +1765,31 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       end
 
     # v0.9: checks produce their message when failing
-    check_errors = Checks.evaluate_checks(checks, data_model, scope_path, opts)
+    # Inject the TextField's value into checks that don't have an explicit args.value
+    checks_with_value = inject_implicit_value(checks, text)
+    check_errors = Checks.evaluate_checks(checks_with_value, data_model, scope_path, opts)
     errors ++ check_errors
   end
+
+  # Injects an implicit value into checks that don't have an explicit args.value
+  # This allows checks like {"call":"required"} to work without explicit value binding
+  defp inject_implicit_value(nil, _value), do: nil
+  defp inject_implicit_value(checks, value) when is_list(checks) do
+    Enum.map(checks, fn check ->
+      inject_check_value(check, value)
+    end)
+  end
+
+  defp inject_check_value(%{"call" => _} = check, value) do
+    args = check["args"] || %{}
+    # Only inject if args doesn't already have a "value" key
+    if Map.has_key?(args, "value") do
+      check
+    else
+      Map.put(check, "args", Map.put(args, "value", value))
+    end
+  end
+  defp inject_check_value(check, _value), do: check
 
   defp component_dom_id(surface_id, component_id, scope_path, suffix \\ nil) do
     base = "a2ui-#{surface_id}-#{component_id}"

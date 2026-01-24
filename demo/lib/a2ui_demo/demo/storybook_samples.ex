@@ -56,6 +56,18 @@ defmodule A2UIDemo.Demo.StorybookSamples do
       {"Advanced", "Weight (flex-grow)", "weight", weight_example()},
       {"Advanced", "Nested Layout", "nested", nested_layout()},
 
+      # v0.9 Features - Demonstrating protocol changes
+      {"v0.9 Features", "Message Format", "v09-message", v09_message_format()},
+      {"v0.9 Features", "Layout justify/align", "v09-layout", v09_layout_props()},
+      {"v0.9 Features", "Text variant", "v09-text", v09_text_variant()},
+      {"v0.9 Features", "TextField value/checks", "v09-textfield", v09_textfield()},
+      {"v0.9 Features", "ChoicePicker", "v09-choice", v09_choice_picker()},
+      {"v0.9 Features", "Slider min/max", "v09-slider", v09_slider()},
+      {"v0.9 Features", "Tabs (tabs prop)", "v09-tabs", v09_tabs()},
+      {"v0.9 Features", "Modal trigger/content", "v09-modal", v09_modal()},
+      {"v0.9 Features", "Button context (map)", "v09-button", v09_button_context()},
+      {"v0.9 Features", "String Format", "v09-stringformat", v09_string_format()},
+
       # Gallery Examples (from A2UI Composer)
       {"Gallery", "Flight Status", "gallery-flight", gallery_flight_status()},
       {"Gallery", "Notification", "gallery-notification", gallery_notification()},
@@ -654,6 +666,217 @@ defmodule A2UIDemo.Demo.StorybookSamples do
       ]}}),
       ~s({"beginRendering":{"surfaceId":"nested","root":"root"}})
     ]
+  end
+
+  # ============================================
+  # v0.9 Features - Protocol Changes
+  # ============================================
+
+  defp v09_message_format do
+    # v0.9 native wire format:
+    # - createSurface (requires catalogId)
+    # - updateComponents (flat component structure)
+    # - children as plain arrays
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-message","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-message","components":[
+        {"id":"root","component":"Column","children":["title","desc","code"]},
+        {"id":"title","component":"Text","text":"v0.9 Native Wire Format","variant":"h3"},
+        {"id":"desc","component":"Text","text":"This sample uses native v0.9 wire format: createSurface, updateComponents, flat component structure."},
+        {"id":"code","component":"Card","child":"code-content"},
+        {"id":"code-content","component":"Column","children":["c1","c2","c3","c4","c5"]},
+        {"id":"c1","component":"Text","text":"• createSurface (was beginRendering)","variant":"caption"},
+        {"id":"c2","component":"Text","text":"• updateComponents (was surfaceUpdate)","variant":"caption"},
+        {"id":"c3","component":"Text","text":"• updateDataModel (was dataModelUpdate)","variant":"caption"},
+        {"id":"c4","component":"Text","text":"• Flat component: {\"component\": \"Text\", \"text\": \"...\"}","variant":"caption"},
+        {"id":"c5","component":"Text","text":"• Children as array: [\"a\", \"b\", \"c\"]","variant":"caption"}
+      ]}}|
+    ]
+  end
+
+  defp v09_layout_props do
+    # v0.9 native wire format with justify/align props
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-layout","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-layout","components":[
+        {"id":"root","component":"Column","children":["title","row1-label","row1","row2-label","row2","row3-label","row3"]},
+        {"id":"title","component":"Text","text":"v0.9 Layout: justify & align","variant":"h4"},
+        {"id":"row1-label","component":"Text","text":"justify: spaceBetween, align: center","variant":"caption"},
+        {"id":"row1","component":"Row","children":["r1a","r1b","r1c"],"justify":"spaceBetween","align":"center"},
+        {"id":"r1a","component":"Button","child":"r1a-t"},
+        {"id":"r1a-t","component":"Text","text":"A"},
+        {"id":"r1b","component":"Button","child":"r1b-t"},
+        {"id":"r1b-t","component":"Text","text":"B"},
+        {"id":"r1c","component":"Button","child":"r1c-t"},
+        {"id":"r1c-t","component":"Text","text":"C"},
+        {"id":"row2-label","component":"Text","text":"justify: spaceEvenly, align: stretch","variant":"caption"},
+        {"id":"row2","component":"Row","children":["r2a","r2b"],"justify":"spaceEvenly","align":"stretch"},
+        {"id":"r2a","component":"Card","child":"r2a-t"},
+        {"id":"r2a-t","component":"Text","text":"Card 1"},
+        {"id":"r2b","component":"Card","child":"r2b-t"},
+        {"id":"r2b-t","component":"Text","text":"Card 2"},
+        {"id":"row3-label","component":"Text","text":"justify: end, align: end","variant":"caption"},
+        {"id":"row3","component":"Row","children":["r3a","r3b"],"justify":"end","align":"end"},
+        {"id":"r3a","component":"Icon","name":"star"},
+        {"id":"r3b","component":"Text","text":"Aligned to end"}
+      ]}}|
+    ]
+  end
+
+  defp v09_text_variant do
+    # v0.9 native wire format with variant prop
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-text","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-text","components":[
+        {"id":"root","component":"Column","children":["title","h1","h2","h3","h4","h5","body","caption"]},
+        {"id":"title","component":"Text","text":"v0.9 Text: variant prop","variant":"h4"},
+        {"id":"h1","component":"Text","text":"variant: h1","variant":"h1"},
+        {"id":"h2","component":"Text","text":"variant: h2","variant":"h2"},
+        {"id":"h3","component":"Text","text":"variant: h3","variant":"h3"},
+        {"id":"h4","component":"Text","text":"variant: h4","variant":"h4"},
+        {"id":"h5","component":"Text","text":"variant: h5","variant":"h5"},
+        {"id":"body","component":"Text","text":"variant: body (default)","variant":"body"},
+        {"id":"caption","component":"Text","text":"variant: caption","variant":"caption"}
+      ]}}|
+    ]
+  end
+
+  defp v09_textfield do
+    # v0.9 native wire format with value, variant, checks
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-textfield","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-textfield","components":[
+        {"id":"root","component":"Column","children":["title","tf1","tf2","tf3","tf4"]},
+        {"id":"title","component":"Text","text":"v0.9 TextField: value, variant, checks","variant":"h4"},
+        {"id":"tf1","component":"TextField","label":"Email (variant: email)","value":{"path":"/email"},"variant":"email","checks":[{"call":"required"},{"call":"email"}]},
+        {"id":"tf2","component":"TextField","label":"Password (variant: password)","value":{"path":"/password"},"variant":"password","checks":[{"call":"required"},{"call":"length","args":{"min":8}}]},
+        {"id":"tf3","component":"TextField","label":"Phone (with regex check)","value":{"path":"/phone"},"checks":[{"call":"regex","args":{"pattern":"^[0-9-]+$","message":"Numbers and dashes only"}}]},
+        {"id":"tf4","component":"TextField","label":"Username (required + length)","value":{"path":"/username"},"checks":[{"call":"required"},{"call":"length","args":{"min":3,"max":20}}]}
+      ]}}|,
+      ~S|{"updateDataModel":{"surfaceId":"v09-textfield","path":"/","value":{"email":"","password":"","phone":"","username":""}}}|
+    ]
+  end
+
+  defp v09_choice_picker do
+    # v0.9 native wire format: ChoicePicker component
+    # - value (DynamicStringList) - array of selected values
+    # - variant ("mutuallyExclusive"/"multipleSelection")
+    # - options: label (DynamicString) + value (string)
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-choice","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-choice","components":[
+        {"id":"root","component":"Column","children":["title","cp1-label","cp1","cp2-label","cp2"]},
+        {"id":"title","component":"Text","text":"v0.9 ChoicePicker","variant":"h4"},
+        {"id":"cp1-label","component":"Text","text":"variant: mutuallyExclusive (radio buttons)","variant":"caption"},
+        {"id":"cp1","component":"ChoicePicker","options":[{"label":"Option A","value":"opt1"},{"label":"Option B","value":"opt2"},{"label":"Option C","value":"opt3"}],"value":{"path":"/single"},"variant":"mutuallyExclusive"},
+        {"id":"cp2-label","component":"Text","text":"variant: multipleSelection (checkboxes)","variant":"caption"},
+        {"id":"cp2","component":"ChoicePicker","options":[{"label":"Red","value":"red"},{"label":"Green","value":"green"},{"label":"Blue","value":"blue"}],"value":{"path":"/multi"},"variant":"multipleSelection"}
+      ]}}|,
+      ~S|{"updateDataModel":{"surfaceId":"v09-choice","path":"/","value":{"single":["opt1"],"multi":["red","blue"]}}}|
+    ]
+  end
+
+  defp v09_slider do
+    # v0.9 native wire format with min/max props
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-slider","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-slider","components":[
+        {"id":"root","component":"Column","children":["title","s1-label","s1","s2-label","s2"]},
+        {"id":"title","component":"Text","text":"v0.9 Slider: min/max","variant":"h4"},
+        {"id":"s1-label","component":"Text","text":"Volume (min: 0, max: 100)","variant":"caption"},
+        {"id":"s1","component":"Slider","value":{"path":"/volume"},"min":0,"max":100},
+        {"id":"s2-label","component":"Text","text":"Temperature (min: -20, max: 50)","variant":"caption"},
+        {"id":"s2","component":"Slider","value":{"path":"/temp"},"min":-20,"max":50}
+      ]}}|,
+      ~S|{"updateDataModel":{"surfaceId":"v09-slider","path":"/","value":{"volume":75,"temp":22}}}|
+    ]
+  end
+
+  defp v09_tabs do
+    # v0.9 native wire format: tabs prop with title (DynamicString) and child
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-tabs","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-tabs","components":[
+        {"id":"root","component":"Column","children":["heading","mytabs"]},
+        {"id":"heading","component":"Text","text":"v0.9 Tabs: tabs prop","variant":"h4"},
+        {"id":"mytabs","component":"Tabs","tabs":[{"title":"Overview","child":"tab1"},{"title":"Details","child":"tab2"},{"title":"Settings","child":"tab3"}]},
+        {"id":"tab1","component":"Column","children":["tab1-title","tab1-text"]},
+        {"id":"tab1-title","component":"Text","text":"Overview Tab","variant":"h4"},
+        {"id":"tab1-text","component":"Text","text":"This is the overview content."},
+        {"id":"tab2","component":"Column","children":["tab2-title","tab2-text"]},
+        {"id":"tab2-title","component":"Text","text":"Details Tab","variant":"h4"},
+        {"id":"tab2-text","component":"Text","text":"Here are the detailed information."},
+        {"id":"tab3","component":"Column","children":["tab3-title","tab3-text"]},
+        {"id":"tab3-title","component":"Text","text":"Settings Tab","variant":"h4"},
+        {"id":"tab3-text","component":"Text","text":"Configure your preferences here."}
+      ]}}|
+    ]
+  end
+
+  defp v09_modal do
+    # v0.9 native wire format: trigger and content props
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-modal","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-modal","components":[
+        {"id":"root","component":"Modal","trigger":"trigger-btn","content":"dialog"},
+        {"id":"trigger-btn","component":"Button","child":"trigger-text","primary":true},
+        {"id":"trigger-text","component":"Text","text":"Open Modal (v0.9 trigger/content)"},
+        {"id":"dialog","component":"Column","children":["dlg-title","dlg-body","dlg-actions"]},
+        {"id":"dlg-title","component":"Text","text":"v0.9 Modal Props","variant":"h3"},
+        {"id":"dlg-body","component":"Text","text":"This modal uses v0.9 props: trigger and content (was entryPointChild and contentChild)."},
+        {"id":"dlg-actions","component":"Row","children":["cancel-btn","confirm-btn"],"justify":"end"},
+        {"id":"cancel-btn","component":"Button","child":"cancel-text"},
+        {"id":"cancel-text","component":"Text","text":"Cancel"},
+        {"id":"confirm-btn","component":"Button","child":"confirm-text","primary":true},
+        {"id":"confirm-text","component":"Text","text":"Confirm"}
+      ]}}|
+    ]
+  end
+
+  defp v09_button_context do
+    # v0.9 native wire format: context as a standard map
+    [
+      ~S|{"createSurface":{"surfaceId":"v09-button","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}}|,
+      ~S|{"updateComponents":{"surfaceId":"v09-button","components":[
+        {"id":"root","component":"Column","children":["title","desc","btns"]},
+        {"id":"title","component":"Text","text":"v0.9 Button: context as map","variant":"h4"},
+        {"id":"desc","component":"Text","text":"Button context is now a standard JSON object instead of array of key-value pairs."},
+        {"id":"btns","component":"Row","children":["btn1","btn2","btn3"],"justify":"start"},
+        {"id":"btn1","component":"Button","child":"btn1-text","action":{"name":"select_item","context":{"itemId":"item-001","category":"electronics"}},"primary":true},
+        {"id":"btn1-text","component":"Text","text":"Select Item 001"},
+        {"id":"btn2","component":"Button","child":"btn2-text","action":{"name":"select_item","context":{"itemId":"item-002","category":"books"}}},
+        {"id":"btn2-text","component":"Text","text":"Select Item 002"},
+        {"id":"btn3","component":"Button","child":"btn3-text","action":{"name":"delete","context":{"target":"all","confirm":true}}},
+        {"id":"btn3-text","component":"Text","text":"Delete All"}
+      ]}}|
+    ]
+  end
+
+  defp v09_string_format do
+    # v0.9 native wire format with string_format function
+    # Using heredoc to avoid delimiter conflicts with ${...} syntax
+    components = """
+    {"updateComponents":{"surfaceId":"v09-stringformat","components":[
+      {"id":"root","component":"Column","children":["title","desc","ex1","ex2","ex3","ex4"]},
+      {"id":"title","component":"Text","text":"v0.9 String Format","variant":"h4"},
+      {"id":"desc","component":"Text","text":"The string_format function allows embedding data paths and function calls."},
+      {"id":"ex1","component":"Text","text":{"call":"string_format","args":{"value":"Hello, ${/user/name}! You have ${/user/messageCount} messages."}}},
+      {"id":"ex2","component":"Text","text":{"call":"string_format","args":{"value":"Current time: ${now()}"}}},
+      {"id":"ex3","component":"Text","text":{"call":"string_format","args":{"value":"Order #${/order/id} - Total: $${/order/total}"}},"variant":"h4"},
+      {"id":"ex4","component":"Card","child":"ex4-content"},
+      {"id":"ex4-content","component":"Column","children":["ex4-greeting","ex4-status"]},
+      {"id":"ex4-greeting","component":"Text","text":{"call":"string_format","args":{"value":"Welcome back, ${/user/name}!"}},"variant":"h3"},
+      {"id":"ex4-status","component":"Text","text":{"call":"string_format","args":{"value":"Account: ${/user/accountType} - Points: ${/user/points}"}},"variant":"caption"}
+    ]}}
+    """
+
+    create_surface =
+      ~S({"createSurface":{"surfaceId":"v09-stringformat","catalogId":"https://a2ui.dev/specification/v0_9/standard_catalog.json"}})
+
+    data =
+      ~S({"updateDataModel":{"surfaceId":"v09-stringformat","path":"/","value":{"user":{"name":"Alice","messageCount":5,"accountType":"Premium","points":1250},"order":{"id":"ORD-12345","total":"99.99"}}}})
+
+    [create_surface, String.trim(components), data]
   end
 
   # ============================================

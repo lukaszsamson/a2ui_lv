@@ -4,11 +4,12 @@ defmodule A2UI.ClientCapabilitiesTest do
   alias A2UI.ClientCapabilities
 
   describe "new/1" do
-    test "creates capabilities with all v0.8 standard catalog aliases by default" do
+    test "creates capabilities with all v0.8 and v0.9 standard catalog aliases by default" do
       caps = ClientCapabilities.new()
 
-      # Should include all known v0.8 aliases for maximum compatibility
-      assert caps.supported_catalog_ids == A2UI.V0_8.standard_catalog_ids()
+      # Should include all known v0.8 and v0.9 aliases for maximum compatibility
+      expected = A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
+      assert caps.supported_catalog_ids == expected
       assert caps.inline_catalogs == []
     end
 
@@ -40,11 +41,12 @@ defmodule A2UI.ClientCapabilitiesTest do
   end
 
   describe "default/0" do
-    test "returns capabilities with all v0.8 standard catalog aliases" do
+    test "returns capabilities with all v0.8 and v0.9 standard catalog aliases" do
       caps = ClientCapabilities.default()
 
-      # Should include all known v0.8 aliases for maximum compatibility
-      assert caps.supported_catalog_ids == A2UI.V0_8.standard_catalog_ids()
+      # Should include all known v0.8 and v0.9 aliases for maximum compatibility
+      expected = A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
+      assert caps.supported_catalog_ids == expected
       assert caps.inline_catalogs == []
     end
   end

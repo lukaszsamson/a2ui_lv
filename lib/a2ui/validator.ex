@@ -18,11 +18,7 @@ defmodule A2UI.Validator do
   @max_template_items 200
   @max_data_model_bytes 100_000
 
-  # All 18 standard catalog components (v0.8)
-  @allowed_types ~w(
-    Column Row Card Text Divider Button TextField CheckBox
-    Icon Image AudioPlayer Video Slider DateTimeInput MultipleChoice List Tabs Modal
-  )
+  alias A2UI.Catalog.Components
 
   # Allowed URL schemes for media components (Image, Video, AudioPlayer)
   @allowed_url_schemes ~w(https http data blob)
@@ -46,15 +42,26 @@ defmodule A2UI.Validator do
   def max_template_items, do: @max_template_items
 
   @doc """
-  Returns the list of allowed component types.
+  Returns the list of allowed component types for a catalog.
+
+  If no catalog_id is provided, returns all known types across catalogs.
   """
-  @spec allowed_types() :: [String.t()]
-  def allowed_types, do: @allowed_types
+  @spec allowed_types(String.t() | nil) :: [String.t()]
+  def allowed_types(catalog_id \\ nil) do
+    Components.allowed_types(catalog_id) || Components.all_known_types()
+  end
 
   @doc """
   Validates a surface update message.
 
   Returns `:ok` if valid, or `{:error, reason}` if invalid.
+
+  ## Parameters
+
+  - `msg` - The surface update message with components
+  - `catalog_id` - Optional catalog ID for type validation. If nil, validates
+    against all known component types across catalogs (permissive mode for
+    when catalog is not yet known, e.g., v0.8 surfaceUpdate before beginRendering).
 
   ## Examples
 
@@ -65,11 +72,13 @@ defmodule A2UI.Validator do
       iex> A2UI.Validator.validate_surface_update(%{components: Enum.map(1..1001, fn i -> %A2UI.Component{id: "\#{i}", type: "Text", props: %{}} end)})
       {:error, {:too_many_components, 1001, 1000}}
   """
-  @spec validate_surface_update(%{components: [A2UI.Component.t()]}) ::
+  @spec validate_surface_update(%{components: [A2UI.Component.t()]}, String.t() | nil) ::
           :ok | {:error, term()}
-  def validate_surface_update(%{components: components}) do
+  def validate_surface_update(msg, catalog_id \\ nil)
+
+  def validate_surface_update(%{components: components}, catalog_id) do
     with :ok <- validate_count(components),
-         :ok <- validate_types(components) do
+         :ok <- validate_types(components, catalog_id) do
       :ok
     end
   end
@@ -89,15 +98,14 @@ defmodule A2UI.Validator do
   end
 
   @doc """
-  Validates component types against allowlist.
+  Validates component types against the catalog's allowlist.
+
+  If catalog_id is nil, validates against all known types (permissive mode).
   """
-  @spec validate_types([A2UI.Component.t()]) :: :ok | {:error, term()}
-  def validate_types(components) do
-    unknown =
-      components
-      |> Enum.map(& &1.type)
-      |> Enum.reject(&(&1 in @allowed_types))
-      |> Enum.uniq()
+  @spec validate_types([A2UI.Component.t()], String.t() | nil) :: :ok | {:error, term()}
+  def validate_types(components, catalog_id \\ nil) do
+    types = Enum.map(components, & &1.type)
+    unknown = Components.invalid_types(types, catalog_id)
 
     if unknown == [] do
       :ok

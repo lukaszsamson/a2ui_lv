@@ -64,7 +64,7 @@ defmodule A2UI.ClientCapabilities do
   - `:supported_catalog_ids` - List of catalog URIs this client supports
   - `:inline_catalogs` - List of inline catalog definition documents
 
-  If no `supported_catalog_ids` are provided, defaults to the standard v0.8 catalog.
+  If no `supported_catalog_ids` are provided, defaults to both v0.8 and v0.9 standard catalogs.
 
   ## Inline Catalog Format
 
@@ -74,8 +74,11 @@ defmodule A2UI.ClientCapabilities do
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
-    # Default to all known v0.8 standard catalog aliases for maximum compatibility
-    supported = opts[:supported_catalog_ids] || A2UI.V0_8.standard_catalog_ids()
+    # Default to all known v0.8 and v0.9 standard catalog aliases for maximum compatibility
+    supported =
+      opts[:supported_catalog_ids] ||
+        A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
+
     inline = opts[:inline_catalogs] || []
 
     %__MODULE__{
@@ -85,7 +88,7 @@ defmodule A2UI.ClientCapabilities do
   end
 
   @doc """
-  Returns the default client capabilities with all v0.8 standard catalog aliases.
+  Returns the default client capabilities with all v0.8 and v0.9 standard catalog aliases.
   """
   @spec default() :: t()
   def default do

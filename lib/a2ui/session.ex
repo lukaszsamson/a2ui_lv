@@ -123,7 +123,12 @@ defmodule A2UI.Session do
         ) ::
           {:ok, t()} | {:error, map()}
   def apply_message(session, %SurfaceUpdate{surface_id: sid} = msg) do
-    case Validator.validate_surface_update(msg) do
+    # Get the surface's catalog_id if it exists (set by prior createSurface/beginRendering)
+    # If nil, validator uses permissive mode (all known types across catalogs)
+    surface = Map.get(session.surfaces, sid)
+    catalog_id = if surface, do: surface.catalog_id, else: nil
+
+    case Validator.validate_surface_update(msg, catalog_id) do
       :ok ->
         {:ok, update_surface(session, sid, msg)}
 
@@ -179,32 +184,15 @@ defmodule A2UI.Session do
 
     case Resolver.resolve(catalog_id, session.client_capabilities, version) do
       {:ok, resolved_catalog_id} ->
-        # For v0.9: validate surface has a component with id "root"
-        # Per v0.9 spec: "at least one component must have id: 'root'"
-        # v0.8 allows any component to be the root (specified by root_id in beginRendering)
-        surface = Map.get(session.surfaces, sid) || Surface.new(sid)
+        # Use the resolved catalog ID (canonical form)
+        updated_msg = %{msg | catalog_id: resolved_catalog_id}
+        updated = update_surface_with_catalog(session, sid, updated_msg, :ok)
+        {:ok, updated}
 
-        root_valid? =
-          case version do
-            :v0_9 -> Validator.validate_has_root(surface.components) == :ok
-            :v0_8 -> true
-          end
-
-        if root_valid? do
-          # Use the resolved catalog ID (canonical form)
-          updated_msg = %{msg | catalog_id: resolved_catalog_id}
-          updated = update_surface_with_catalog(session, sid, updated_msg, :ok)
-          {:ok, updated}
-        else
-          error =
-            Error.validation_error(
-              "Surface must have a component with id \"root\"",
-              sid,
-              %{"reason" => "missing_root_component"}
-            )
-
-          {:error, error}
-        end
+        # Note: Root component validation is NOT done here because:
+        # - v0.8: beginRendering can specify any root_id, doesn't require id="root"
+        # - v0.9: createSurface comes BEFORE updateComponents, so components
+        #   aren't present yet. Root validation happens at render time.
 
       {:error, reason} ->
         # Catalog resolution failed - return error without updating session
