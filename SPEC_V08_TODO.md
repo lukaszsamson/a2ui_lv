@@ -73,14 +73,23 @@ Server→client streams must contain only the four envelope types:
 `surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`.
 
 **Resolution:**
-`A2UI.Transport.HTTP.SSEServer` now signals stream completion and errors correctly:
+`A2UI.Transport.HTTP.SSEServer` now correctly handles transport-level signals:
 - SSE `data:` contains only valid A2UI server→client envelopes
-- Stream completion: HTTP connection close + optional SSE comment (`: stream-done`)
-- Transport errors: HTTP connection close + optional SSE comment (`: stream-error: ...`)
-- Transport callbacks (`{:a2ui_stream_done, meta}` / `{:a2ui_stream_error, reason}`) work correctly
-- SSE comments are ignored by the A2UI parser
+- Stream completion (`{:a2ui_stream_done, meta}`): closes connection + optional SSE comment (`: stream-done`)
+- Transport errors (`{:a2ui_stream_error, reason}`): closes connection + optional SSE comment (`: stream-error: ...`)
+- SSE comments are ignored by A2UI parsers, so transport metadata doesn't pollute the protocol stream
 
-The demo HTTP bridge (`demo/priv/claude_bridge_http`) and demo client (`A2UIDemo.Demo.ClaudeHTTPClient`) were also updated accordingly.
+### ~~P0.5 A2A parts missing required `kind` discriminators~~ ✅ FIXED
+
+**Spec requirement (A2UI A2A extension docs):**
+The extension examples include DataParts with:
+- `kind: "data"`
+- `metadata.mimeType: "application/json+a2ui"`
+
+**Resolution:**
+- `A2UI.A2A.DataPart.wrap_envelope/1` now emits `"kind" => "data"` in all DataParts.
+- `A2UI.Transport.A2A.Client` task creation messages now include `"kind" => "text"` for text parts.
+- All A2A messages are now fully spec-compliant with proper part discriminators.
 
 ---
 
@@ -102,15 +111,15 @@ Docs require the client to send **single-event envelopes** back to the server:
   socket = A2UI.Phoenix.Live.init(socket, event_transport: transport)
   ```
 
-### ~~P1.2 A2A extension packaging (mimeType + client capabilities)~~ ✅ PROVISIONS READY
+### ~~P1.2 A2A extension packaging (mimeType + client capabilities)~~ ✅ IMPLEMENTED
 
 A2A extension spec requirements:
 - A2UI messages are A2A `DataPart` with `metadata.mimeType = "application/json+a2ui"`.
 - Every client→server A2A message must include `metadata.a2uiClientCapabilities`.
 
-**Implementation (plumbing only - no A2A transport yet):**
+**Implementation (packaging + transport):**
 
-Modules added to make implementing A2A transport straightforward:
+Packaging (shared, transport-agnostic):
 
 - `A2UI.A2A.Protocol` - Protocol constants:
   - `mime_type/0` → `"application/json+a2ui"`
@@ -126,6 +135,13 @@ Modules added to make implementing A2A transport straightforward:
   - `extract_envelopes/1` → Extracts A2UI envelopes from A2A message
   - `parse_client_capabilities/1` → Parses capabilities from A2A metadata
 
+Concrete A2A transport:
+
+- `A2UI.Transport.A2A.AgentCard` - Parses `/.well-known/agent.json` and A2UI extension config
+- `A2UI.Transport.A2A.Client` - Implements both:
+  - `A2UI.Transport.UIStream` via `GET /a2a/tasks/:id` (SSE)
+  - `A2UI.Transport.Events` via `POST /a2a/tasks/:id`
+
 - `A2UI.Session` updates:
   - Now defaults to `ClientCapabilities.default()` (not nil)
   - `client_capabilities/1` → Returns session's capabilities
@@ -135,8 +151,8 @@ Modules added to make implementing A2A transport straightforward:
   - `A2UI.V0_8.extension_uri/0` → v0.8 A2A extension URI
   - `A2UI.V0_9.Adapter.extension_uri/0` → v0.9 A2A extension URI
 
-**Remaining work:**
-- Implement actual A2A transport (HTTP client, SSE/WebSocket)
+**Strictness:**
+- ✅ A2UI A2A extension `kind` fields are now emitted (see P0.5 fix).
 
 ### ~~P1.3 Streaming UI transport~~ ✅ IMPLEMENTED (HTTP+SSE)
 
@@ -159,7 +175,7 @@ Docs describe:
   - `test/a2ui/transport/http/registry_test.exs`
 
 **Transport conformance:**
-- ✅ SSE `data:` stream contains only valid A2UI envelopes (P0.4 fixed)
+- ✅ SSE server emits only valid A2UI envelopes on the `data:` stream (see P0.4 fix).
 
 ---
 

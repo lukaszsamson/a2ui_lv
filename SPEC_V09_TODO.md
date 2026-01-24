@@ -14,7 +14,10 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 
 **Transport status (FYI):**
 - HTTP+SSE transport is implemented in `lib/a2ui/transport/http/*` and documented in `TRANSPORT_SSE.md`.
-- ✅ SSE `data:` stream contains only valid A2UI envelopes (no transport-level JSON like `{"streamDone": ...}` or ad-hoc `{"error": ...}`). Stream completion and errors are signaled via HTTP connection close + optional SSE comments.
+- A2A transport is implemented in `lib/a2ui/transport/a2a/*` and documented in `TRANSPORT_A2A.md`.
+- ✅ Transport conformance achieved:
+  - SSE: `data:` stream contains only A2UI server→client envelopes (transport signals use SSE comments).
+  - A2A: outbound A2A parts include `kind` fields and DataParts include `metadata.mimeType: application/json+a2ui`.
 
 ---
 

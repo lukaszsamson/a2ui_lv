@@ -6,12 +6,13 @@ defmodule A2UI.A2A.DataPartTest do
   alias A2UI.ClientCapabilities
 
   describe "wrap_envelope/1" do
-    test "wraps A2UI envelope in DataPart format" do
+    test "wraps A2UI envelope in DataPart format with kind discriminator" do
       envelope = %{"userAction" => %{"name" => "click", "surfaceId" => "main"}}
 
       result = DataPart.wrap_envelope(envelope)
 
       assert result == %{
+               "kind" => "data",
                "data" => envelope,
                "metadata" => %{"mimeType" => "application/json+a2ui"}
              }
@@ -27,6 +28,7 @@ defmodule A2UI.A2A.DataPartTest do
 
       for envelope <- envelopes do
         result = DataPart.wrap_envelope(envelope)
+        assert result["kind"] == "data"
         assert result["data"] == envelope
         assert result["metadata"]["mimeType"] == Protocol.mime_type()
       end
@@ -98,6 +100,7 @@ defmodule A2UI.A2A.DataPartTest do
       assert result["message"]["role"] == "user"
       assert is_map(result["message"]["metadata"]["a2uiClientCapabilities"])
       assert [part] = result["message"]["parts"]
+      assert part["kind"] == "data"
       assert part["data"] == envelope
       assert part["metadata"]["mimeType"] == Protocol.mime_type()
     end

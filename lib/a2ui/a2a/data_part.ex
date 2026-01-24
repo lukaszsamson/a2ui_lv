@@ -11,6 +11,7 @@ defmodule A2UI.A2A.DataPart do
 
   ```json
   {
+    "kind": "data",
     "data": { "userAction": { ... } },
     "metadata": {
       "mimeType": "application/json+a2ui"
@@ -61,6 +62,7 @@ defmodule A2UI.A2A.DataPart do
       iex> envelope = %{"surfaceUpdate" => %{"surfaceId" => "main"}}
       iex> A2UI.A2A.DataPart.wrap_envelope(envelope)
       %{
+        "kind" => "data",
         "data" => %{"surfaceUpdate" => %{"surfaceId" => "main"}},
         "metadata" => %{"mimeType" => "application/json+a2ui"}
       }
@@ -68,6 +70,7 @@ defmodule A2UI.A2A.DataPart do
   @spec wrap_envelope(a2ui_envelope()) :: data_part()
   def wrap_envelope(envelope) when is_map(envelope) do
     %{
+      "kind" => "data",
       "data" => envelope,
       "metadata" => %{
         "mimeType" => Protocol.mime_type()

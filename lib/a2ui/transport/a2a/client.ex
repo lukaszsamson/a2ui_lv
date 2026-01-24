@@ -654,6 +654,7 @@ defmodule A2UI.Transport.A2A.Client do
           },
           "parts" => [
             %{
+              "kind" => "text",
               "text" => content
             }
           ]
