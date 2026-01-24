@@ -295,15 +295,20 @@ defmodule A2UIDemo.Demo.StorybookSamples do
   end
 
   defp icon_all do
-    # Show a curated selection of icons with labels
+    # Show all 40 standard icons with labels - 4 icons per row (10 rows) to accommodate long names
     [
       ~s({"surfaceUpdate":{"surfaceId":"icon-all","components":[
-        {"id":"root","component":{"Column":{"children":{"explicitList":["row1","row2","row3","row4","row5"]}}}},
-        {"id":"row1","component":{"Row":{"children":{"explicitList":["g1","g2","g3","g4","g5","g6","g7","g8"]},"distribution":"start"}}},
-        {"id":"row2","component":{"Row":{"children":{"explicitList":["g9","g10","g11","g12","g13","g14","g15","g16"]},"distribution":"start"}}},
-        {"id":"row3","component":{"Row":{"children":{"explicitList":["g17","g18","g19","g20","g21","g22","g23","g24"]},"distribution":"start"}}},
-        {"id":"row4","component":{"Row":{"children":{"explicitList":["g25","g26","g27","g28","g29","g30","g31","g32"]},"distribution":"start"}}},
-        {"id":"row5","component":{"Row":{"children":{"explicitList":["g33","g34","g35","g36","g37","g38","g39","g40"]},"distribution":"start"}}},
+        {"id":"root","component":{"Column":{"children":{"explicitList":["row1","row2","row3","row4","row5","row6","row7","row8","row9","row10"]}}}},
+        {"id":"row1","component":{"Row":{"children":{"explicitList":["g1","g2","g3","g4"]},"distribution":"spaceEvenly"}}},
+        {"id":"row2","component":{"Row":{"children":{"explicitList":["g5","g6","g7","g8"]},"distribution":"spaceEvenly"}}},
+        {"id":"row3","component":{"Row":{"children":{"explicitList":["g9","g10","g11","g12"]},"distribution":"spaceEvenly"}}},
+        {"id":"row4","component":{"Row":{"children":{"explicitList":["g13","g14","g15","g16"]},"distribution":"spaceEvenly"}}},
+        {"id":"row5","component":{"Row":{"children":{"explicitList":["g17","g18","g19","g20"]},"distribution":"spaceEvenly"}}},
+        {"id":"row6","component":{"Row":{"children":{"explicitList":["g21","g22","g23","g24"]},"distribution":"spaceEvenly"}}},
+        {"id":"row7","component":{"Row":{"children":{"explicitList":["g25","g26","g27","g28"]},"distribution":"spaceEvenly"}}},
+        {"id":"row8","component":{"Row":{"children":{"explicitList":["g29","g30","g31","g32"]},"distribution":"spaceEvenly"}}},
+        {"id":"row9","component":{"Row":{"children":{"explicitList":["g33","g34","g35","g36"]},"distribution":"spaceEvenly"}}},
+        {"id":"row10","component":{"Row":{"children":{"explicitList":["g37","g38","g39","g40"]},"distribution":"spaceEvenly"}}},
         {"id":"g1","component":{"Column":{"children":{"explicitList":["i1","l1"]},"alignment":"center"}}},{"id":"i1","component":{"Icon":{"name":{"literalString":"accountCircle"}}}},{"id":"l1","component":{"Text":{"text":{"literalString":"accountCircle"},"usageHint":"caption"}}},
         {"id":"g2","component":{"Column":{"children":{"explicitList":["i2","l2"]},"alignment":"center"}}},{"id":"i2","component":{"Icon":{"name":{"literalString":"add"}}}},{"id":"l2","component":{"Text":{"text":{"literalString":"add"},"usageHint":"caption"}}},
         {"id":"g3","component":{"Column":{"children":{"explicitList":["i3","l3"]},"alignment":"center"}}},{"id":"i3","component":{"Icon":{"name":{"literalString":"arrowBack"}}}},{"id":"l3","component":{"Text":{"text":{"literalString":"arrowBack"},"usageHint":"caption"}}},
