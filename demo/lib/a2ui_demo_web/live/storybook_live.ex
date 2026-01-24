@@ -112,8 +112,16 @@ defmodule A2UIDemoWeb.StorybookLive do
   end
 
   defp load_sample(socket, sample_id) do
-    # Clear existing surfaces
-    socket = Phoenix.Component.assign(socket, :a2ui_surfaces, %{})
+    # Clear existing surfaces by creating a fresh session
+    # The old approach only cleared :a2ui_surfaces but not :a2ui_session,
+    # causing new messages to accumulate on the old session state
+    session = A2UI.Session.new(client_capabilities: socket.assigns.a2ui_session.client_capabilities)
+
+    socket =
+      Phoenix.Component.assign(socket,
+        a2ui_session: session,
+        a2ui_surfaces: session.surfaces
+      )
 
     # Send sample messages
     StorybookSamples.send_sample(self(), sample_id)
