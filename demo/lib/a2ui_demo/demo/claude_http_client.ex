@@ -67,7 +67,11 @@ defmodule A2UIDemo.Demo.ClaudeHTTPClient do
   @spec generate_with_action(String.t(), map(), map(), keyword()) ::
           {:ok, [String.t()]} | {:error, term()}
   def generate_with_action(original_prompt, user_action, data_model, opts \\ []) do
-    action = user_action["userAction"] || user_action
+    action =
+      user_action["action"] ||
+        user_action["userAction"] ||
+        user_action
+
     action_name = action["name"] || "unknown"
     action_context = action["context"] || %{}
 

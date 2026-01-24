@@ -56,11 +56,15 @@ defmodule A2UIDemo.Demo.OllamaClient do
     config = ModelConfig.get(model_name)
 
     # Determine if we should use schema
+    force_schema = opts[:force_schema]
+
     use_schema =
-      case opts[:force_schema] do
+      case force_schema do
         nil -> config.supports_schema
         val -> val
       end
+
+    temperature_zero = force_schema == true
 
     system_prompt = PromptBuilder.build(config, surface_id, protocol_version)
 
@@ -75,6 +79,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
         surface_id,
         use_schema,
         protocol_version,
+        temperature_zero,
         on_chunk
       )
     else
@@ -85,7 +90,8 @@ defmodule A2UIDemo.Demo.OllamaClient do
         base_url,
         surface_id,
         use_schema,
-        protocol_version
+        protocol_version,
+        temperature_zero
       )
     end
   end
@@ -116,14 +122,22 @@ defmodule A2UIDemo.Demo.OllamaClient do
     config = ModelConfig.get(model_name)
 
     # Determine if we should use schema
+    force_schema = opts[:force_schema]
+
     use_schema =
-      case opts[:force_schema] do
+      case force_schema do
         nil -> config.supports_schema
         val -> val
       end
 
+    temperature_zero = force_schema == true
+
     # Extract action info
-    action = user_action["userAction"] || user_action
+    action =
+      user_action["action"] ||
+        user_action["userAction"] ||
+        user_action
+
     action_name = action["name"] || "unknown"
     action_context = action["context"] || %{}
 
@@ -153,6 +167,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
         surface_id,
         use_schema,
         protocol_version,
+        temperature_zero,
         on_chunk
       )
     else
@@ -163,7 +178,8 @@ defmodule A2UIDemo.Demo.OllamaClient do
         base_url,
         surface_id,
         use_schema,
-        protocol_version
+        protocol_version,
+        temperature_zero
       )
     end
   end
@@ -176,10 +192,19 @@ defmodule A2UIDemo.Demo.OllamaClient do
          base_url,
          surface_id,
          use_schema,
-         protocol_version
+         protocol_version,
+         temperature_zero
        ) do
     request_body =
-      build_request_body(user_prompt, system_prompt, model, use_schema, protocol_version, false)
+      build_request_body(
+        user_prompt,
+        system_prompt,
+        model,
+        use_schema,
+        protocol_version,
+        temperature_zero,
+        false
+      )
 
     case Req.post("#{base_url}/api/generate",
            json: request_body,
@@ -207,38 +232,38 @@ defmodule A2UIDemo.Demo.OllamaClient do
          surface_id,
          use_schema,
          protocol_version,
+         temperature_zero,
          on_chunk
        ) do
-    unless is_function(on_chunk, 1) do
-      raise ArgumentError, "on_chunk callback required for streaming mode"
-    end
+    on_chunk =
+      if is_function(on_chunk, 1) do
+        on_chunk
+      else
+        fn _chunk -> :ok end
+      end
 
     request_body =
-      build_request_body(user_prompt, system_prompt, model, use_schema, protocol_version, true)
+      build_request_body(
+        user_prompt,
+        system_prompt,
+        model,
+        use_schema,
+        protocol_version,
+        temperature_zero,
+        true
+      )
 
     pid = self()
+
+    Process.put(:ollama_stream_buffer, "")
+    Process.put(:ollama_stream_response, "")
 
     # Ollama streaming returns newline-delimited JSON (NDJSON). Req may deliver
     # arbitrary chunks, so we buffer and split on newlines before decoding.
     stream_handler = fn
-      {:data, data}, acc ->
-        acc =
-          case acc do
-            %{buffer: _buf, response: _resp, done: _done} ->
-              acc
-
-            %{buffer: _buf, response: _resp} ->
-              Map.put(acc, :done, false)
-
-            %{response: resp} ->
-              %{buffer: "", response: resp, done: false}
-
-            _ ->
-              %{buffer: "", response: "", done: false}
-          end
-
+      {:data, data}, {req, resp} ->
         chunk = IO.iodata_to_binary(data)
-        buffer = acc.buffer <> chunk
+        buffer = Process.get(:ollama_stream_buffer, "") <> chunk
         lines = String.split(buffer, "\n", trim: false)
 
         {complete_lines, rest} =
@@ -247,72 +272,70 @@ defmodule A2UIDemo.Demo.OllamaClient do
             _ -> {Enum.drop(lines, -1), List.last(lines) || ""}
           end
 
-        reduce_result =
-          Enum.reduce_while(complete_lines, %{acc | buffer: rest}, fn line, acc2 ->
+        Process.put(:ollama_stream_buffer, rest)
+
+        done? =
+          Enum.reduce_while(complete_lines, false, fn line, _acc ->
             line = String.trim(line)
 
             if line == "" do
-              {:cont, acc2}
+              {:cont, false}
             else
               case Jason.decode(line) do
                 {:ok, %{"response" => resp_chunk} = msg} when is_binary(resp_chunk) ->
-                  new_response = acc2.response <> resp_chunk
+                  response = Process.get(:ollama_stream_response, "") <> resp_chunk
+                  Process.put(:ollama_stream_response, response)
                   on_chunk.(resp_chunk)
 
                   if msg["done"] == true do
-                    send(pid, {:stream_complete, new_response})
-                    {:halt, %{acc2 | response: new_response, done: true}}
+                    send(pid, {:stream_complete, response})
+                    {:halt, true}
                   else
-                    {:cont, %{acc2 | response: new_response}}
+                    {:cont, false}
                   end
 
                 {:ok, %{"done" => true}} ->
-                  send(pid, {:stream_complete, acc2.response})
-                  {:halt, %{acc2 | done: true}}
+                  response = Process.get(:ollama_stream_response, "")
+                  send(pid, {:stream_complete, response})
+                  {:halt, true}
 
                 _ ->
-                  {:cont, acc2}
+                  {:cont, false}
               end
             end
           end)
 
-        if reduce_result.done do
-          {:halt, reduce_result}
+        if done? do
+          {:halt, {req, resp}}
         else
-          {:cont, reduce_result}
+          {:cont, {req, resp}}
         end
 
-      {:done, _}, acc ->
-        acc =
-          case acc do
-            %{buffer: _buf, response: _resp, done: _done} -> acc
-            %{buffer: _buf, response: _resp} -> Map.put(acc, :done, false)
-            %{response: resp} -> %{buffer: "", response: resp, done: false}
-            _ -> %{buffer: "", response: "", done: false}
-          end
-
+      {:done, _}, {req, resp} ->
         # Best-effort: process any trailing buffered line (stream may not end with "\n").
-        tail = String.trim(acc.buffer || "")
+        tail = String.trim(Process.get(:ollama_stream_buffer, ""))
+        response = Process.get(:ollama_stream_response, "")
 
-        acc =
+        response =
           if tail != "" do
             case Jason.decode(tail) do
               {:ok, %{"response" => resp_chunk}} when is_binary(resp_chunk) ->
                 on_chunk.(resp_chunk)
-                %{acc | response: acc.response <> resp_chunk}
+                response <> resp_chunk
 
               _ ->
-                acc
+                response
             end
           else
-            acc
+            response
           end
 
-        send(pid, {:stream_complete, acc.response})
-        {:halt, %{acc | done: true}}
+        Process.put(:ollama_stream_response, response)
+        send(pid, {:stream_complete, response})
+        {:halt, {req, resp}}
 
-      _other, acc ->
-        {:cont, acc}
+      _other, {req, resp} ->
+        {:cont, {req, resp}}
     end
 
     Task.start(fn ->
@@ -340,12 +363,28 @@ defmodule A2UIDemo.Demo.OllamaClient do
     end
   end
 
-  defp build_request_body(user_prompt, system_prompt, model, use_schema, protocol_version, stream) do
+  defp build_request_body(
+         user_prompt,
+         system_prompt,
+         model,
+         use_schema,
+         protocol_version,
+         temperature_zero,
+         stream
+       ) do
     body = %{
       "model" => model,
-      "prompt" => "#{system_prompt}\n\nUser request: #{user_prompt}",
+      "prompt" => user_prompt,
+      "system" => system_prompt,
       "stream" => stream
     }
+
+    body =
+      if temperature_zero do
+        Map.put(body, "options", %{"temperature" => 0})
+      else
+        body
+      end
 
     if use_schema do
       Map.put(body, "format", PromptBuilder.a2ui_schema(protocol_version))
