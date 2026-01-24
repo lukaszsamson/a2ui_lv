@@ -216,7 +216,13 @@ defmodule A2UIDemo.Demo.Ollama.PromptBuilder do
     ## DATA BINDING
     - Static value: {"literalString": "Hello"} or {"literalNumber": 42} or {"literalBoolean": true}
     - Dynamic binding: {"path": "/keyname"} - references dataModel["keyname"]
-    - The dataModel should prefer primitives. Avoid JSON arrays (v0.8 contents cannot represent arrays); use maps with numeric string keys instead.
+
+    Paths use JSON Pointer syntax (RFC 6901). Examples:
+    - "/user" → references dataModel.user
+    - "/user/name" → references dataModel.user.name
+    - "/items/0/price" → references dataModel.items["0"].price
+
+    The dataModel should prefer primitives. Avoid JSON arrays (v0.8 contents cannot represent arrays); use maps with numeric string keys instead.
 
     ## RULES
     1. The root component MUST have id "root"
