@@ -51,6 +51,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
     surface_id = opts[:surface_id] || "llm-surface"
     stream = opts[:stream] || false
     on_chunk = opts[:on_chunk]
+    protocol_version = opts[:protocol_version] || :v0_8
 
     config = ModelConfig.get(model_name)
 
@@ -61,7 +62,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
         val -> val
       end
 
-    system_prompt = PromptBuilder.build(config, surface_id)
+    system_prompt = PromptBuilder.build(config, surface_id, protocol_version)
 
     Logger.info("Generating A2UI with #{model_name} (schema: #{use_schema}, stream: #{stream})")
 
@@ -73,10 +74,19 @@ defmodule A2UIDemo.Demo.OllamaClient do
         base_url,
         surface_id,
         use_schema,
+        protocol_version,
         on_chunk
       )
     else
-      generate_sync(user_prompt, system_prompt, model_name, base_url, surface_id, use_schema)
+      generate_sync(
+        user_prompt,
+        system_prompt,
+        model_name,
+        base_url,
+        surface_id,
+        use_schema,
+        protocol_version
+      )
     end
   end
 
@@ -101,6 +111,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
     surface_id = opts[:surface_id] || "llm-surface"
     stream = opts[:stream] || false
     on_chunk = opts[:on_chunk]
+    protocol_version = opts[:protocol_version] || :v0_8
 
     config = ModelConfig.get(model_name)
 
@@ -123,7 +134,8 @@ defmodule A2UIDemo.Demo.OllamaClient do
       data_model: data_model
     }
 
-    system_prompt = PromptBuilder.build_action_prompt(config, surface_id, action_info)
+    system_prompt =
+      PromptBuilder.build_action_prompt(config, surface_id, action_info, protocol_version)
 
     Logger.info(
       "Generating A2UI action response with #{model_name} (action: #{action_name}, schema: #{use_schema})"
@@ -140,24 +152,41 @@ defmodule A2UIDemo.Demo.OllamaClient do
         base_url,
         surface_id,
         use_schema,
+        protocol_version,
         on_chunk
       )
     else
-      generate_sync(user_prompt, system_prompt, model_name, base_url, surface_id, use_schema)
+      generate_sync(
+        user_prompt,
+        system_prompt,
+        model_name,
+        base_url,
+        surface_id,
+        use_schema,
+        protocol_version
+      )
     end
   end
 
   # Synchronous generation
-  defp generate_sync(user_prompt, system_prompt, model, base_url, surface_id, use_schema) do
+  defp generate_sync(
+         user_prompt,
+         system_prompt,
+         model,
+         base_url,
+         surface_id,
+         use_schema,
+         protocol_version
+       ) do
     request_body =
-      build_request_body(user_prompt, system_prompt, model, use_schema, false)
+      build_request_body(user_prompt, system_prompt, model, use_schema, protocol_version, false)
 
     case Req.post("#{base_url}/api/generate",
            json: request_body,
            receive_timeout: @timeout
          ) do
       {:ok, %{status: 200, body: body}} ->
-        parse_response(body, surface_id)
+        parse_response(body, surface_id, protocol_version)
 
       {:ok, %{status: status, body: body}} ->
         Logger.error("Ollama API error: #{status} - #{inspect(body)}")
@@ -177,6 +206,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
          base_url,
          surface_id,
          use_schema,
+         protocol_version,
          on_chunk
        ) do
     unless is_function(on_chunk, 1) do
@@ -184,7 +214,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
     end
 
     request_body =
-      build_request_body(user_prompt, system_prompt, model, use_schema, true)
+      build_request_body(user_prompt, system_prompt, model, use_schema, protocol_version, true)
 
     pid = self()
 
@@ -300,7 +330,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
     # Wait for stream to complete
     receive do
       {:stream_complete, response} ->
-        parse_response(%{"response" => response}, surface_id)
+        parse_response(%{"response" => response}, surface_id, protocol_version)
 
       {:stream_error, reason} ->
         {:error, reason}
@@ -310,7 +340,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
     end
   end
 
-  defp build_request_body(user_prompt, system_prompt, model, use_schema, stream) do
+  defp build_request_body(user_prompt, system_prompt, model, use_schema, protocol_version, stream) do
     body = %{
       "model" => model,
       "prompt" => "#{system_prompt}\n\nUser request: #{user_prompt}",
@@ -318,20 +348,20 @@ defmodule A2UIDemo.Demo.OllamaClient do
     }
 
     if use_schema do
-      Map.put(body, "format", PromptBuilder.a2ui_schema())
+      Map.put(body, "format", PromptBuilder.a2ui_schema(protocol_version))
     else
       body
     end
   end
 
-  defp parse_response(%{"response" => response_str}, surface_id) do
+  defp parse_response(%{"response" => response_str}, surface_id, protocol_version) do
     Logger.debug("Raw response: #{String.slice(response_str, 0, 500)}")
 
     json_str = extract_json(response_str)
 
     case Jason.decode(json_str) do
       {:ok, parsed} ->
-        messages = build_a2ui_messages(parsed, surface_id)
+        messages = build_a2ui_messages(parsed, surface_id, protocol_version)
         {:ok, messages}
 
       {:error, reason} ->
@@ -340,7 +370,7 @@ defmodule A2UIDemo.Demo.OllamaClient do
     end
   end
 
-  defp parse_response(body, _surface_id) do
+  defp parse_response(body, _surface_id, _protocol_version) do
     Logger.error("Unexpected response format: #{inspect(body)}")
     {:error, :unexpected_response_format}
   end
@@ -377,7 +407,11 @@ defmodule A2UIDemo.Demo.OllamaClient do
     end
   end
 
-  defp build_a2ui_messages(parsed, surface_id) do
+  defp build_a2ui_messages(parsed, surface_id, :v0_9) do
+    build_a2ui_messages_v09(parsed, surface_id)
+  end
+
+  defp build_a2ui_messages(parsed, surface_id, _version) do
     messages = []
 
     # 1. surfaceUpdate message
@@ -416,6 +450,47 @@ defmodule A2UIDemo.Demo.OllamaClient do
       end
 
     Enum.reverse(messages)
+  end
+
+  defp build_a2ui_messages_v09(parsed, surface_id) do
+    catalog_id =
+      get_in(parsed, ["createSurface", "catalogId"]) ||
+        "https://a2ui.dev/specification/v0_9/standard_catalog.json"
+
+    create_surface = %{
+      "createSurface" => %{
+        "surfaceId" => surface_id,
+        "catalogId" => catalog_id
+      }
+    }
+
+    update_components =
+      case parsed["updateComponents"] do
+        nil -> nil
+        update -> %{"updateComponents" => Map.put(update, "surfaceId", surface_id)}
+      end
+
+    update_data_model =
+      case parsed["dataModel"] do
+        nil ->
+          nil
+
+        data_model ->
+          %{
+            "updateDataModel" => %{
+              "surfaceId" => surface_id,
+              "path" => "/",
+              "value" => data_model
+            }
+          }
+      end
+
+    [
+      Jason.encode!(create_surface),
+      update_components && Jason.encode!(update_components),
+      update_data_model && Jason.encode!(update_data_model)
+    ]
+    |> Enum.reject(&is_nil/1)
   end
 
   defp build_data_model_update_messages(data_model, surface_id) when is_map(data_model) do

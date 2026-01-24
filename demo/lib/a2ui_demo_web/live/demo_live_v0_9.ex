@@ -19,7 +19,8 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
   @v09_catalog_id "https://a2ui.dev/specification/v0_9/standard_catalog.json"
 
   @scenarios [
-    {"basic", "Basic Form", "Initial render with createSurface, updateComponents, updateDataModel"},
+    {"basic", "Basic Form",
+     "Initial render with createSurface, updateComponents, updateDataModel"},
     {"dynamic", "Dynamic Updates", "UI changes in response to action"},
     {"multi_surface", "Multiple Surfaces", "Independent UI regions with separate data models"},
     {"delete_surface", "Delete Surface", "Removing surfaces from the UI"},
@@ -266,7 +267,8 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
 
         send(
           self(),
-          {:a2ui, ~s({"updateComponents":{"surfaceId":"error-test","components":[#{components}]}})}
+          {:a2ui,
+           ~s({"updateComponents":{"surfaceId":"error-test","components":[#{components}]}})}
         )
     end
 
@@ -331,10 +333,12 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
   defp collection_drop_last(list) when is_list(list) and length(list) > 0 do
     Enum.take(list, length(list) - 1)
   end
+
   defp collection_drop_last(map) when is_map(map) and map_size(map) > 0 do
     last_key = Integer.to_string(map_size(map) - 1)
     Map.delete(map, last_key)
   end
+
   defp collection_drop_last(other), do: other
 
   # Add another surface
@@ -432,7 +436,8 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
             model: socket.assigns.llm_model,
             surface_id: "llm-surface",
             stream: socket.assigns.llm_use_streaming,
-            force_schema: socket.assigns.llm_force_schema
+            force_schema: socket.assigns.llm_force_schema,
+            protocol_version: :v0_9
           ]
 
           # Add streaming callback if enabled
@@ -843,20 +848,20 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
               <% end %>
             </div>
           <% else %>
-          <%= for model <- @llm_available_models, model.name == @llm_model do %>
-            <div class="text-xs text-zinc-500 dark:text-zinc-400">
-              <span class="font-medium">{model.display_name}:</span>
-              {model.description}
-              <span class="ml-2">
-                [schema: {if model.supports_schema, do: "✓", else: "✗"},
-                streaming: {if model.supports_streaming, do: "✓", else: "✗"},
-                prompt: {model.prompt_style}]
-              </span>
-            </div>
+            <%= for model <- @llm_available_models, model.name == @llm_model do %>
+              <div class="text-xs text-zinc-500 dark:text-zinc-400">
+                <span class="font-medium">{model.display_name}:</span>
+                {model.description}
+                <span class="ml-2">
+                  [schema: {if model.supports_schema, do: "✓", else: "✗"},
+                  streaming: {if model.supports_streaming, do: "✓", else: "✗"},
+                  prompt: {model.prompt_style}]
+                </span>
+              </div>
+            <% end %>
           <% end %>
         <% end %>
       <% end %>
-    <% end %>
 
       <%!-- Prompt Input --%>
       <form phx-change="llm_prompt_change" phx-submit="llm_submit" class="flex gap-2">
@@ -1089,7 +1094,8 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
               model: socket.assigns.llm_model,
               surface_id: "llm-surface",
               stream: socket.assigns.llm_use_streaming,
-              force_schema: socket.assigns.llm_force_schema
+              force_schema: socket.assigns.llm_force_schema,
+              protocol_version: :v0_9
             )
 
           send(pid, {:llm_response, result})
@@ -1142,8 +1148,7 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
   defp respond_to_action(socket, "reset_counter", surface_id) do
     send(
       self(),
-      {:a2ui,
-       ~s({"updateDataModel":{"surfaceId":"#{surface_id}","path":"/counter","value":0}})}
+      {:a2ui, ~s({"updateDataModel":{"surfaceId":"#{surface_id}","path":"/counter","value":0}})}
     )
 
     socket
@@ -1315,7 +1320,8 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
   defp send_additional_surface(pid, surface_id) do
     send(
       pid,
-      {:a2ui, ~s({"createSurface":{"surfaceId":"#{surface_id}","catalogId":"#{@v09_catalog_id}"}})}
+      {:a2ui,
+       ~s({"createSurface":{"surfaceId":"#{surface_id}","catalogId":"#{@v09_catalog_id}"}})}
     )
 
     send(
@@ -1343,7 +1349,8 @@ defmodule A2UIDemoWeb.DemoLiveV09 do
 
       send(
         pid,
-        {:a2ui, ~s({"createSurface":{"surfaceId":"#{surface_id}","catalogId":"#{@v09_catalog_id}"}})}
+        {:a2ui,
+         ~s({"createSurface":{"surfaceId":"#{surface_id}","catalogId":"#{@v09_catalog_id}"}})}
       )
 
       send(
