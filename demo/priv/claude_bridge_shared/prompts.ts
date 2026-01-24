@@ -428,7 +428,8 @@ Dynamic list (template):
 
 ### TextField - Text input
 {"id": "email-field", "component": "TextField", "label": "Email", "value": {"path": "/form/email"}, "variant": "shortText"}
-- variant: shortText|longText|number|date|obscured|email|password
+- variant: shortText|longText|number|obscured
+- Use "checks" (e.g., {"call":"email"}) for email/password validation instead of custom variants.
 
 ### CheckBox - Boolean toggle
 {"id": "terms", "component": "CheckBox", "label": "I agree to the terms", "value": {"path": "/form/agreed"}}
@@ -461,7 +462,7 @@ User request: "show a contact form"
       {"id": "form-card", "component": "Card", "child": "form-fields"},
       {"id": "form-fields", "component": "Column", "children": ["name-field", "email-field", "message-field"]},
       {"id": "name-field", "component": "TextField", "label": "Name", "value": {"path": "/form/name"}},
-      {"id": "email-field", "component": "TextField", "label": "Email", "value": {"path": "/form/email"}, "variant": "email"},
+      {"id": "email-field", "component": "TextField", "label": "Email", "value": {"path": "/form/email"}, "variant": "shortText", "checks": [{"call": "email", "message": "Invalid email"}]},
       {"id": "message-field", "component": "TextField", "label": "Message", "value": {"path": "/form/message"}, "variant": "longText"},
       {"id": "submit-row", "component": "Row", "children": ["submit-btn"], "justify": "end"},
       {"id": "submit-btn", "component": "Button", "child": "submit-text", "primary": true, "action": {"name": "submit_contact", "context": {"formData": {"path": "/form"}}}},
