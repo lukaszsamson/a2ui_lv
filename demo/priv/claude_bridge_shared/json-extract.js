@@ -70,4 +70,3 @@ export function extractJsonObject(str) {
     }
     return str;
 }
-//# sourceMappingURL=json-extract.js.map

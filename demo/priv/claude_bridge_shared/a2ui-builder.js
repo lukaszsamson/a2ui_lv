@@ -160,4 +160,3 @@ export function parseActionRequest(prompt) {
     }
     return { originalPrompt, actionName, actionContext, dataModel };
 }
-//# sourceMappingURL=a2ui-builder.js.map

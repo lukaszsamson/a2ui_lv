@@ -144,7 +144,7 @@ defmodule A2UIDemo.Demo.A2AClient do
 
   # Private functions
 
-  defp fetch_agent_card(endpoint, opts \\ []) do
+  defp fetch_agent_card(endpoint, opts) do
     url = endpoint <> "/.well-known/agent.json"
     headers = a2a_headers()
 
@@ -264,7 +264,7 @@ defmodule A2UIDemo.Demo.A2AClient do
     end
   end
 
-  defp collect_messages(task, messages, timeout) do
+  defp collect_messages(%Task{ref: ref} = task, messages, timeout) do
     deadline = System.monotonic_time(:millisecond) + timeout
 
     receive do
@@ -279,13 +279,27 @@ defmodule A2UIDemo.Demo.A2AClient do
         Task.shutdown(task, :brutal_kill)
         {:error, error}
 
-      {^task, :ok} ->
+      {^ref, :ok} ->
+        # Task completed successfully - flush the DOWN message
+        receive do
+          {:DOWN, ^ref, :process, _, _} -> :ok
+        after
+          0 -> :ok
+        end
+
         {:ok, Enum.reverse(messages)}
 
-      {^task, {:error, reason}} ->
+      {^ref, {:error, reason}} ->
+        # Task completed with error - flush the DOWN message
+        receive do
+          {:DOWN, ^ref, :process, _, _} -> :ok
+        after
+          0 -> :ok
+        end
+
         {:error, reason}
 
-      {:DOWN, _, :process, _, reason} ->
+      {:DOWN, ^ref, :process, _, reason} ->
         {:error, {:task_crashed, reason}}
     after
       remaining_timeout(deadline) ->

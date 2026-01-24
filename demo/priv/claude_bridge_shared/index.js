@@ -6,4 +6,3 @@
 export { A2UI_SYSTEM_PROMPT, A2UI_ACTION_PROMPT } from "./prompts.js";
 export { extractJson, extractJsonObject } from "./json-extract.js";
 export { buildA2uiMessages, buildDataModelUpdateMessages, isActionRequest, parseActionRequest, } from "./a2ui-builder.js";
-//# sourceMappingURL=index.js.map

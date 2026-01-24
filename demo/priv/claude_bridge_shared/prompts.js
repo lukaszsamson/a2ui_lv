@@ -312,4 +312,3 @@ Output ONLY the JSON object. No markdown, no explanation, no code blocks.
 5. Include relevant data, charts references, or indicators based on what makes sense
 
 ${A2UI_SYSTEM_PROMPT.split("# CORE PHILOSOPHY")[1]}`;
-//# sourceMappingURL=prompts.js.map
