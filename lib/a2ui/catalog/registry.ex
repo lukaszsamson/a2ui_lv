@@ -198,7 +198,11 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec unregister(String.t()) :: :ok
   def unregister(catalog_id) when is_binary(catalog_id) do
-    :ets.delete(@table_name, catalog_id)
+    case :ets.whereis(@table_name) do
+      :undefined -> :ok
+      _ref -> :ets.delete(@table_name, catalog_id)
+    end
+
     :ok
   end
 
@@ -211,8 +215,15 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec list() :: [String.t()]
   def list do
-    :ets.tab2list(@table_name)
-    |> Enum.map(fn {catalog_id, _module} -> catalog_id end)
+    case :ets.whereis(@table_name) do
+      :undefined ->
+        []
+
+      _ref ->
+        @table_name
+        |> :ets.tab2list()
+        |> Enum.map(fn {catalog_id, _module} -> catalog_id end)
+    end
   end
 
   @doc """
@@ -224,8 +235,15 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec all() :: %{String.t() => module()}
   def all do
-    :ets.tab2list(@table_name)
-    |> Map.new()
+    case :ets.whereis(@table_name) do
+      :undefined ->
+        %{}
+
+      _ref ->
+        @table_name
+        |> :ets.tab2list()
+        |> Map.new()
+    end
   end
 
   @doc """

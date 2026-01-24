@@ -60,8 +60,8 @@ defmodule A2UI.Props.Adapter do
   @spec row_column_props(map(), String.t()) :: {String.t(), String.t()}
   def row_column_props(props, default_align \\ "stretch") do
     # v0.9 props take precedence over v0.8 props
-    justify = props["justify"] || props["distribution"] || "start"
-    align = props["align"] || props["alignment"] || default_align
+    justify = prop(props, "justify", "distribution", "start")
+    align = prop(props, "align", "alignment", default_align)
     {justify, align}
   end
 
@@ -82,8 +82,8 @@ defmodule A2UI.Props.Adapter do
   """
   @spec modal_props(map()) :: {String.t() | nil, String.t() | nil}
   def modal_props(props) do
-    trigger = props["trigger"] || props["entryPointChild"]
-    content = props["content"] || props["contentChild"]
+    trigger = prop(props, "trigger", "entryPointChild")
+    content = prop(props, "content", "contentChild")
     {trigger, content}
   end
 
@@ -102,7 +102,7 @@ defmodule A2UI.Props.Adapter do
   """
   @spec tabs_props(map()) :: list()
   def tabs_props(props) do
-    props["tabs"] || props["tabItems"] || []
+    prop(props, "tabs", "tabItems", [])
   end
 
   @doc """
@@ -123,7 +123,7 @@ defmodule A2UI.Props.Adapter do
   """
   @spec variant_prop(map(), String.t() | nil) :: String.t() | nil
   def variant_prop(props, default \\ nil) do
-    props["variant"] || props["usageHint"] || default
+    prop(props, "variant", "usageHint", default)
   end
 
   @doc """
@@ -141,7 +141,7 @@ defmodule A2UI.Props.Adapter do
   """
   @spec text_field_value_prop(map()) :: term()
   def text_field_value_prop(props) do
-    props["value"] || props["text"]
+    prop(props, "value", "text")
   end
 
   @doc """
@@ -162,7 +162,7 @@ defmodule A2UI.Props.Adapter do
   """
   @spec text_field_type_prop(map()) :: String.t()
   def text_field_type_prop(props) do
-    props["variant"] || props["textFieldType"] || "shortText"
+    prop(props, "variant", "textFieldType", "shortText")
   end
 
   @doc """
@@ -180,8 +180,8 @@ defmodule A2UI.Props.Adapter do
   """
   @spec slider_range_props(map()) :: {number(), number()}
   def slider_range_props(props) do
-    min_val = props["min"] || props["minValue"] || 0
-    max_val = props["max"] || props["maxValue"] || 100
+    min_val = prop(props, "min", "minValue", 0)
+    max_val = prop(props, "max", "maxValue", 100)
     {min_val, max_val}
   end
 
@@ -200,7 +200,7 @@ defmodule A2UI.Props.Adapter do
   """
   @spec choice_selections_prop(map()) :: term()
   def choice_selections_prop(props) do
-    props["value"] || props["selections"]
+    prop(props, "value", "selections")
   end
 
   @doc """
@@ -235,6 +235,14 @@ defmodule A2UI.Props.Adapter do
       # Fall back to v0.8 maxAllowedSelections
       max_allowed == 1 -> true
       true -> false
+    end
+  end
+
+  defp prop(props, v0_9_key, v0_8_key, default \\ nil) do
+    cond do
+      Map.has_key?(props, v0_9_key) -> props[v0_9_key]
+      Map.has_key?(props, v0_8_key) -> props[v0_8_key]
+      true -> default
     end
   end
 end
