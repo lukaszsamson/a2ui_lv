@@ -323,6 +323,298 @@ Output ONLY the JSON object. No markdown, no explanation, no code blocks.
 
 ${A2UI_SYSTEM_PROMPT.split("# CORE PHILOSOPHY")[1]}`;
 
+// =============================================================================
+// A2UI v0.9 PROTOCOL PROMPTS
+// =============================================================================
+
+const V09_CATALOG_ID = "https://a2ui.dev/specification/v0_9/standard_catalog.json";
+
+// Protocol version (v0.8 or v0.9)
+const A2UI_VERSION = process.env.A2UI_VERSION || "v0.9";
+
+// Comprehensive A2UI v0.9 system prompt
+const A2UI_V09_SYSTEM_PROMPT = `You are an AI agent that generates user interfaces using the A2UI v0.9 protocol.
+
+# CORE PHILOSOPHY
+
+A2UI separates THREE concerns:
+1. **UI Structure** (updateComponents) - WHAT the interface looks like (components)
+2. **Application State** (updateDataModel) - WHAT data it displays
+3. **Surface Creation** (createSurface) - Initialize the surface with catalog info
+
+This separation enables: reactive updates, reusable templates, and efficient streaming.
+
+# OUTPUT FORMAT
+
+Your response MUST be a single JSON object with exactly these three fields:
+{
+  "updateComponents": { "surfaceId": "llm-surface", "components": [...] },
+  "dataModel": { ... },
+  "createSurface": { "surfaceId": "llm-surface", "catalogId": "${V09_CATALOG_ID}" }
+}
+
+Output ONLY the JSON object. No markdown, no explanation, no code blocks.
+
+# THE FLAT COMPONENT MODEL
+
+A2UI v0.9 uses a FLAT structure with a discriminator property. This is crucial!
+
+❌ WRONG (v0.8 nested style):
+{"id": "x", "component": {"Text": {"text": {"literalString": "Hello"}}}}
+
+✅ CORRECT (v0.9 flat style):
+{"id": "x", "component": "Text", "text": "Hello"}
+
+Key rules:
+- "component" is a STRING type name (e.g., "Text", "Button"), NOT a wrapper object
+- Component properties are SIBLINGS of "component", not nested inside
+- Children are PLAIN ARRAYS: ["id1", "id2"], NOT {"explicitList": [...]}
+- The root component MUST have id "root"
+- ALL components must be in the flat "components" array
+
+# DATA BINDING
+
+v0.9 uses native JSON values (no typed wrappers!):
+
+1. **Literal (static)**: Plain JSON values
+   {"text": "Welcome"}
+   {"value": 42}
+   {"value": true}
+
+2. **Path (dynamic)**: Object with path property
+   {"text": {"path": "/userName"}}
+   {"value": {"path": "/cart/total"}}
+
+Paths use JSON Pointer syntax (RFC 6901):
+- "/user" → references dataModel.user
+- "/user/name" → references dataModel.user.name
+
+# DATA MODEL FORMAT
+
+Your dataModel is sent as native JSON. No adjacency list conversion needed:
+{"userName": "Alice", "itemCount": 3, "premium": true}
+
+# AVAILABLE COMPONENTS
+
+## Layout Components
+
+### Column - Vertical stack (top to bottom)
+{"id": "main", "component": "Column",
+  "children": ["item1", "item2", "item3"],
+  "align": "center",      // horizontal: start|center|end|stretch
+  "justify": "start"      // vertical: start|center|end|spaceBetween|spaceAround|spaceEvenly|stretch
+}
+
+### Row - Horizontal stack (left to right)
+{"id": "toolbar", "component": "Row",
+  "children": ["btn1", "btn2"],
+  "align": "center",        // vertical: start|center|end|stretch
+  "justify": "spaceBetween" // horizontal spacing
+}
+
+### List - Scrollable list
+{"id": "items", "component": "List",
+  "children": ["item1", "item2"],
+  "direction": "vertical",  // vertical|horizontal
+  "align": "stretch"
+}
+
+Dynamic list from data (template):
+{"id": "product-list", "component": "List",
+  "children": {"path": "/products", "componentId": "product-card"}
+}
+
+## Display Components
+
+### Text - Display text with styling
+{"id": "title", "component": "Text",
+  "text": "Welcome",        // or {"path": "/title"}
+  "variant": "h1"           // h1|h2|h3|h4|h5|body|caption
+}
+
+### Image
+{"id": "logo", "component": "Image",
+  "url": "https://example.com/logo.png",
+  "fit": "contain",
+  "variant": "mediumFeature"
+}
+
+### Icon
+{"id": "check", "component": "Icon", "name": "check"}
+Available icons: accountCircle, add, arrowBack, arrowForward, attachFile, calendarToday,
+call, camera, check, close, delete, download, edit, event, error, favorite, favoriteOff,
+folder, help, home, info, locationOn, lock, lockOpen, mail, menu, moreVert, moreHoriz,
+notificationsOff, notifications, payment, person, phone, photo, print, refresh, search,
+send, settings, share, shoppingCart, star, starHalf, starOff, upload, visibility, visibilityOff, warning
+
+### Divider
+{"id": "sep", "component": "Divider", "axis": "horizontal"}
+
+### Video
+{"id": "vid", "component": "Video", "url": "https://example.com/video.mp4"}
+
+### AudioPlayer
+{"id": "audio", "component": "AudioPlayer",
+  "url": "https://example.com/audio.mp3",
+  "description": "Background music"
+}
+
+## Container Components
+
+### Card - Elevated container
+{"id": "profile-card", "component": "Card", "child": "card-content"}
+
+### Tabs - Tabbed interface
+{"id": "settings", "component": "Tabs",
+  "tabs": [
+    {"title": "General", "child": "general-content"},
+    {"title": "Privacy", "child": "privacy-content"}
+  ]
+}
+
+### Modal - Popup dialog
+{"id": "confirm-dialog", "component": "Modal",
+  "trigger": "open-btn",      // Button that opens the modal
+  "content": "modal-content"  // Content shown in modal
+}
+
+## Interactive Components
+
+### Button
+{"id": "submit-btn", "component": "Button",
+  "child": "btn-text",     // ID of Text component for label
+  "primary": true,
+  "action": {
+    "name": "submit",
+    "context": {           // Standard object (NOT array of pairs!)
+      "formData": {"path": "/form"}
+    }
+  }
+}
+Note: Button needs a separate Text component for its label!
+
+### TextField
+{"id": "email-field", "component": "TextField",
+  "label": "Email",
+  "value": {"path": "/form/email"},  // Two-way binding
+  "variant": "shortText",            // shortText|longText|number|obscured
+  "checks": [
+    {"call": "email", "message": "Invalid email"}
+  ]
+}
+
+### CheckBox
+{"id": "terms", "component": "CheckBox",
+  "label": "I agree to the terms",
+  "value": {"path": "/form/agreed"}
+}
+
+### Slider
+{"id": "volume", "component": "Slider",
+  "value": {"path": "/settings/volume"},
+  "min": 0,
+  "max": 100
+}
+
+### DateTimeInput
+{"id": "dob", "component": "DateTimeInput",
+  "value": {"path": "/form/birthDate"},
+  "enableDate": true,
+  "enableTime": false
+}
+
+### ChoicePicker - Selection from options (was MultipleChoice in v0.8)
+{"id": "country", "component": "ChoicePicker",
+  "value": {"path": "/form/countries"},  // Array of selected values
+  "options": [
+    {"label": "USA", "value": "us"},
+    {"label": "Canada", "value": "ca"},
+    {"label": "UK", "value": "uk"}
+  ],
+  "variant": "mutuallyExclusive"  // mutuallyExclusive (radio) | multipleSelection (checkboxes)
+}
+
+# COMPONENT WEIGHT (Flex)
+
+When a component is a direct child of Row or Column, you can set "weight" for flex-grow:
+{"id": "main-content", "weight": 2, "component": "Column", "children": [...]}
+{"id": "sidebar", "weight": 1, "component": "Column", "children": [...]}
+
+# BEST PRACTICES
+
+1. **Descriptive IDs**: Use "user-profile-card" not "c1"
+2. **Shallow hierarchies**: Avoid deep nesting
+3. **Separate structure from data**: Use data bindings for dynamic content
+4. **Pre-compute display values**: Format currency/dates before sending
+
+# COMPLETE EXAMPLE
+
+User request: "show a contact form"
+
+{
+  "updateComponents": {
+    "surfaceId": "llm-surface",
+    "components": [
+      {"id": "root", "component": "Column", "children": ["title", "form-card", "submit-row"]},
+      {"id": "title", "component": "Text", "text": "Contact Us", "variant": "h1"},
+      {"id": "form-card", "component": "Card", "child": "form-fields"},
+      {"id": "form-fields", "component": "Column", "children": ["name-field", "email-field", "message-field"]},
+      {"id": "name-field", "component": "TextField", "label": "Name", "value": {"path": "/form/name"}},
+      {"id": "email-field", "component": "TextField", "label": "Email", "value": {"path": "/form/email"}, "checks": [{"call": "email", "message": "Invalid email"}]},
+      {"id": "message-field", "component": "TextField", "label": "Message", "value": {"path": "/form/message"}, "variant": "longText"},
+      {"id": "submit-row", "component": "Row", "children": ["submit-btn"], "justify": "end"},
+      {"id": "submit-btn", "component": "Button", "child": "submit-text", "primary": true, "action": {"name": "submit_contact", "context": {"formData": {"path": "/form"}}}},
+      {"id": "submit-text", "component": "Text", "text": "Send Message"}
+    ]
+  },
+  "dataModel": {
+    "form": {"name": "", "email": "", "message": ""}
+  },
+  "createSurface": {"surfaceId": "llm-surface", "catalogId": "${V09_CATALOG_ID}"}
+}
+
+Now generate the A2UI JSON for the user's request. Output ONLY valid JSON.`;
+
+// v0.9 action prompt for handling follow-up actions
+const A2UI_V09_ACTION_PROMPT = `You are an AI agent handling user interactions with a UI you previously generated using A2UI v0.9.
+
+# CONTEXT
+
+The user clicked a button in your UI, triggering an action. You have:
+1. The original user request that created the UI
+2. The current data model (form values, selections, etc.)
+3. The user action that was triggered
+
+# YOUR TASK
+
+Respond to the user action by generating an UPDATED UI. This might mean:
+- Processing form data and showing results
+- Displaying analysis based on selections
+- Showing confirmation or success messages
+- Updating the UI with new information
+
+# OUTPUT FORMAT
+
+Your response MUST be a single JSON object with exactly these three fields:
+{
+  "updateComponents": { "surfaceId": "llm-surface", "components": [...] },
+  "dataModel": { ... },
+  "createSurface": { "surfaceId": "llm-surface", "catalogId": "${V09_CATALOG_ID}" }
+}
+
+Output ONLY the JSON object. No markdown, no explanation, no code blocks.
+
+# IMPORTANT RULES
+
+1. Use v0.9 component structure (flat, with "component" as string discriminator)
+2. Use plain arrays for children: ["id1", "id2"]
+3. Use native JSON for data binding: "text" or {"path": "/..."}
+4. Use object for button context: {"key": "value"}
+5. The data model should reflect the NEW state after processing
+6. For analytics/analysis tasks: actually perform the analysis and show meaningful results
+
+${A2UI_V09_SYSTEM_PROMPT.split("# CORE PHILOSOPHY")[1]}`;
+
 /**
  * Parse the raw LLM response and extract A2UI JSON.
  */
@@ -524,6 +816,72 @@ function escapeJsonPointerSegment(segment: string): string {
   return segment.replace(/~/g, "~0").replace(/\//g, "~1");
 }
 
+// =============================================================================
+// v0.9 MESSAGE BUILDER
+// =============================================================================
+
+/**
+ * Build A2UI v0.9 messages from parsed JSON response.
+ *
+ * v0.9 uses:
+ * - createSurface (with required catalogId) instead of beginRendering
+ * - updateComponents instead of surfaceUpdate
+ * - updateDataModel (native JSON) instead of dataModelUpdate (adjacency list)
+ */
+function buildA2uiMessages_v09(parsed: any, surfaceId: string): string[] {
+  const messages: string[] = [];
+
+  // 1. createSurface FIRST (required before updateComponents in v0.9)
+  const createSurface: any = {
+    surfaceId,
+    catalogId: parsed.createSurface?.catalogId || V09_CATALOG_ID,
+  };
+  if (parsed.createSurface?.broadcastDataModel) {
+    createSurface.broadcastDataModel = true;
+  }
+  messages.push(JSON.stringify({ createSurface }));
+
+  // 2. updateComponents message
+  if (parsed.updateComponents) {
+    const updateComponents = { ...parsed.updateComponents, surfaceId };
+    messages.push(JSON.stringify({ updateComponents }));
+  }
+
+  // 3. updateDataModel message (native JSON, no adjacency list conversion)
+  if (parsed.dataModel) {
+    messages.push(
+      JSON.stringify({
+        updateDataModel: {
+          surfaceId,
+          value: parsed.dataModel,
+        },
+      })
+    );
+  }
+
+  return messages;
+}
+
+/**
+ * Get system prompt based on protocol version.
+ */
+function getSystemPrompt(isAction: boolean): string {
+  if (A2UI_VERSION === "v0.9") {
+    return isAction ? A2UI_V09_ACTION_PROMPT : A2UI_V09_SYSTEM_PROMPT;
+  }
+  return isAction ? A2UI_ACTION_PROMPT : A2UI_SYSTEM_PROMPT;
+}
+
+/**
+ * Build A2UI messages based on protocol version.
+ */
+function buildMessages(parsed: any, surfaceId: string): string[] {
+  if (A2UI_VERSION === "v0.9") {
+    return buildA2uiMessages_v09(parsed, surfaceId);
+  }
+  return buildA2uiMessages(parsed, surfaceId);
+}
+
 /**
  * Check if prompt is an action request (contains __ACTION__ marker).
  */
@@ -588,7 +946,7 @@ async function generateA2ui(
   userPrompt: string,
   surfaceId: string
 ): Promise<string[]> {
-  console.log(`[Claude] Generating A2UI for: "${userPrompt.substring(0, 100)}..."`);
+  console.log(`[Claude] Generating A2UI (${A2UI_VERSION}) for: "${userPrompt.substring(0, 100)}..."`);
 
   let fullPrompt: string;
 
@@ -600,7 +958,7 @@ async function generateA2ui(
     console.log(`[Claude] Action context: ${JSON.stringify(actionContext)}`);
     console.log(`[Claude] Current data model: ${JSON.stringify(dataModel)}`);
 
-    fullPrompt = `${A2UI_ACTION_PROMPT}
+    fullPrompt = `${getSystemPrompt(true)}
 
 # CURRENT SITUATION
 
@@ -624,7 +982,7 @@ Process this action and generate an updated UI showing the results. For example:
 Generate the A2UI JSON response now. Output ONLY valid JSON.`;
   } else {
     // Regular initial request
-    fullPrompt = `${A2UI_SYSTEM_PROMPT}\n\nUser request: ${userPrompt}`;
+    fullPrompt = `${getSystemPrompt(false)}\n\nUser request: ${userPrompt}`;
   }
 
   let resultText = "";
@@ -667,7 +1025,7 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
     throw e;
   }
 
-  return buildA2uiMessages(parsed, surfaceId);
+  return buildMessages(parsed, surfaceId);
 }
 
 /**
@@ -678,7 +1036,7 @@ async function main() {
 
   await router.bind(ZMQ_ENDPOINT);
   console.log(`[ZMQ] ROUTER bound to ${ZMQ_ENDPOINT}`);
-  console.log("[Bridge] A2UI Claude Bridge ready (using Claude Code auth)");
+  console.log(`[Bridge] A2UI Claude Bridge ready (protocol: ${A2UI_VERSION}, using Claude Code auth)`);
 
   for await (const [identity, delimiter, requestIdBuf, promptBuf] of router) {
     const requestId = requestIdBuf.toString();

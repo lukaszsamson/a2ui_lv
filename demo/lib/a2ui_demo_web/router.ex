@@ -25,6 +25,7 @@ defmodule A2UIDemoWeb.Router do
 
     get "/", PageController, :home
     live "/demo", DemoLive
+    live "/demo-v0.9", DemoLiveV09
     live "/storybook", StorybookLive
   end
 
