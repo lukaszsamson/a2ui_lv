@@ -20,14 +20,21 @@ import { randomUUID } from "crypto";
 import {
   A2UI_SYSTEM_PROMPT,
   A2UI_ACTION_PROMPT,
+  A2UI_SYSTEM_PROMPT_V09,
+  A2UI_ACTION_PROMPT_V09,
   extractJson,
   buildA2uiMessages,
+  buildA2uiMessagesV09,
   isActionRequest,
   parseActionRequest,
 } from "../../claude_bridge_shared/index.js";
 
 const PORT = parseInt(process.env.PORT || "3001", 10);
 const HOST = process.env.HOST || "0.0.0.0";
+
+function getA2uiVersion(): "v0.8" | "v0.9" {
+  return process.env.A2UI_VERSION === "v0.9" ? "v0.9" : "v0.8";
+}
 
 // Session storage
 interface Session {
@@ -296,10 +303,15 @@ app.get("/health", (req: Request, res: Response) => {
 async function generateForSession(session: Session): Promise<void> {
   session.status = "generating";
   const { prompt, surfaceId } = session;
+  const version = getA2uiVersion();
 
-  console.log(`[Claude] Generating A2UI for session ${session.id}: "${prompt.substring(0, 100)}..."`);
+  console.log(
+    `[Claude] Generating A2UI (${version}) for session ${session.id}: "${prompt.substring(0, 100)}..."`
+  );
 
   let fullPrompt: string;
+  const systemPrompt = version === "v0.9" ? A2UI_SYSTEM_PROMPT_V09 : A2UI_SYSTEM_PROMPT;
+  const actionPrompt = version === "v0.9" ? A2UI_ACTION_PROMPT_V09 : A2UI_ACTION_PROMPT;
 
   if (isActionRequest(prompt)) {
     // This is a follow-up action request
@@ -308,7 +320,7 @@ async function generateForSession(session: Session): Promise<void> {
 
     console.log(`[Claude] Action request - action: ${actionName}`);
 
-    fullPrompt = `${A2UI_ACTION_PROMPT}
+    fullPrompt = `${actionPrompt}
 
 # CURRENT SITUATION
 
@@ -332,7 +344,7 @@ Process this action and generate an updated UI showing the results. For example:
 Generate the A2UI JSON response now. Output ONLY valid JSON.`;
   } else {
     // Regular initial request
-    fullPrompt = `${A2UI_SYSTEM_PROMPT}\n\nUser request: ${prompt}`;
+    fullPrompt = `${systemPrompt}\n\nUser request: ${prompt}`;
 
     // Store original prompt for future actions
     session.originalPrompt = prompt;
@@ -382,7 +394,10 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
       session.dataModel = parsed.dataModel;
     }
 
-    const messages = buildA2uiMessages(parsed, surfaceId);
+    const messages =
+      version === "v0.9"
+        ? buildA2uiMessagesV09(parsed, surfaceId)
+        : buildA2uiMessages(parsed, surfaceId);
 
     // Send messages
     for (const msg of messages) {
@@ -456,7 +471,9 @@ function extractUserAction(event: any): any {
 // ============================================
 
 app.listen(PORT, HOST, () => {
+  const version = getA2uiVersion();
   console.log(`[HTTP] A2UI Claude Bridge (HTTP+SSE) listening on http://${HOST}:${PORT}`);
+  console.log(`[HTTP] Protocol version: ${version}`);
   console.log("[HTTP] Endpoints:");
   console.log("  POST /sessions - Create session, receive sessionId");
   console.log("  GET /stream/:sessionId - SSE stream of A2UI messages");

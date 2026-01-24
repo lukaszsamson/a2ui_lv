@@ -10,11 +10,19 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import {
   A2UI_SYSTEM_PROMPT,
   A2UI_ACTION_PROMPT,
+  A2UI_SYSTEM_PROMPT_V09,
+  A2UI_ACTION_PROMPT_V09,
   extractJson,
   buildA2uiMessages,
+  buildA2uiMessagesV09,
   isActionRequest,
   parseActionRequest,
 } from "../../claude_bridge_shared/index.js";
+
+// Get A2UI version from environment
+export function getA2uiVersion(): "v0.8" | "v0.9" {
+  return process.env.A2UI_VERSION === "v0.9" ? "v0.9" : "v0.8";
+}
 
 export interface GenerationResult {
   messages: string[];
@@ -35,8 +43,13 @@ export async function generateA2UI(
   options: GenerationOptions
 ): Promise<GenerationResult> {
   const { surfaceId, onMessage } = options;
+  const version = getA2uiVersion();
 
-  console.log(`[Claude] Generating A2UI for: "${prompt.substring(0, 100)}..."`);
+  console.log(`[Claude] Generating A2UI (${version}) for: "${prompt.substring(0, 100)}..."`);
+
+  // Select prompts based on version
+  const systemPrompt = version === "v0.9" ? A2UI_SYSTEM_PROMPT_V09 : A2UI_SYSTEM_PROMPT;
+  const actionPrompt = version === "v0.9" ? A2UI_ACTION_PROMPT_V09 : A2UI_ACTION_PROMPT;
 
   let fullPrompt: string;
   let dataModel: Record<string, any> | undefined;
@@ -46,7 +59,7 @@ export async function generateA2UI(
     const parsed = parseActionRequest(prompt);
     console.log(`[Claude] Action request - action: ${parsed.actionName}`);
 
-    fullPrompt = `${A2UI_ACTION_PROMPT}
+    fullPrompt = `${actionPrompt}
 
 # CURRENT SITUATION
 
@@ -67,12 +80,12 @@ Process this action and generate an updated UI showing the results. For example:
 - If this is an analysis request, perform the analysis and display findings
 - Show appropriate success/error states
 
-Generate the A2UI JSON response now. Output ONLY valid JSON.`;
+Generate the A2UI ${version} JSON response now. Output ONLY valid JSON.`;
 
     dataModel = parsed.dataModel;
   } else {
     // Regular initial request
-    fullPrompt = `${A2UI_SYSTEM_PROMPT}\n\nUser request: ${prompt}`;
+    fullPrompt = `${systemPrompt}\n\nUser request: ${prompt}`;
   }
 
   let resultText = "";
@@ -119,7 +132,10 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
       dataModel = parsed.dataModel;
     }
 
-    const messages = buildA2uiMessages(parsed, surfaceId);
+    // Use version-appropriate message builder
+    const messages = version === "v0.9"
+      ? buildA2uiMessagesV09(parsed, surfaceId)
+      : buildA2uiMessages(parsed, surfaceId);
 
     // Call onMessage for each message if provided
     if (onMessage) {

@@ -28,7 +28,7 @@ import {
   supportsA2UI,
 } from "./a2a.js";
 
-import { generateA2UI, buildActionPrompt } from "./agent.js";
+import { generateA2UI, buildActionPrompt, getA2uiVersion } from "./agent.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -37,7 +37,7 @@ const PORT = parseInt(process.env.PORT || "3002", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 
 // Load agent card
-const agentCardPath = join(__dirname, "..", "agent.json");
+const agentCardPath = join(process.cwd(), "agent.json");
 let agentCard: any;
 try {
   agentCard = JSON.parse(readFileSync(agentCardPath, "utf-8"));
@@ -367,7 +367,9 @@ function wrapA2UIMessage(jsonMsg: string): object {
 // ============================================
 
 app.listen(PORT, HOST, () => {
+  const version = getA2uiVersion();
   console.log(`[A2A] A2UI Claude Bridge (A2A) listening on http://${HOST}:${PORT}`);
+  console.log(`[A2A] Protocol version: ${version}`);
   console.log("[A2A] Endpoints:");
   console.log("  GET  /.well-known/agent.json  → Agent card");
   console.log("  POST /a2a/tasks               → Create task");

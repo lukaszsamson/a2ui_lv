@@ -5,7 +5,7 @@
  */
 
 /**
- * Build A2UI messages from parsed JSON response.
+ * Build A2UI messages from parsed JSON response (v0.8 format).
  */
 export function buildA2uiMessages(parsed: any, surfaceId: string): string[] {
   const messages: string[] = [];
@@ -33,6 +33,46 @@ export function buildA2uiMessages(parsed: any, surfaceId: string): string[] {
     beginRendering.styles = parsed.beginRendering.styles;
   }
   messages.push(JSON.stringify({ beginRendering }));
+
+  return messages;
+}
+
+/**
+ * Build A2UI messages from parsed JSON response (v0.9 format).
+ *
+ * v0.9 wire format uses:
+ * - createSurface (instead of beginRendering)
+ * - updateComponents (instead of surfaceUpdate)
+ * - updateDataModel (instead of dataModelUpdate)
+ */
+export function buildA2uiMessagesV09(parsed: any, surfaceId: string): string[] {
+  const messages: string[] = [];
+  const catalogId = parsed.createSurface?.catalogId || "https://a2ui.dev/specification/v0_9/standard_catalog.json";
+
+  // 1. createSurface message (must come first)
+  messages.push(JSON.stringify({
+    createSurface: {
+      surfaceId,
+      catalogId
+    }
+  }));
+
+  // 2. updateComponents message
+  if (parsed.updateComponents) {
+    const updateComponents = { ...parsed.updateComponents, surfaceId };
+    messages.push(JSON.stringify({ updateComponents }));
+  }
+
+  // 3. updateDataModel message (v0.9 uses path + value format)
+  if (parsed.dataModel) {
+    messages.push(JSON.stringify({
+      updateDataModel: {
+        surfaceId,
+        path: "/",
+        value: parsed.dataModel
+      }
+    }));
+  }
 
   return messages;
 }

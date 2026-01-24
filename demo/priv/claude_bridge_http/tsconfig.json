@@ -4,11 +4,12 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "../claude_bridge_shared/**/*"],
+  "include": ["src/**/*", "../claude_bridge_shared/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

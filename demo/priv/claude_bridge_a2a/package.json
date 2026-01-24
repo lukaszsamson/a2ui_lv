@@ -3,11 +3,11 @@
   "version": "1.0.0",
   "description": "A2A-compliant Claude bridge for A2UI",
   "type": "module",
-  "main": "dist/server.js",
+  "main": "src/server.ts",
   "scripts": {
     "build": "tsc",
-    "start": "tsc && node dist/server.js",
-    "dev": "tsc --watch & nodemon dist/server.js"
+    "start": "node --import tsx src/server.ts",
+    "dev": "node --import tsx --watch src/server.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.0",
@@ -18,7 +18,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^20.10.0",
     "@types/uuid": "^10.0.0",
-    "nodemon": "^3.0.2",
+    "tsx": "^4.0.0",
     "typescript": "^5.3.0"
   }
 }

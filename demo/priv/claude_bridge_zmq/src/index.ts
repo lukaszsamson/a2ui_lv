@@ -9,8 +9,13 @@
 
 import * as zmq from "zeromq";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import * as Shared from "../../claude_bridge_shared/index.js";
 
 const ZMQ_ENDPOINT = process.env.ZMQ_ENDPOINT || "tcp://127.0.0.1:5555";
+
+function getA2uiVersion(): "v0.8" | "v0.9" {
+  return process.env.A2UI_VERSION === "v0.9" ? "v0.9" : "v0.8";
+}
 
 // Comprehensive A2UI system prompt based on protocol documentation
 const A2UI_SYSTEM_PROMPT = `You are an AI agent that generates user interfaces using the A2UI protocol.
@@ -330,7 +335,7 @@ ${A2UI_SYSTEM_PROMPT.split("# CORE PHILOSOPHY")[1]}`;
 const V09_CATALOG_ID = "https://a2ui.dev/specification/v0_9/standard_catalog.json";
 
 // Protocol version (v0.8 or v0.9)
-const A2UI_VERSION = process.env.A2UI_VERSION || "v0.9";
+const A2UI_VERSION = getA2uiVersion();
 
 // Comprehensive A2UI v0.9 system prompt
 const A2UI_V09_SYSTEM_PROMPT = `You are an AI agent that generates user interfaces using the A2UI v0.9 protocol.
@@ -946,19 +951,25 @@ async function generateA2ui(
   userPrompt: string,
   surfaceId: string
 ): Promise<string[]> {
-  console.log(`[Claude] Generating A2UI (${A2UI_VERSION}) for: "${userPrompt.substring(0, 100)}..."`);
+  const version = getA2uiVersion();
+  console.log(`[Claude] Generating A2UI (${version}) for: "${userPrompt.substring(0, 100)}..."`);
 
   let fullPrompt: string;
+  const systemPrompt =
+    version === "v0.9" ? Shared.A2UI_SYSTEM_PROMPT_V09 : Shared.A2UI_SYSTEM_PROMPT;
+  const actionPrompt =
+    version === "v0.9" ? Shared.A2UI_ACTION_PROMPT_V09 : Shared.A2UI_ACTION_PROMPT;
 
-  if (isActionRequest(userPrompt)) {
+  if (Shared.isActionRequest(userPrompt)) {
     // This is a follow-up action request
-    const { originalPrompt, actionName, actionContext, dataModel } = parseActionRequest(userPrompt);
+    const { originalPrompt, actionName, actionContext, dataModel } =
+      Shared.parseActionRequest(userPrompt);
 
     console.log(`[Claude] Action request - action: ${actionName}`);
     console.log(`[Claude] Action context: ${JSON.stringify(actionContext)}`);
     console.log(`[Claude] Current data model: ${JSON.stringify(dataModel)}`);
 
-    fullPrompt = `${getSystemPrompt(true)}
+    fullPrompt = `${actionPrompt}
 
 # CURRENT SITUATION
 
@@ -982,7 +993,7 @@ Process this action and generate an updated UI showing the results. For example:
 Generate the A2UI JSON response now. Output ONLY valid JSON.`;
   } else {
     // Regular initial request
-    fullPrompt = `${getSystemPrompt(false)}\n\nUser request: ${userPrompt}`;
+    fullPrompt = `${systemPrompt}\n\nUser request: ${userPrompt}`;
   }
 
   let resultText = "";
@@ -1012,7 +1023,7 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
   console.log(`[Claude] Response length: ${resultText.length}`);
   console.log(`[Claude] Response preview: ${resultText.substring(0, 500)}...`);
 
-  const jsonStr = extractJson(resultText);
+  const jsonStr = Shared.extractJson(resultText);
   console.log(`[Claude] Extracted JSON length: ${jsonStr.length}`);
 
   let parsed: any;
@@ -1025,7 +1036,9 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
     throw e;
   }
 
-  return buildMessages(parsed, surfaceId);
+  return version === "v0.9"
+    ? Shared.buildA2uiMessagesV09(parsed, surfaceId)
+    : Shared.buildA2uiMessages(parsed, surfaceId);
 }
 
 /**
@@ -1036,7 +1049,9 @@ async function main() {
 
   await router.bind(ZMQ_ENDPOINT);
   console.log(`[ZMQ] ROUTER bound to ${ZMQ_ENDPOINT}`);
-  console.log(`[Bridge] A2UI Claude Bridge ready (protocol: ${A2UI_VERSION}, using Claude Code auth)`);
+  console.log(
+    `[Bridge] A2UI Claude Bridge ready (protocol: ${getA2uiVersion()}, using Claude Code auth)`
+  );
 
   for await (const [identity, delimiter, requestIdBuf, promptBuf] of router) {
     const requestId = requestIdBuf.toString();
