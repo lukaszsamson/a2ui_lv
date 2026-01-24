@@ -14,6 +14,12 @@ defmodule A2UIDemoWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # HTTP+SSE transport for A2UI
+  # This allows external agents to push A2UI messages via HTTP
+  forward "/a2ui", A2UI.Transport.HTTP.Plug,
+    pubsub: A2UIDemo.PubSub,
+    registry: A2UI.Transport.HTTP.Registry
+
   scope "/", A2UIDemoWeb do
     pipe_through :browser
 

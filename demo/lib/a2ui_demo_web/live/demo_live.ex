@@ -43,8 +43,9 @@ defmodule A2UIDemoWeb.DemoLive do
         {:error, _} -> []
       end
 
-    # Check Claude bridge availability
-    claude_available = A2UIDemo.Demo.ClaudeClient.available?()
+    # Check Claude bridge availability (both ZMQ and HTTP)
+    claude_zmq_available = A2UIDemo.Demo.ClaudeClient.available?()
+    claude_http_available = A2UIDemo.Demo.ClaudeHTTPClient.available?()
 
     socket =
       Phoenix.Component.assign(socket,
@@ -58,12 +59,20 @@ defmodule A2UIDemoWeb.DemoLive do
         llm_original_prompt: nil,
         llm_loading: false,
         llm_error: nil,
-        llm_provider: if(claude_available, do: "claude", else: "ollama"),
+        llm_provider:
+          cond do
+            claude_http_available -> "claude_http"
+            claude_zmq_available -> "claude"
+            true -> "ollama"
+          end,
         llm_model: "gpt-oss:latest",
         llm_available_models: available_models,
         llm_use_streaming: false,
         llm_force_schema: nil,
-        claude_available: claude_available
+        claude_zmq_available: claude_zmq_available,
+        claude_http_available: claude_http_available,
+        # Keep claude_available for backwards compatibility
+        claude_available: claude_zmq_available or claude_http_available
       )
 
     {:ok, socket}
@@ -303,6 +312,19 @@ defmodule A2UIDemoWeb.DemoLive do
             send(pid, {:llm_done, result})
           end)
 
+        "claude_http" ->
+          # Use Claude Agent SDK via HTTP+SSE bridge
+          Task.start(fn ->
+            result =
+              A2UIDemo.Demo.ClaudeHTTPClient.generate(prompt,
+                surface_id: "llm-surface",
+                on_message: fn msg -> send(pid, {:a2ui, msg}) end,
+                timeout: 300_000
+              )
+
+            send(pid, {:llm_done, result})
+          end)
+
         _ollama ->
           opts = [
             model: socket.assigns.llm_model,
@@ -398,6 +420,8 @@ defmodule A2UIDemoWeb.DemoLive do
           llm_use_streaming={@llm_use_streaming}
           llm_force_schema={@llm_force_schema}
           claude_available={@claude_available}
+          claude_zmq_available={@claude_zmq_available}
+          claude_http_available={@claude_http_available}
         />
 
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -604,7 +628,10 @@ defmodule A2UIDemoWeb.DemoLive do
             disabled={@llm_loading}
           >
             <option value="claude" selected={@llm_provider == "claude"}>
-              Claude {if @claude_available, do: "✓", else: "(unavailable)"}
+              Claude (ZMQ) {if @claude_zmq_available, do: "✓", else: "(unavailable)"}
+            </option>
+            <option value="claude_http" selected={@llm_provider == "claude_http"}>
+              Claude (HTTP) {if @claude_http_available, do: "✓", else: "(unavailable)"}
             </option>
             <option value="ollama" selected={@llm_provider == "ollama"}>
               Ollama (local)
@@ -679,25 +706,37 @@ defmodule A2UIDemoWeb.DemoLive do
       <%!-- Provider/Model Info --%>
       <%= if @llm_provider == "claude" do %>
         <div class="text-xs text-zinc-500 dark:text-zinc-400">
-          <span class="font-medium">Claude (Sonnet):</span>
-          High-quality AI agent via Claude Agent SDK
-          <%= if not @claude_available do %>
+          <span class="font-medium">Claude (ZMQ):</span>
+          High-quality AI agent via Claude Agent SDK (ZMQ bridge)
+          <%= if not @claude_zmq_available do %>
             <span class="ml-2 text-amber-600 dark:text-amber-400">
               ⚠ Bridge not running. Start with: cd priv/claude_bridge && npm start
             </span>
           <% end %>
         </div>
       <% else %>
-        <%= for model <- @llm_available_models, model.name == @llm_model do %>
+        <%= if @llm_provider == "claude_http" do %>
           <div class="text-xs text-zinc-500 dark:text-zinc-400">
-            <span class="font-medium">{model.display_name}:</span>
-            {model.description}
-            <span class="ml-2">
-              [schema: {if model.supports_schema, do: "✓", else: "✗"},
-              streaming: {if model.supports_streaming, do: "✓", else: "✗"},
-              prompt: {model.prompt_style}]
-            </span>
+            <span class="font-medium">Claude (HTTP):</span>
+            High-quality AI agent via Claude Agent SDK (HTTP+SSE bridge)
+            <%= if not @claude_http_available do %>
+              <span class="ml-2 text-amber-600 dark:text-amber-400">
+                ⚠ Bridge not running. Start with: cd priv/claude_bridge_http && npm start
+              </span>
+            <% end %>
           </div>
+        <% else %>
+          <%= for model <- @llm_available_models, model.name == @llm_model do %>
+            <div class="text-xs text-zinc-500 dark:text-zinc-400">
+              <span class="font-medium">{model.display_name}:</span>
+              {model.description}
+              <span class="ml-2">
+                [schema: {if model.supports_schema, do: "✓", else: "✗"},
+                streaming: {if model.supports_streaming, do: "✓", else: "✗"},
+                prompt: {model.prompt_style}]
+              </span>
+            </div>
+          <% end %>
         <% end %>
       <% end %>
 
@@ -715,7 +754,9 @@ defmodule A2UIDemoWeb.DemoLive do
         <button
           type="submit"
           disabled={
-            @llm_loading or @llm_prompt == "" or (@llm_provider == "claude" and not @claude_available)
+            @llm_loading or @llm_prompt == "" or
+              (@llm_provider == "claude" and not @claude_zmq_available) or
+              (@llm_provider == "claude_http" and not @claude_http_available)
           }
           class={[
             "rounded-lg px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors",
@@ -815,8 +856,17 @@ defmodule A2UIDemoWeb.DemoLive do
         {:error, _} -> socket.assigns.llm_available_models
       end
 
-    # Check Claude bridge availability
-    claude_available = A2UIDemo.Demo.ClaudeClient.available?()
+    # Check Claude bridge availability (both ZMQ and HTTP)
+    claude_zmq_available = A2UIDemo.Demo.ClaudeClient.available?()
+    claude_http_available = A2UIDemo.Demo.ClaudeHTTPClient.available?()
+
+    # Default provider: prefer HTTP if available, then ZMQ, then Ollama
+    default_provider =
+      cond do
+        claude_http_available -> "claude_http"
+        claude_zmq_available -> "claude"
+        true -> "ollama"
+      end
 
     assign(socket,
       llm_prompt: "",
@@ -824,8 +874,10 @@ defmodule A2UIDemoWeb.DemoLive do
       llm_loading: false,
       llm_error: nil,
       llm_available_models: available_models,
-      claude_available: claude_available,
-      llm_provider: if(claude_available, do: "claude", else: "ollama")
+      claude_available: claude_zmq_available,
+      claude_zmq_available: claude_zmq_available,
+      claude_http_available: claude_http_available,
+      llm_provider: default_provider
     )
   end
 
@@ -879,10 +931,28 @@ defmodule A2UIDemoWeb.DemoLive do
 
     case socket.assigns.llm_provider do
       "claude" ->
-        # Use Claude Agent SDK for follow-up
+        # Use Claude Agent SDK for follow-up via ZMQ bridge
         Task.start(fn ->
           result =
             A2UIDemo.Demo.ClaudeClient.generate_with_action(
+              original_prompt,
+              user_action,
+              data_model,
+              surface_id: "llm-surface",
+              on_message: fn msg -> send(pid, {:a2ui, msg}) end,
+              timeout: 300_000
+            )
+
+          send(pid, {:llm_done, result})
+        end)
+
+        socket
+
+      "claude_http" ->
+        # Use Claude Agent SDK for follow-up via HTTP+SSE bridge
+        Task.start(fn ->
+          result =
+            A2UIDemo.Demo.ClaudeHTTPClient.generate_with_action(
               original_prompt,
               user_action,
               data_model,

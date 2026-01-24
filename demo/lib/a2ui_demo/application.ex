@@ -17,8 +17,12 @@ defmodule A2UIDemo.Application do
        catalogs:
          A2UI.V0_8.standard_catalog_ids()
          |> Map.new(fn id -> {id, A2UI.Phoenix.Catalog.Standard} end)},
+      # HTTP+SSE Transport Registry for external agents
+      {A2UI.Transport.HTTP.Registry, pubsub: A2UIDemo.PubSub},
       # Claude Agent SDK bridge client (ZMQ DEALER)
       A2UIDemo.Demo.ClaudeClient,
+      # Claude Agent SDK HTTP bridge client (alternative to ZMQ)
+      A2UIDemo.Demo.ClaudeHTTPClient,
       # Start to serve requests, typically the last entry
       A2UIDemoWeb.Endpoint
     ]
