@@ -1,18 +1,12 @@
-"use strict";
 /**
  * A2UI Message Builder
  *
  * Functions to build A2UI protocol messages from parsed JSON responses.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.buildA2uiMessages = buildA2uiMessages;
-exports.buildDataModelUpdateMessages = buildDataModelUpdateMessages;
-exports.isActionRequest = isActionRequest;
-exports.parseActionRequest = parseActionRequest;
 /**
  * Build A2UI messages from parsed JSON response.
  */
-function buildA2uiMessages(parsed, surfaceId) {
+export function buildA2uiMessages(parsed, surfaceId) {
     const messages = [];
     // 1. surfaceUpdate message
     if (parsed.surfaceUpdate) {
@@ -40,7 +34,7 @@ function buildA2uiMessages(parsed, surfaceId) {
 /**
  * Convert data model to A2UI contents format (adjacency list).
  */
-function buildDataModelUpdateMessages(dataModel, surfaceId) {
+export function buildDataModelUpdateMessages(dataModel, surfaceId) {
     if (!dataModel || typeof dataModel !== "object")
         return [];
     const updates = [];
@@ -114,7 +108,7 @@ function escapeJsonPointerSegment(segment) {
 /**
  * Check if prompt is an action request (contains __ACTION__ marker).
  */
-function isActionRequest(prompt) {
+export function isActionRequest(prompt) {
     return prompt.trimStart().startsWith("__ACTION__");
 }
 /**
@@ -125,7 +119,7 @@ function isActionRequest(prompt) {
  * Context: <JSON context>
  * DataModel: <JSON data model>
  */
-function parseActionRequest(prompt) {
+export function parseActionRequest(prompt) {
     const lines = prompt.trimStart().split("\n");
     let originalPrompt = "";
     let actionName = "";
@@ -166,3 +160,4 @@ function parseActionRequest(prompt) {
     }
     return { originalPrompt, actionName, actionContext, dataModel };
 }
+//# sourceMappingURL=a2ui-builder.js.map

@@ -23,6 +23,8 @@ defmodule A2UIDemo.Application do
       A2UIDemo.Demo.ClaudeClient,
       # Claude Agent SDK HTTP bridge client (alternative to ZMQ)
       A2UIDemo.Demo.ClaudeHTTPClient,
+      # Claude Agent SDK A2A bridge client (full A2A protocol)
+      A2UIDemo.Demo.A2AClient,
       # Start to serve requests, typically the last entry
       A2UIDemoWeb.Endpoint
     ]

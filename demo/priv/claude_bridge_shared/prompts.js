@@ -1,13 +1,10 @@
-"use strict";
 /**
  * A2UI System Prompts
  *
  * Comprehensive prompts for Claude to generate A2UI protocol messages.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.A2UI_ACTION_PROMPT = exports.A2UI_SYSTEM_PROMPT = void 0;
 // Comprehensive A2UI system prompt based on protocol documentation
-exports.A2UI_SYSTEM_PROMPT = `You are an AI agent that generates user interfaces using the A2UI protocol.
+export const A2UI_SYSTEM_PROMPT = `You are an AI agent that generates user interfaces using the A2UI protocol.
 
 # CORE PHILOSOPHY
 
@@ -278,7 +275,7 @@ User request: "show a contact form"
 
 Now generate the A2UI JSON for the user's request. Output ONLY valid JSON.`;
 // Extended system prompt for handling follow-up actions
-exports.A2UI_ACTION_PROMPT = `You are an AI agent handling user interactions with a UI you previously generated.
+export const A2UI_ACTION_PROMPT = `You are an AI agent handling user interactions with a UI you previously generated.
 
 # CONTEXT
 
@@ -314,4 +311,5 @@ Output ONLY the JSON object. No markdown, no explanation, no code blocks.
 4. For analytics/analysis tasks: actually perform the analysis and show meaningful results
 5. Include relevant data, charts references, or indicators based on what makes sense
 
-${exports.A2UI_SYSTEM_PROMPT.split("# CORE PHILOSOPHY")[1]}`;
+${A2UI_SYSTEM_PROMPT.split("# CORE PHILOSOPHY")[1]}`;
+//# sourceMappingURL=prompts.js.map

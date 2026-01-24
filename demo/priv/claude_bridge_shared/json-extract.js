@@ -1,17 +1,13 @@
-"use strict";
 /**
  * JSON Extraction Utilities
  *
  * Functions to extract JSON from LLM responses that may contain
  * markdown code blocks or other formatting.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.extractJson = extractJson;
-exports.extractJsonObject = extractJsonObject;
 /**
  * Parse the raw LLM response and extract A2UI JSON.
  */
-function extractJson(response) {
+export function extractJson(response) {
     let str = response.trim();
     // Remove any leading/trailing whitespace
     str = str.replace(/^\s+|\s+$/g, "");
@@ -39,7 +35,7 @@ function extractJson(response) {
 /**
  * Extract a complete JSON object from a string that starts with {
  */
-function extractJsonObject(str) {
+export function extractJsonObject(str) {
     if (!str.startsWith("{")) {
         return str;
     }
@@ -74,3 +70,4 @@ function extractJsonObject(str) {
     }
     return str;
 }
+//# sourceMappingURL=json-extract.js.map
