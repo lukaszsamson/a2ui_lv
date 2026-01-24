@@ -19,20 +19,7 @@ defmodule A2UI.V0_8 do
 
   @type message :: Parser.message()
 
-  # Canonical ID (GitHub URL from protocol spec)
-  @standard_catalog_id "https://github.com/google/A2UI/blob/main/specification/v0_8/json/standard_catalog_definition.json"
-
-  # All known v0.8 standard catalog ID aliases
-  @standard_catalog_ids [
-    # From a2ui_protocol.md (canonical)
-    "https://github.com/google/A2UI/blob/main/specification/v0_8/json/standard_catalog_definition.json",
-    # From server_to_client.json schema
-    "a2ui.org:standard_catalog_0_8_0"
-  ]
-
-  # TODO: v0.9 uses a different catalog ID format:
-  # "https://a2ui.dev/specification/v0_9/standard_catalog.json"
-  # When v0.9 support is added, create A2UI.V0_9.standard_catalog_ids/0
+  alias A2UI.Protocol
 
   @doc """
   Returns the canonical standard catalog ID for v0.8.
@@ -40,7 +27,7 @@ defmodule A2UI.V0_8 do
   This is the default catalog used when `beginRendering.catalogId` is not specified.
   """
   @spec standard_catalog_id() :: String.t()
-  def standard_catalog_id, do: @standard_catalog_id
+  def standard_catalog_id, do: Protocol.standard_catalog_id(:v0_8)
 
   @doc """
   Returns all known standard catalog ID aliases for v0.8.
@@ -55,13 +42,13 @@ defmodule A2UI.V0_8 do
   - `"a2ui.org:standard_catalog_0_8_0"` - from server_to_client.json schema
   """
   @spec standard_catalog_ids() :: [String.t()]
-  def standard_catalog_ids, do: @standard_catalog_ids
+  def standard_catalog_ids, do: Protocol.standard_catalog_ids(:v0_8)
 
   @doc """
   Checks if a catalog ID is a known v0.8 standard catalog alias.
   """
   @spec standard_catalog_id?(String.t()) :: boolean()
-  def standard_catalog_id?(catalog_id), do: catalog_id in @standard_catalog_ids
+  def standard_catalog_id?(catalog_id), do: Protocol.standard_catalog_id?(:v0_8, catalog_id)
 
   @doc """
   Returns the A2A extension URI for v0.8.
@@ -69,7 +56,7 @@ defmodule A2UI.V0_8 do
   Delegates to `A2UI.A2A.Protocol.extension_uri(:v0_8)`.
   """
   @spec extension_uri() :: String.t()
-  def extension_uri, do: A2UI.A2A.Protocol.extension_uri(:v0_8)
+  def extension_uri, do: Protocol.extension_uri(:v0_8)
 
   @doc """
   Parses a JSONL line as v0.8 format.

@@ -24,6 +24,7 @@ defmodule A2UI.Parser do
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
   alias A2UI.Parser.{V0_8, V0_9}
+  alias A2UI.Protocol
 
   @type message ::
           {:surface_update, SurfaceUpdate.t()}
@@ -86,22 +87,14 @@ defmodule A2UI.Parser do
   Returns `:v0_8`, `:v0_9`, or `:unknown`.
   """
   @spec detect_version(map()) :: :v0_8 | :v0_9 | :unknown
-  def detect_version(decoded) when is_map(decoded) do
-    cond do
-      V0_8.v0_8_message?(decoded) -> :v0_8
-      V0_9.v0_9_message?(decoded) -> :v0_9
-      true -> :unknown
-    end
-  end
-
-  def detect_version(_), do: :unknown
+  def detect_version(decoded), do: Protocol.detect_server_version(decoded)
 
   # Version-detecting dispatch
   defp dispatch_message(decoded) do
-    cond do
-      V0_8.v0_8_message?(decoded) -> V0_8.parse_map(decoded)
-      V0_9.v0_9_message?(decoded) -> V0_9.parse_map(decoded)
-      true -> {:error, :unknown_message_type}
+    case Protocol.detect_server_version(decoded) do
+      :v0_8 -> V0_8.parse_map(decoded)
+      :v0_9 -> V0_9.parse_map(decoded)
+      :unknown -> {:error, :unknown_message_type}
     end
   end
 end

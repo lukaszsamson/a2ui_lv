@@ -10,7 +10,7 @@ defmodule A2UI.Transport.HTTP.RegistryTest do
 
     start_supervised!({Phoenix.PubSub, name: pubsub_name})
 
-    {:ok, registry} =
+    {:ok, _registry} =
       start_supervised({Registry, pubsub: pubsub_name, name: registry_name})
 
     %{pubsub: pubsub_name, registry: registry_name}

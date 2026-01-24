@@ -29,7 +29,7 @@ defmodule A2UI.Event do
       #=> %{"error" => %{"code" => "VALIDATION_FAILED", ...}}
   """
 
-  @type protocol_version :: :v0_8 | :v0_9
+  @type protocol_version :: A2UI.Protocol.version()
 
   # ============================================
   # Action Events
@@ -84,9 +84,7 @@ defmodule A2UI.Event do
   - v0.9: `"action"`
   """
   @spec action_envelope_key(protocol_version()) :: String.t()
-  def action_envelope_key(:v0_8), do: "userAction"
-  def action_envelope_key(:v0_9), do: "action"
-  def action_envelope_key(_), do: "userAction"
+  def action_envelope_key(version), do: A2UI.Protocol.client_action_envelope_key(version)
 
   # ============================================
   # Error Events (v0.9)
@@ -175,10 +173,7 @@ defmodule A2UI.Event do
   - Returns `:unknown` for unrecognized envelopes
   """
   @spec detect_version(map()) :: protocol_version() | :unknown
-  def detect_version(%{"action" => _}), do: :v0_9
-  def detect_version(%{"userAction" => _}), do: :v0_8
-  def detect_version(%{"error" => _}), do: :unknown
-  def detect_version(_), do: :unknown
+  def detect_version(decoded), do: A2UI.Protocol.detect_client_version(decoded)
 
   @doc """
   Returns the envelope type for a client→server event.

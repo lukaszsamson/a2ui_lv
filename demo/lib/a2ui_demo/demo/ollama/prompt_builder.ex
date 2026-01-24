@@ -17,17 +17,10 @@ defmodule A2UIDemo.Demo.Ollama.PromptBuilder do
                                  "../../../../../priv/a2ui/spec/v0_8/json/standard_catalog_definition.json",
                                  __DIR__
                                )
-  @catalog_definition_path_v09 Path.expand(
-                                 "../../../../../priv/a2ui/spec/v0_9/json/standard_catalog.json",
-                                 __DIR__
-                               )
   @external_resource @catalog_definition_path_v08
-  @external_resource @catalog_definition_path_v09
 
   @catalog_definition_v08 Jason.decode!(File.read!(@catalog_definition_path_v08))
-  @catalog_definition_v09 Jason.decode!(File.read!(@catalog_definition_path_v09))
   @catalog_components_v08 Map.fetch!(@catalog_definition_v08, "components")
-  @catalog_components_v09 Map.fetch!(@catalog_definition_v09, "components")
 
   @doc """
   Build a system prompt for the given model and surface ID.

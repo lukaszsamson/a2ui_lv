@@ -35,8 +35,9 @@ defmodule A2UI.Catalog.Resolver do
   """
 
   alias A2UI.ClientCapabilities
+  alias A2UI.Protocol
 
-  @type version :: :v0_8 | :v0_9
+  @type version :: Protocol.version()
   @type error_reason ::
           :unsupported_catalog
           | :inline_catalog_not_supported
@@ -70,7 +71,7 @@ defmodule A2UI.Catalog.Resolver do
 
   # v0.8: nil catalogId defaults to standard catalog
   def resolve(nil, _capabilities, :v0_8) do
-    {:ok, A2UI.V0_8.standard_catalog_id()}
+    {:ok, Protocol.standard_catalog_id(:v0_8)}
   end
 
   # v0.9: catalogId is required
@@ -82,18 +83,18 @@ defmodule A2UI.Catalog.Resolver do
   def resolve(catalog_id, capabilities, _version) when is_binary(catalog_id) do
     cond do
       # Check if it's a known v0.8 standard catalog alias
-      A2UI.V0_8.standard_catalog_id?(catalog_id) ->
+      Protocol.standard_catalog_id?(:v0_8, catalog_id) ->
         # Verify client supports it (should always be true for standard)
         if ClientCapabilities.supports_catalog?(capabilities, catalog_id) do
-          {:ok, A2UI.V0_8.standard_catalog_id()}
+          {:ok, Protocol.standard_catalog_id(:v0_8)}
         else
           {:error, :catalog_not_in_capabilities}
         end
 
       # Check if it's the v0.9 standard catalog
-      A2UI.V0_9.standard_catalog_id?(catalog_id) ->
+      Protocol.standard_catalog_id?(:v0_9, catalog_id) ->
         if ClientCapabilities.supports_catalog?(capabilities, catalog_id) do
-          {:ok, A2UI.V0_9.standard_catalog_id()}
+          {:ok, Protocol.standard_catalog_id(:v0_9)}
         else
           {:error, :catalog_not_in_capabilities}
         end
@@ -150,8 +151,7 @@ defmodule A2UI.Catalog.Resolver do
     %{
       "catalogId" => catalog_id,
       "reason" => to_string(reason),
-      "supportedCatalogIds" =>
-        A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
+      "supportedCatalogIds" => Protocol.standard_catalog_ids()
     }
   end
 

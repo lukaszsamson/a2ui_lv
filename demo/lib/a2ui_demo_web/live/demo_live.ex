@@ -318,23 +318,6 @@ defmodule A2UIDemoWeb.DemoLive do
     end
   end
 
-  # Helper to get size of list or map
-  defp collection_size(list) when is_list(list), do: length(list)
-  defp collection_size(map) when is_map(map), do: map_size(map)
-  defp collection_size(_), do: 0
-
-  # Helper to drop the last element from a list or map
-  defp collection_drop_last(list) when is_list(list) and length(list) > 0 do
-    Enum.take(list, length(list) - 1)
-  end
-
-  defp collection_drop_last(map) when is_map(map) and map_size(map) > 0 do
-    last_key = Integer.to_string(map_size(map) - 1)
-    Map.delete(map, last_key)
-  end
-
-  defp collection_drop_last(other), do: other
-
   # Add another surface
   def handle_event("add_surface", _, socket) do
     surface_id = "surface-#{System.unique_integer([:positive])}"
@@ -465,6 +448,23 @@ defmodule A2UIDemoWeb.DemoLive do
   def handle_event("a2ui:" <> _ = event, params, socket) do
     A2UI.Phoenix.Live.handle_a2ui_event(event, params, socket)
   end
+
+  # Helper to get size of list or map
+  defp collection_size(list) when is_list(list), do: length(list)
+  defp collection_size(map) when is_map(map), do: map_size(map)
+  defp collection_size(_), do: 0
+
+  # Helper to drop the last element from a list or map
+  defp collection_drop_last(list) when is_list(list) and length(list) > 0 do
+    Enum.take(list, length(list) - 1)
+  end
+
+  defp collection_drop_last(map) when is_map(map) and map_size(map) > 0 do
+    last_key = Integer.to_string(map_size(map) - 1)
+    Map.delete(map, last_key)
+  end
+
+  defp collection_drop_last(other), do: other
 
   @impl true
   def render(assigns) do

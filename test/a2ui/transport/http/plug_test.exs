@@ -1,6 +1,7 @@
 defmodule A2UI.Transport.HTTP.PlugTest do
   use ExUnit.Case, async: true
-  use Plug.Test
+  import Plug.Conn
+  import Plug.Test
 
   alias A2UI.Transport.HTTP.Plug, as: HTTPPlug
   alias A2UI.Transport.HTTP.Registry

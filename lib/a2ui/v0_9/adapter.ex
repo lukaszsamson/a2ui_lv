@@ -25,26 +25,25 @@ defmodule A2UI.V0_9.Adapter do
 
   @type message :: Parser.message()
 
-  # v0.9 standard catalog ID
-  @standard_catalog_id "https://a2ui.dev/specification/v0_9/standard_catalog.json"
+  alias A2UI.Protocol
 
   @doc """
   Returns the standard catalog ID for v0.9.
   """
   @spec standard_catalog_id() :: String.t()
-  def standard_catalog_id, do: @standard_catalog_id
+  def standard_catalog_id, do: Protocol.standard_catalog_id(:v0_9)
 
   @doc """
   Returns all known standard catalog ID aliases for v0.9.
   """
   @spec standard_catalog_ids() :: [String.t()]
-  def standard_catalog_ids, do: [@standard_catalog_id]
+  def standard_catalog_ids, do: Protocol.standard_catalog_ids(:v0_9)
 
   @doc """
   Checks if a catalog ID is a known v0.9 standard catalog alias.
   """
   @spec standard_catalog_id?(String.t()) :: boolean()
-  def standard_catalog_id?(catalog_id), do: catalog_id == @standard_catalog_id
+  def standard_catalog_id?(catalog_id), do: Protocol.standard_catalog_id?(:v0_9, catalog_id)
 
   @doc """
   Returns the A2A extension URI for v0.9.
@@ -52,7 +51,7 @@ defmodule A2UI.V0_9.Adapter do
   Delegates to `A2UI.A2A.Protocol.extension_uri(:v0_9)`.
   """
   @spec extension_uri() :: String.t()
-  def extension_uri, do: A2UI.A2A.Protocol.extension_uri(:v0_9)
+  def extension_uri, do: Protocol.extension_uri(:v0_9)
 
   @doc """
   Parses a JSONL line as v0.9 format.

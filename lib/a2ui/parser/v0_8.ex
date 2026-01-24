@@ -21,6 +21,7 @@ defmodule A2UI.Parser.V0_8 do
   """
 
   alias A2UI.Messages.{SurfaceUpdate, DataModelUpdate, BeginRendering, DeleteSurface}
+  alias A2UI.Protocol
   alias A2UI.V0_8.Adapter
 
   @type message ::
@@ -74,8 +75,7 @@ defmodule A2UI.Parser.V0_8 do
   """
   @spec v0_8_message?(map()) :: boolean()
   def v0_8_message?(decoded) when is_map(decoded) do
-    v0_8_keys = ["surfaceUpdate", "dataModelUpdate", "beginRendering", "deleteSurface"]
-    Enum.any?(v0_8_keys, &Map.has_key?(decoded, &1))
+    Protocol.server_message?(:v0_8, decoded)
   end
 
   def v0_8_message?(_), do: false
