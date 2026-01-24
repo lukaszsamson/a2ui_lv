@@ -53,7 +53,7 @@ defmodule A2UI.DynamicValue do
       #=> "Hi Bob"
   """
 
-  alias A2UI.{Binding, Functions}
+  alias A2UI.{Binding, BoundValue, Functions}
 
   @type dynamic_value :: term()
   @type data_model :: map()
@@ -156,11 +156,12 @@ defmodule A2UI.DynamicValue do
   end
 
   # Get literal fallback from v0.8 format bound value
-  defp get_literal_fallback(%{"literalString" => v}), do: v
-  defp get_literal_fallback(%{"literalNumber" => v}), do: v
-  defp get_literal_fallback(%{"literalBoolean" => v}), do: v
-  defp get_literal_fallback(%{"literalArray" => v}), do: v
-  defp get_literal_fallback(_), do: nil
+  defp get_literal_fallback(term) do
+    case BoundValue.extract_literal(term) do
+      {:ok, value} -> value
+      :error -> nil
+    end
+  end
 
   # ============================================
   # Function Execution

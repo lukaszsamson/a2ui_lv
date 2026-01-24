@@ -24,7 +24,7 @@ defmodule A2UI.V0_8.Adapter do
   - v0.9: Native JSON `value`
   """
 
-  @literal_keys ~w(literalString literalNumber literalBoolean literalArray)
+  alias A2UI.BoundValue
 
   # ============================================
   # Component Adaptation
@@ -165,7 +165,7 @@ defmodule A2UI.V0_8.Adapter do
   @spec adapt_bound_value(map()) :: term()
   def adapt_bound_value(%{"path" => path} = term) when is_binary(path) do
     # Has a path binding - check for initial value
-    case extract_literal(term) do
+    case BoundValue.extract_literal(term) do
       {:ok, initial_value} ->
         %{"path" => path, "_initialValue" => initial_value}
 
@@ -176,7 +176,7 @@ defmodule A2UI.V0_8.Adapter do
 
   def adapt_bound_value(%{} = term) do
     # No path - check if it's a pure literal
-    case extract_literal(term) do
+    case BoundValue.extract_literal(term) do
       {:ok, value} -> value
       :error -> term
     end
@@ -239,20 +239,10 @@ defmodule A2UI.V0_8.Adapter do
   defp bound_value?(%{"path" => path}) when is_binary(path), do: true
 
   defp bound_value?(term) when is_map(term) do
-    Enum.any?(@literal_keys, &Map.has_key?(term, &1))
+    Enum.any?(BoundValue.literal_keys(), &Map.has_key?(term, &1))
   end
 
   defp bound_value?(_), do: false
-
-  defp extract_literal(term) do
-    cond do
-      Map.has_key?(term, "literalString") -> {:ok, term["literalString"]}
-      Map.has_key?(term, "literalNumber") -> {:ok, term["literalNumber"]}
-      Map.has_key?(term, "literalBoolean") -> {:ok, term["literalBoolean"]}
-      Map.has_key?(term, "literalArray") -> {:ok, term["literalArray"]}
-      true -> :error
-    end
-  end
 
   # ============================================
   # Private: Contents Decoding

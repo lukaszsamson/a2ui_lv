@@ -14,6 +14,8 @@ defmodule A2UI.Binding do
   @type data_model :: map()
   @type scope_path :: String.t() | nil
 
+  alias A2UI.BoundValue
+
   @doc """
   Resolves a BoundValue to its actual value.
 
@@ -417,11 +419,12 @@ defmodule A2UI.Binding do
     end
   end
 
-  defp get_literal_fallback(%{"literalString" => v}), do: v
-  defp get_literal_fallback(%{"literalNumber" => v}), do: v
-  defp get_literal_fallback(%{"literalBoolean" => v}), do: v
-  defp get_literal_fallback(%{"literalArray" => v}), do: v
-  defp get_literal_fallback(_), do: nil
+  defp get_literal_fallback(term) do
+    case BoundValue.extract_literal(term) do
+      {:ok, value} -> value
+      :error -> nil
+    end
+  end
 
   # Path deletion implementation
   defp delete_at_path(data, [key]) when is_map(data) do
