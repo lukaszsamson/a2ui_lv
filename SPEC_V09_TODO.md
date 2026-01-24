@@ -12,6 +12,10 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 
 **Out of scope in this file:** concrete transports (HTTP/SSE/WebSocket/A2A wiring). Plumbing may exist; end-to-end transport conformance is tracked elsewhere.
 
+**Transport status (FYI):**
+- HTTP+SSE transport is implemented in `lib/a2ui/transport/http/*` and documented in `TRANSPORT_SSE.md`.
+- ✅ SSE `data:` stream contains only valid A2UI envelopes (no transport-level JSON like `{"streamDone": ...}` or ad-hoc `{"error": ...}`). Stream completion and errors are signaled via HTTP connection close + optional SSE comments.
+
 ---
 
 ## Implementation snapshot (today)

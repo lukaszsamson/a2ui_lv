@@ -21,7 +21,7 @@ Tracks what is still missing, stubbed, or non-conformant for **A2UI protocol v0.
 - Phoenix adapter: `A2UI.Phoenix.Live`, `A2UI.Phoenix.Renderer` (`lib/a2ui/phoenix/*`)
 - Standard Phoenix catalog: `A2UI.Phoenix.Catalog.Standard` (all 18 v0.8 components) (`lib/a2ui/phoenix/catalog/standard.ex`)
 - Catalog registry: `A2UI.Catalog.Registry` (`lib/a2ui/catalog/registry.ex`)
-- Transport abstraction: `A2UI.Transport.UIStream`, `A2UI.Transport.Events` + in-process `A2UI.Transport.Local` (`lib/a2ui/transport/*`)
+- Transport abstraction: `A2UI.Transport.UIStream`, `A2UI.Transport.Events` + in-process `A2UI.Transport.Local` + HTTP+SSE transport (`A2UI.Transport.HTTP`) (`lib/a2ui/transport/*`)
 
 **What’s already covered well:**
 - ✅ 4/4 server→client envelopes: `surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`
@@ -65,6 +65,22 @@ Spec requirement (v0.8 protocol + A2A extension):
 - Each catalog document has `catalogId`, `components`, and optionally `styles`.
 - `to_a2a_metadata/1` correctly emits `inlineCatalogs` as an array.
 - Added `get_inline_catalog/2` to look up inline catalogs by ID.
+
+### ~~P0.4 HTTP+SSE transport sends non-protocol JSON payloads on the SSE `data:` stream~~ ✅ FIXED
+
+**Spec requirement (v0.8 protocol):**
+Server→client streams must contain only the four envelope types:
+`surfaceUpdate`, `dataModelUpdate`, `beginRendering`, `deleteSurface`.
+
+**Resolution:**
+`A2UI.Transport.HTTP.SSEServer` now signals stream completion and errors correctly:
+- SSE `data:` contains only valid A2UI server→client envelopes
+- Stream completion: HTTP connection close + optional SSE comment (`: stream-done`)
+- Transport errors: HTTP connection close + optional SSE comment (`: stream-error: ...`)
+- Transport callbacks (`{:a2ui_stream_done, meta}` / `{:a2ui_stream_error, reason}`) work correctly
+- SSE comments are ignored by the A2UI parser
+
+The demo HTTP bridge (`demo/priv/claude_bridge_http`) and demo client (`A2UIDemo.Demo.ClaudeHTTPClient`) were also updated accordingly.
 
 ---
 
@@ -122,61 +138,28 @@ Modules added to make implementing A2A transport straightforward:
 **Remaining work:**
 - Implement actual A2A transport (HTTP client, SSE/WebSocket)
 
-### ~~P1.3 Streaming UI transport~~ ✅ PROVISIONS READY
+### ~~P1.3 Streaming UI transport~~ ✅ IMPLEMENTED (HTTP+SSE)
 
 Docs describe:
 - one-way JSONL stream (often SSE/WebSocket/etc.) for UI updates
 - separate channel for events (often A2A)
 
-**Implementation (plumbing only - no concrete HTTP/SSE client yet):**
+**Implementation:**
 
-Modules added to make implementing SSE transport straightforward:
+- SSE parsing + reconnection state:
+  - `A2UI.SSE.Protocol`, `A2UI.SSE.Event`, `A2UI.SSE.StreamState`
+- Concrete HTTP+SSE transport (client + server):
+  - `A2UI.Transport.HTTP.SSEClient` implements `A2UI.Transport.UIStream` (Req streaming + `StreamState`)
+  - `A2UI.Transport.HTTP.HTTPEvents` implements `A2UI.Transport.Events` (HTTP POST, A2A-wrapped payload)
+  - `A2UI.Transport.HTTP.SSEServer` streams PubSub messages as SSE events
+  - `A2UI.Transport.HTTP.Registry` tracks sessions and broadcasts messages via PubSub
+  - `A2UI.Transport.HTTP.Plug` exposes HTTP endpoints (`/stream`, `/events`, `/message`, `/sessions`, `/done`)
+- Tests:
+  - `test/a2ui/transport/http/plug_test.exs`
+  - `test/a2ui/transport/http/registry_test.exs`
 
-- `A2UI.SSE.Protocol` - SSE wire format constants:
-  - `content_type/0` → `"text/event-stream"`
-  - `event_stream?/1` → Checks Content-Type header
-  - `response_headers/1` → SSE response headers (content-type, cache-control, connection)
-  - `request_headers/0` → Accept header for SSE requests
-  - `request_headers_with_resume/1` → Includes Last-Event-ID for reconnection
-  - `default_retry_ms/0` → Default reconnect delay (2000ms)
-
-- `A2UI.SSE.Event` - SSE event parsing:
-  - `parse/1` → Parse single SSE event text block
-  - `parse_stream/1` → Parse streaming data, returns `{events, buffer}`
-  - `extract_payload/1` → Get JSON from parsed event
-  - `format/2` → Format envelope as SSE event (for servers)
-
-- `A2UI.SSE.StreamState` - Reconnection state tracking:
-  - `new/1` → Create stream state with URL, surface_id, retry_ms
-  - `mark_connected/1`, `mark_disconnected/1` → Connection state
-  - `update_from_event/1` → Track last_event_id, retry_ms from events
-  - `process_chunk/2` → Parse chunk, update state, return events
-  - `reconnect_headers/1` → Headers with Last-Event-ID for resume
-  - `retry_delay/1` → Get retry interval
-  - `completion_meta/1` → Stream statistics for `{:a2ui_stream_done, meta}`
-
-**Integration pattern:**
-
-```elixir
-# SSE client would implement A2UI.Transport.UIStream and use:
-state = A2UI.SSE.StreamState.new(url: url, surface_id: surface_id)
-
-# On each HTTP chunk:
-{events, state} = A2UI.SSE.StreamState.process_chunk(state, chunk)
-for event <- events do
-  {:ok, json_line} = A2UI.SSE.Event.extract_payload(event)
-  send(consumer, {:a2ui, json_line})
-end
-
-# On disconnect:
-headers = A2UI.SSE.StreamState.reconnect_headers(state)
-delay = A2UI.SSE.StreamState.retry_delay(state)
-Process.send_after(self(), :reconnect, delay)
-```
-
-**Remaining work:**
-- Implement concrete SSE HTTP client (using `Req` or `Finch`)
-- Implement WebSocket transport (if needed)
+**Transport conformance:**
+- ✅ SSE `data:` stream contains only valid A2UI envelopes (P0.4 fixed)
 
 ---
 

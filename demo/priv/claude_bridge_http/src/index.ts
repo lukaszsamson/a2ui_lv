@@ -136,15 +136,12 @@ app.get("/stream/:sessionId", async (req: Request, res: Response) => {
     res.write(`data: ${msg}\n\n`);
   }
 
-  // If already done, close immediately
-  if (session.status === "done") {
-    res.write(`data: ${JSON.stringify({ streamDone: {} })}\n\n`);
-    res.end();
-    return;
-  }
-
-  if (session.status === "error") {
-    res.write(`data: ${JSON.stringify({ error: { message: session.error } })}\n\n`);
+  // If already done or error, close immediately
+  // Per A2UI spec: SSE data: must contain ONLY valid A2UI envelopes.
+  // Signal completion/error by closing the connection, NOT by sending JSON.
+  if (session.status === "done" || session.status === "error") {
+    // Optionally send SSE comment (ignored by A2UI parser) for debugging
+    res.write(`: stream-${session.status}\n\n`);
     res.end();
     return;
   }
@@ -272,7 +269,9 @@ app.post("/done", async (req: Request, res: Response) => {
   session.status = "done";
 
   if (session.sseResponse) {
-    session.sseResponse.write(`data: ${JSON.stringify({ streamDone: meta })}\n\n`);
+    // Per A2UI spec: SSE data: must contain ONLY valid A2UI envelopes.
+    // Signal completion by closing the connection, NOT by sending JSON.
+    session.sseResponse.write(`: stream-done\n\n`);
     session.sseResponse.end();
     session.sseResponse = undefined;
   }
@@ -397,8 +396,10 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
     session.status = "done";
 
     // End SSE stream
+    // Per A2UI spec: SSE data: must contain ONLY valid A2UI envelopes.
+    // Signal completion by closing the connection, NOT by sending JSON.
     if (session.sseResponse) {
-      session.sseResponse.write(`data: ${JSON.stringify({ streamDone: {} })}\n\n`);
+      session.sseResponse.write(`: stream-done\n\n`);
       session.sseResponse.end();
       session.sseResponse = undefined;
     }
@@ -411,10 +412,10 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
     session.status = "error";
     session.error = errorMsg;
 
+    // Per A2UI spec: SSE data: must contain ONLY valid A2UI envelopes.
+    // Signal errors by closing the connection, NOT by sending JSON.
     if (session.sseResponse) {
-      session.sseResponse.write(
-        `data: ${JSON.stringify({ error: { message: errorMsg } })}\n\n`
-      );
+      session.sseResponse.write(`: stream-error: ${errorMsg}\n\n`);
       session.sseResponse.end();
       session.sseResponse = undefined;
     }

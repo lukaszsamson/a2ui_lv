@@ -113,22 +113,20 @@ defmodule A2UI.Transport.HTTP.SSEServer do
         end
 
       {:a2ui_stream_done, meta} ->
+        # Per A2UI spec: SSE data: must contain ONLY valid A2UI envelopes.
+        # Signal completion by closing the connection, NOT by sending JSON.
+        # Optionally send an SSE comment (ignored by A2UI parser) for debugging.
         Logger.debug("SSE stream completed for #{topic}: #{inspect(meta)}")
-        # Optionally send a completion event
-        case send_sse_event(conn, Jason.encode!(%{streamDone: meta})) do
-          {:ok, conn} -> conn
-          {:error, _} -> conn
-        end
+        _ = send_sse_comment(conn, "stream-done")
+        conn
 
       {:a2ui_stream_error, reason} ->
+        # Per A2UI spec: SSE data: must contain ONLY valid A2UI envelopes.
+        # Signal errors by closing the connection, NOT by sending JSON.
+        # Optionally send an SSE comment (ignored by A2UI parser) for debugging.
         Logger.error("SSE stream error for #{topic}: #{inspect(reason)}")
-        # Optionally send an error event
-        error_msg = Jason.encode!(%{error: %{message: inspect(reason)}})
-
-        case send_sse_event(conn, error_msg) do
-          {:ok, conn} -> conn
-          {:error, _} -> conn
-        end
+        _ = send_sse_comment(conn, "stream-error: #{inspect(reason)}")
+        conn
     after
       # Heartbeat to detect disconnected clients
       30_000 ->

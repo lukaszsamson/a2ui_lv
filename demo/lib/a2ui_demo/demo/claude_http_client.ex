@@ -176,24 +176,22 @@ defmodule A2UIDemo.Demo.ClaudeHTTPClient do
         Process.put(:sse_buffer, new_buffer)
 
         # Process each event
+        # Per A2UI spec: SSE data: contains ONLY valid A2UI envelopes.
+        # Stream completion/errors are signaled via HTTP connection close,
+        # NOT via JSON payloads like {"streamDone": ...} or {"error": ...}.
         for event <- events do
           case parse_sse_data(event) do
             {:ok, data} when data != "" ->
-              # Check for stream end markers
+              # Per spec, all data: payloads should be valid A2UI envelopes.
+              # Just forward them to the consumer without filtering.
               case Jason.decode(data) do
-                {:ok, %{"streamDone" => _}} ->
-                  send(parent, {:stream_done, nil})
-
-                {:ok, %{"error" => error}} ->
-                  send(parent, {:stream_error, error})
-
-                {:ok, _} ->
-                  # Regular A2UI message
+                {:ok, _parsed} ->
+                  # Valid JSON A2UI envelope
                   if on_message, do: on_message.(data)
                   send(parent, {:stream_message, data})
 
                 {:error, _} ->
-                  # Non-JSON data, skip
+                  # Non-JSON data, skip (could be malformed)
                   :ok
               end
 
