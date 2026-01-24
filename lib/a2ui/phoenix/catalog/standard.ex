@@ -530,7 +530,16 @@ defmodule A2UI.Phoenix.Catalog.Standard do
     # Build error messages from v0.8 validationRegexp and/or v0.9 checks
     validation_regexp = assigns.props["validationRegexp"]
     checks = assigns.props["checks"]
-    errors = build_text_field_errors(text || "", validation_regexp, checks, assigns.surface.data_model, assigns.scope_path, opts)
+
+    errors =
+      build_text_field_errors(
+        text || "",
+        validation_regexp,
+        checks,
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     assigns =
       assign(assigns,
@@ -1437,7 +1446,14 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         max_items = A2UI.Validator.max_template_items()
         template_weight = assigns.apply_weight && component_weight(assigns.surface, template_id)
 
-        render_template_collection(assigns, collection, template_id, base_path, template_weight, max_items)
+        render_template_collection(
+          assigns,
+          collection,
+          template_id,
+          base_path,
+          template_weight,
+          max_items
+        )
 
       # v0.8 Template format: {"template": {"dataBinding": "/items", "componentId": "item"}}
       is_map(children_spec) && Map.has_key?(children_spec, "template") ->
@@ -1453,7 +1469,14 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         max_items = A2UI.Validator.max_template_items()
         template_weight = assigns.apply_weight && component_weight(assigns.surface, template_id)
 
-        render_template_collection(assigns, collection, template_id, base_path, template_weight, max_items)
+        render_template_collection(
+          assigns,
+          collection,
+          template_id,
+          base_path,
+          template_weight,
+          max_items
+        )
 
       true ->
         ~H""
@@ -1461,7 +1484,14 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   end
 
   # Helper to render a template collection (shared by v0.8 and v0.9 template formats)
-  defp render_template_collection(assigns, collection, template_id, base_path, template_weight, max_items) do
+  defp render_template_collection(
+         assigns,
+         collection,
+         template_id,
+         base_path,
+         template_weight,
+         max_items
+       ) do
     cond do
       # v0.9 semantics: collections are native JSON arrays
       is_list(collection) ->
@@ -1779,7 +1809,8 @@ defmodule A2UI.Phoenix.Catalog.Standard do
 
     # v0.8: validationRegexp produces "Invalid format" error
     errors =
-      if validation_regexp != nil and text != "" and not validate_text_field(text, validation_regexp) do
+      if validation_regexp != nil and text != "" and
+           not validate_text_field(text, validation_regexp) do
         ["Invalid format" | errors]
       else
         errors
@@ -1795,6 +1826,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
   # Injects an implicit value into checks that don't have an explicit args.value
   # This allows checks like {"call":"required"} to work without explicit value binding
   defp inject_implicit_value(nil, _value), do: nil
+
   defp inject_implicit_value(checks, value) when is_list(checks) do
     Enum.map(checks, fn check ->
       inject_check_value(check, value)
@@ -1810,6 +1842,7 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       Map.put(check, "args", Map.put(args, "value", value))
     end
   end
+
   defp inject_check_value(check, _value), do: check
 
   defp component_dom_id(surface_id, component_id, scope_path, suffix \\ nil) do

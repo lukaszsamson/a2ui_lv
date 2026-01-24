@@ -189,10 +189,10 @@ defmodule A2UI.Session do
         updated = update_surface_with_catalog(session, sid, updated_msg, :ok)
         {:ok, updated}
 
-        # Note: Root component validation is NOT done here because:
-        # - v0.8: beginRendering can specify any root_id, doesn't require id="root"
-        # - v0.9: createSurface comes BEFORE updateComponents, so components
-        #   aren't present yet. Root validation happens at render time.
+      # Note: Root component validation is NOT done here because:
+      # - v0.8: beginRendering can specify any root_id, doesn't require id="root"
+      # - v0.9: createSurface comes BEFORE updateComponents, so components
+      #   aren't present yet. Root validation happens at render time.
 
       {:error, reason} ->
         # Catalog resolution failed - return error without updating session

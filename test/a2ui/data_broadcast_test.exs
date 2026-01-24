@@ -196,7 +196,9 @@ defmodule A2UI.DataBroadcastTest do
     end
 
     test "returns error for invalid surface entry" do
-      assert DataBroadcast.validate(%{"surfaces" => %{123 => %{}}}) == {:error, :invalid_surface_entry}
+      assert DataBroadcast.validate(%{"surfaces" => %{123 => %{}}}) ==
+               {:error, :invalid_surface_entry}
+
       assert DataBroadcast.validate(%{"surfaces" => %{"main" => "not a map"}}) ==
                {:error, :invalid_surface_entry}
     end

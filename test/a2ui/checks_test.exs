@@ -328,16 +328,36 @@ defmodule A2UI.ChecksTest do
       }
 
       # All missing - fails
-      assert Checks.evaluate_expression(expr, %{"terms" => false, "email" => "", "phone" => ""}, nil, []) == false
+      assert Checks.evaluate_expression(
+               expr,
+               %{"terms" => false, "email" => "", "phone" => ""},
+               nil,
+               []
+             ) == false
 
       # Terms accepted but no contact - fails
-      assert Checks.evaluate_expression(expr, %{"terms" => true, "email" => "", "phone" => ""}, nil, []) == false
+      assert Checks.evaluate_expression(
+               expr,
+               %{"terms" => true, "email" => "", "phone" => ""},
+               nil,
+               []
+             ) == false
 
       # Terms accepted with email - passes
-      assert Checks.evaluate_expression(expr, %{"terms" => true, "email" => "a@b.com", "phone" => ""}, nil, []) == true
+      assert Checks.evaluate_expression(
+               expr,
+               %{"terms" => true, "email" => "a@b.com", "phone" => ""},
+               nil,
+               []
+             ) == true
 
       # Terms accepted with phone - passes
-      assert Checks.evaluate_expression(expr, %{"terms" => true, "email" => "", "phone" => "123"}, nil, []) == true
+      assert Checks.evaluate_expression(
+               expr,
+               %{"terms" => true, "email" => "", "phone" => "123"},
+               nil,
+               []
+             ) == true
     end
   end
 

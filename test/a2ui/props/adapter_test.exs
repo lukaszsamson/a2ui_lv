@@ -21,6 +21,7 @@ defmodule A2UI.Props.AdapterTest do
         "distribution" => "spaceBetween",
         "alignment" => "start"
       }
+
       assert Adapter.row_column_props(props) == {"center", "end"}
     end
 
@@ -33,7 +34,15 @@ defmodule A2UI.Props.AdapterTest do
     end
 
     test "handles all v0.9 justify values" do
-      for justify <- ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly", "stretch"] do
+      for justify <- [
+            "start",
+            "center",
+            "end",
+            "spaceBetween",
+            "spaceAround",
+            "spaceEvenly",
+            "stretch"
+          ] do
         props = %{"justify" => justify}
         {result_justify, _} = Adapter.row_column_props(props)
         assert result_justify == justify
@@ -67,6 +76,7 @@ defmodule A2UI.Props.AdapterTest do
         "entryPointChild" => "v08-entry",
         "contentChild" => "v08-content"
       }
+
       assert Adapter.modal_props(props) == {"v09-trigger", "v09-content"}
     end
 
@@ -93,6 +103,7 @@ defmodule A2UI.Props.AdapterTest do
         "tabs" => [%{"title" => "v09"}],
         "tabItems" => [%{"title" => "v08"}]
       }
+
       assert Adapter.tabs_props(props) == [%{"title" => "v09"}]
     end
 

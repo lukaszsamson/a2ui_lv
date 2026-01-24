@@ -127,7 +127,8 @@ defmodule A2UI.Checks do
   - `%{"true" => true}` - Literal true
   - `%{"false" => false}` - Literal false
   """
-  @spec evaluate_expression(logic_expression(), data_model(), scope_path(), keyword()) :: boolean()
+  @spec evaluate_expression(logic_expression(), data_model(), scope_path(), keyword()) ::
+          boolean()
 
   # Literal true
   def evaluate_expression(%{"true" => true}, _data, _scope, _opts), do: true
@@ -151,7 +152,8 @@ defmodule A2UI.Checks do
   end
 
   # Function call
-  def evaluate_expression(%{"call" => func_name} = expr, data, scope, opts) when is_binary(func_name) do
+  def evaluate_expression(%{"call" => func_name} = expr, data, scope, opts)
+      when is_binary(func_name) do
     args = expr["args"] || %{}
     resolved_args = resolve_function_args(args, data, scope, opts)
     execute_check_function(func_name, resolved_args)

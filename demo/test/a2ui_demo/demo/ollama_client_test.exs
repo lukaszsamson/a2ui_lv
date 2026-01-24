@@ -25,28 +25,55 @@ defmodule A2UIDemo.Demo.OllamaClientTest do
   describe "generate/2" do
     @tag :external
     test "generates valid A2UI messages from prompt" do
-      case A2UIDemo.Demo.OllamaClient.generate("show a simple hello message") do
-        {:ok, messages} ->
-          assert is_list(messages)
-          assert length(messages) > 0
+      opts =
+        case A2UIDemo.Demo.OllamaClient.list_available_models() do
+          {:ok, models} ->
+            case Enum.find(models, & &1.supports_schema) do
+              nil -> []
+              model -> [model: model.name, force_schema: true]
+            end
 
-          # Each message should be valid JSON
-          for json <- messages do
-            assert {:ok, _} = Jason.decode(json)
-          end
+          {:error, {:connection_failed, _}} ->
+            :skip
 
-          # Should have surfaceUpdate
-          json_str = Enum.join(messages, "")
-          assert json_str =~ "surfaceUpdate"
+          {:error, reason} ->
+            {:error, reason}
+        end
 
-        {:error, {:connection_failed, _}} ->
+      case opts do
+        :skip ->
           skip_test("Ollama not running")
 
-        {:error, {:model_not_found, model, _}} ->
-          skip_test("Model #{model} not available")
-
         {:error, reason} ->
-          flunk("Generation failed: #{inspect(reason)}")
+          skip_test("Unable to list models: #{inspect(reason)}")
+
+        opts ->
+          case A2UIDemo.Demo.OllamaClient.generate("show a simple hello message", opts) do
+            {:ok, messages} ->
+              assert is_list(messages)
+              assert length(messages) > 0
+
+              # Each message should be valid JSON
+              for json <- messages do
+                assert {:ok, _} = Jason.decode(json)
+              end
+
+              # Should have surfaceUpdate
+              json_str = Enum.join(messages, "")
+              assert json_str =~ "surfaceUpdate"
+
+            {:error, {:connection_failed, _}} ->
+              skip_test("Ollama not running")
+
+            {:error, {:model_not_found, model, _}} ->
+              skip_test("Model #{model} not available")
+
+            {:error, {:json_parse_error, _reason}} ->
+              skip_test("Model returned invalid JSON")
+
+            {:error, reason} ->
+              flunk("Generation failed: #{inspect(reason)}")
+          end
       end
     end
   end

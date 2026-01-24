@@ -452,7 +452,9 @@ defmodule A2UI.Phoenix.LiveTest do
       # Create v0.9 surface with data
       catalog_id = A2UI.V0_8.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"user":{"name":"Alice","age":30}}}})
+
+      data_json =
+        ~s({"updateDataModel":{"surfaceId":"test","value":{"user":{"name":"Alice","age":30}}}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)
@@ -558,7 +560,9 @@ defmodule A2UI.Phoenix.LiveTest do
       # Create v0.9 surface then set data
       catalog_id = A2UI.V0_8.standard_catalog_id()
       create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      data_json = ~s({"updateDataModel":{"surfaceId":"test","value":{"email":"test@example.com"}}})
+
+      data_json =
+        ~s({"updateDataModel":{"surfaceId":"test","value":{"email":"test@example.com"}}})
 
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, create_json}, socket)
       {:noreply, socket} = Live.handle_a2ui_message({:a2ui, data_json}, socket)

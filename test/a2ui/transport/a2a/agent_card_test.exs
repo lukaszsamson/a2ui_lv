@@ -156,7 +156,10 @@ defmodule A2UI.Transport.A2A.AgentCardTest do
           %{
             uri: Protocol.extension_uri(:v0_8),
             params: %{
-              "supportedCatalogIds" => ["https://a2ui.org/catalog.json", "https://custom.com/catalog.json"]
+              "supportedCatalogIds" => [
+                "https://a2ui.org/catalog.json",
+                "https://custom.com/catalog.json"
+              ]
             }
           }
         ]

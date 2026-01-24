@@ -327,10 +327,12 @@ defmodule A2UIDemoWeb.DemoLive do
   defp collection_drop_last(list) when is_list(list) and length(list) > 0 do
     Enum.take(list, length(list) - 1)
   end
+
   defp collection_drop_last(map) when is_map(map) and map_size(map) > 0 do
     last_key = Integer.to_string(map_size(map) - 1)
     Map.delete(map, last_key)
   end
+
   defp collection_drop_last(other), do: other
 
   # Add another surface
@@ -839,20 +841,20 @@ defmodule A2UIDemoWeb.DemoLive do
               <% end %>
             </div>
           <% else %>
-          <%= for model <- @llm_available_models, model.name == @llm_model do %>
-            <div class="text-xs text-zinc-500 dark:text-zinc-400">
-              <span class="font-medium">{model.display_name}:</span>
-              {model.description}
-              <span class="ml-2">
-                [schema: {if model.supports_schema, do: "✓", else: "✗"},
-                streaming: {if model.supports_streaming, do: "✓", else: "✗"},
-                prompt: {model.prompt_style}]
-              </span>
-            </div>
+            <%= for model <- @llm_available_models, model.name == @llm_model do %>
+              <div class="text-xs text-zinc-500 dark:text-zinc-400">
+                <span class="font-medium">{model.display_name}:</span>
+                {model.description}
+                <span class="ml-2">
+                  [schema: {if model.supports_schema, do: "✓", else: "✗"},
+                  streaming: {if model.supports_streaming, do: "✓", else: "✗"},
+                  prompt: {model.prompt_style}]
+                </span>
+              </div>
+            <% end %>
           <% end %>
         <% end %>
       <% end %>
-    <% end %>
 
       <%!-- Prompt Input --%>
       <form phx-change="llm_prompt_change" phx-submit="llm_submit" class="flex gap-2">

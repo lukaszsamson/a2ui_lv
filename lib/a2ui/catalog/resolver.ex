@@ -150,7 +150,8 @@ defmodule A2UI.Catalog.Resolver do
     %{
       "catalogId" => catalog_id,
       "reason" => to_string(reason),
-      "supportedCatalogIds" => A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
+      "supportedCatalogIds" =>
+        A2UI.V0_8.standard_catalog_ids() ++ A2UI.V0_9.standard_catalog_ids()
     }
   end
 

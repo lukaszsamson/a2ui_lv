@@ -91,7 +91,8 @@ defmodule A2UI.DynamicValue do
   @spec evaluate(dynamic_value(), data_model(), scope_path(), keyword()) :: term()
 
   # FunctionCall - detect before other map handlers
-  def evaluate(%{"call" => func_name} = value, data_model, scope_path, opts) when is_binary(func_name) do
+  def evaluate(%{"call" => func_name} = value, data_model, scope_path, opts)
+      when is_binary(func_name) do
     args = value["args"] || %{}
     # Recursively evaluate args as DynamicValues
     resolved_args = resolve_args(args, data_model, scope_path, opts)
@@ -101,6 +102,7 @@ defmodule A2UI.DynamicValue do
   # Path binding with optional literal fallback
   def evaluate(%{"path" => path} = bound, data_model, scope_path, opts) when is_binary(path) do
     version = Keyword.get(opts, :version, :v0_8)
+
     case Binding.resolve_path(path, data_model, scope_path, version: version) do
       nil -> get_literal_fallback(bound)
       value -> value

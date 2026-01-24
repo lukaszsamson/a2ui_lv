@@ -273,7 +273,9 @@ defmodule A2UI.FunctionsTest do
 
     test "interpolates booleans" do
       data = %{"active" => true, "disabled" => false}
-      assert Functions.string_format("Active: ${/active}, Disabled: ${/disabled}", data, nil) == "Active: true, Disabled: false"
+
+      assert Functions.string_format("Active: ${/active}, Disabled: ${/disabled}", data, nil) ==
+               "Active: true, Disabled: false"
     end
 
     test "interpolates nested paths" do
@@ -321,7 +323,9 @@ defmodule A2UI.FunctionsTest do
 
     test "calls regex function with pattern" do
       data = %{"phone" => "123-456-7890"}
-      assert Functions.string_format("${regex(${/phone}, '^\\d{3}-\\d{3}-\\d{4}$')}", data, nil) == "true"
+
+      assert Functions.string_format("${regex(${/phone}, '^\\d{3}-\\d{3}-\\d{4}$')}", data, nil) ==
+               "true"
     end
 
     test "handles literal string arguments" do
@@ -394,11 +398,14 @@ defmodule A2UI.FunctionsTest do
 
     test "handles mixed content" do
       data = %{"name" => "World", "count" => 3}
-      result = Functions.string_format(
-        "Hello ${/name}! You have ${/count} messages. \\${escaped}",
-        data,
-        nil
-      )
+
+      result =
+        Functions.string_format(
+          "Hello ${/name}! You have ${/count} messages. \\${escaped}",
+          data,
+          nil
+        )
+
       assert result == "Hello World! You have 3 messages. ${escaped}"
     end
   end

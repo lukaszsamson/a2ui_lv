@@ -53,7 +53,9 @@ defmodule A2UI.DynamicValueTest do
 
     test "resolves relative path with scope" do
       data = %{"items" => [%{"name" => "first"}, %{"name" => "second"}]}
-      assert DynamicValue.evaluate(%{"path" => "name"}, data, "/items/0", version: :v0_9) == "first"
+
+      assert DynamicValue.evaluate(%{"path" => "name"}, data, "/items/0", version: :v0_9) ==
+               "first"
     end
 
     test "returns nil for missing path" do
@@ -76,10 +78,20 @@ defmodule A2UI.DynamicValueTest do
     end
 
     test "evaluates email function" do
-      value = %{"call" => "email", "args" => %{"value" => "test@example.com"}, "returnType" => "boolean"}
+      value = %{
+        "call" => "email",
+        "args" => %{"value" => "test@example.com"},
+        "returnType" => "boolean"
+      }
+
       assert DynamicValue.evaluate(value, %{}, nil, []) == true
 
-      value_invalid = %{"call" => "email", "args" => %{"value" => "invalid"}, "returnType" => "boolean"}
+      value_invalid = %{
+        "call" => "email",
+        "args" => %{"value" => "invalid"},
+        "returnType" => "boolean"
+      }
+
       assert DynamicValue.evaluate(value_invalid, %{}, nil, []) == false
     end
 
@@ -89,6 +101,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "123", "pattern" => "^\\d+$"},
         "returnType" => "boolean"
       }
+
       assert DynamicValue.evaluate(value, %{}, nil, []) == true
     end
 
@@ -98,6 +111,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "hello", "min" => 3, "max" => 10},
         "returnType" => "boolean"
       }
+
       assert DynamicValue.evaluate(value, %{}, nil, []) == true
 
       value_short = %{
@@ -105,6 +119,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "hi", "min" => 3},
         "returnType" => "boolean"
       }
+
       assert DynamicValue.evaluate(value_short, %{}, nil, []) == false
     end
 
@@ -114,6 +129,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => 5, "min" => 0, "max" => 10},
         "returnType" => "boolean"
       }
+
       assert DynamicValue.evaluate(value, %{}, nil, []) == true
 
       value_out = %{
@@ -121,6 +137,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => 15, "max" => 10},
         "returnType" => "boolean"
       }
+
       assert DynamicValue.evaluate(value_out, %{}, nil, []) == false
     end
 
@@ -130,6 +147,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "Hello, ${/name}!"},
         "returnType" => "string"
       }
+
       data = %{"name" => "Alice"}
       assert DynamicValue.evaluate(value, data, nil, []) == "Hello, Alice!"
     end
@@ -140,6 +158,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"template" => "Hello, ${/name}!"},
         "returnType" => "string"
       }
+
       data = %{"name" => "Alice"}
       assert DynamicValue.evaluate(value, data, nil, []) == "Hello, Alice!"
     end
@@ -166,6 +185,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => %{"path" => "/name"}},
         "returnType" => "boolean"
       }
+
       data = %{"name" => "Alice"}
       assert DynamicValue.evaluate(value, data, nil, []) == true
 
@@ -186,6 +206,7 @@ defmodule A2UI.DynamicValueTest do
         },
         "returnType" => "boolean"
       }
+
       data = %{"greeting" => "Hello"}
       assert DynamicValue.evaluate(value, data, nil, []) == true
 
@@ -203,6 +224,7 @@ defmodule A2UI.DynamicValueTest do
         },
         "returnType" => "boolean"
       }
+
       data = %{"text" => "hello"}
       assert DynamicValue.evaluate(value, data, nil, []) == true
     end
@@ -246,6 +268,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "Count: ${/count}"},
         "returnType" => "string"
       }
+
       data = %{"count" => 42}
       assert A2UI.Binding.resolve(value, data, nil, []) == "Count: 42"
     end
@@ -256,6 +279,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => %{"path" => "/email"}},
         "returnType" => "boolean"
       }
+
       data = %{"email" => "test@example.com"}
       assert A2UI.Binding.resolve(value, data, nil, []) == true
     end
@@ -275,6 +299,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "Hello, ${/name}!"},
         "returnType" => "string"
       }
+
       data_model = %{"name" => "Alice"}
 
       # This is what Text component does:
@@ -289,6 +314,7 @@ defmodule A2UI.DynamicValueTest do
         "args" => %{"value" => "Item: ${name}"},
         "returnType" => "string"
       }
+
       data_model = %{"items" => [%{"name" => "First"}, %{"name" => "Second"}]}
 
       # v0.9: relative path "name" is scoped to template item
@@ -322,6 +348,7 @@ defmodule A2UI.DynamicValueTest do
         },
         "returnType" => "string"
       }
+
       data_model = %{"status" => "active", "isValid" => true}
 
       result = A2UI.Binding.resolve(text_prop, data_model, nil, [])
@@ -336,6 +363,7 @@ defmodule A2UI.DynamicValueTest do
         },
         "returnType" => "string"
       }
+
       data_model = %{
         "user" => %{
           "firstName" => "John",

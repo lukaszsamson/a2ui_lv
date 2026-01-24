@@ -107,15 +107,18 @@ defmodule A2UI.Functions do
   """
   @spec regex(term(), String.t()) :: boolean()
   def regex(nil, _pattern), do: false
+
   def regex(value, pattern) when is_binary(value) and is_binary(pattern) do
     case Regex.compile(pattern) do
       {:ok, regex} -> Regex.match?(regex, value)
       {:error, _} -> false
     end
   end
+
   def regex(value, pattern) when is_binary(pattern) do
     regex(to_string(value), pattern)
   end
+
   def regex(_, _), do: false
 
   @doc """
@@ -148,6 +151,7 @@ defmodule A2UI.Functions do
   """
   @spec length(term(), keyword()) :: boolean()
   def length(nil, _opts), do: false
+
   def length(value, opts) when is_binary(value) do
     len = String.length(value)
     min = Keyword.get(opts, :min)
@@ -158,6 +162,7 @@ defmodule A2UI.Functions do
 
     min_ok and max_ok
   end
+
   def length(value, opts) when is_list(value) do
     len = Kernel.length(value)
     min = Keyword.get(opts, :min)
@@ -168,6 +173,7 @@ defmodule A2UI.Functions do
 
     min_ok and max_ok
   end
+
   def length(_, _), do: false
 
   @doc """
@@ -200,6 +206,7 @@ defmodule A2UI.Functions do
   """
   @spec numeric(term(), keyword()) :: boolean()
   def numeric(nil, _opts), do: false
+
   def numeric(value, opts) when is_number(value) do
     min = Keyword.get(opts, :min)
     max = Keyword.get(opts, :max)
@@ -209,12 +216,14 @@ defmodule A2UI.Functions do
 
     min_ok and max_ok
   end
+
   def numeric(value, opts) when is_binary(value) do
     case parse_number(value) do
       {:ok, num} -> numeric(num, opts)
       :error -> false
     end
   end
+
   def numeric(_, _), do: false
 
   @doc """
@@ -241,12 +250,16 @@ defmodule A2UI.Functions do
   """
   @spec email(term()) :: boolean()
   def email(nil), do: false
+
   def email(value) when is_binary(value) do
     # Simple but practical email regex
     # Covers: local-part@domain with common characters
-    email_regex = ~r/^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+    email_regex =
+      ~r/^[a-zA-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+
     Regex.match?(email_regex, value)
   end
+
   def email(_), do: false
 
   # ============================================
@@ -301,7 +314,9 @@ defmodule A2UI.Functions do
 
   defp parse_number(str) when is_binary(str) do
     case Integer.parse(str) do
-      {int, ""} -> {:ok, int}
+      {int, ""} ->
+        {:ok, int}
+
       _ ->
         case Float.parse(str) do
           {float, ""} -> {:ok, float}
@@ -397,7 +412,8 @@ defmodule A2UI.Functions do
   end
 
   # Any character inside quoted string - consume without special handling
-  defp extract_expression(<<char::utf8, rest::binary>>, depth, acc, quote_char) when not is_nil(quote_char) do
+  defp extract_expression(<<char::utf8, rest::binary>>, depth, acc, quote_char)
+       when not is_nil(quote_char) do
     extract_expression(rest, depth, [<<char::utf8>> | acc], quote_char)
   end
 
@@ -452,6 +468,7 @@ defmodule A2UI.Functions do
 
   # Parse comma-separated arguments, handling nested parens and quotes
   defp parse_arguments(""), do: []
+
   defp parse_arguments(str) do
     str
     |> String.trim()
@@ -491,7 +508,8 @@ defmodule A2UI.Functions do
   end
 
   # Inside quoted string - consume everything
-  defp split_arguments(<<char::utf8, rest::binary>>, current, args, depth, quote_char) when not is_nil(quote_char) do
+  defp split_arguments(<<char::utf8, rest::binary>>, current, args, depth, quote_char)
+       when not is_nil(quote_char) do
     split_arguments(rest, [<<char::utf8>> | current], args, depth, quote_char)
   end
 
@@ -527,21 +545,26 @@ defmodule A2UI.Functions do
 
       # Quoted string literal
       (String.starts_with?(arg, "'") and String.ends_with?(arg, "'")) or
-      (String.starts_with?(arg, "\"") and String.ends_with?(arg, "\"")) ->
+          (String.starts_with?(arg, "\"") and String.ends_with?(arg, "\"")) ->
         String.slice(arg, 1..-2//1)
 
       # Boolean literals
-      arg == "true" -> true
-      arg == "false" -> false
+      arg == "true" ->
+        true
+
+      arg == "false" ->
+        false
 
       # Null literal
-      arg == "null" -> nil
+      arg == "null" ->
+        nil
 
       # Number literal
       true ->
         case parse_number(arg) do
           {:ok, num} -> num
-          :error -> arg  # Return as-is (possibly a bare path reference)
+          # Return as-is (possibly a bare path reference)
+          :error -> arg
         end
     end
   end

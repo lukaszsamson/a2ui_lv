@@ -197,7 +197,8 @@ defmodule A2UI.Phoenix.Live do
       version = surface.protocol_version || :v0_8
 
       # Resolve all context bindings against current data model (version-aware)
-      resolved_context = resolve_action_context(action_context, surface.data_model, scope_path, version)
+      resolved_context =
+        resolve_action_context(action_context, surface.data_model, scope_path, version)
 
       # Build version-aware action envelope
       action_event =
