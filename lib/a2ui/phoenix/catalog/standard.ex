@@ -1423,7 +1423,23 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         <% end %>
         """
 
-      # Template (dynamic list from data binding)
+      # v0.9 Template format: {"path": "/items", "componentId": "item"}
+      is_map(children_spec) && Map.has_key?(children_spec, "path") &&
+          Map.has_key?(children_spec, "componentId") ->
+        data_binding = children_spec["path"]
+        template_id = children_spec["componentId"]
+
+        # Compute base path for template items (version-aware expansion)
+        base_path =
+          Binding.expand_path(data_binding, assigns.scope_path, binding_opts(assigns.surface))
+
+        collection = Binding.get_at_pointer(assigns.surface.data_model, base_path)
+        max_items = A2UI.Validator.max_template_items()
+        template_weight = assigns.apply_weight && component_weight(assigns.surface, template_id)
+
+        render_template_collection(assigns, collection, template_id, base_path, template_weight, max_items)
+
+      # v0.8 Template format: {"template": {"dataBinding": "/items", "componentId": "item"}}
       is_map(children_spec) && Map.has_key?(children_spec, "template") ->
         template = children_spec["template"]
         data_binding = template["dataBinding"]
@@ -1437,101 +1453,106 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         max_items = A2UI.Validator.max_template_items()
         template_weight = assigns.apply_weight && component_weight(assigns.surface, template_id)
 
-        cond do
-          # v0.9 semantics: collections are native JSON arrays
-          is_list(collection) ->
-            indices =
-              collection
-              |> Enum.with_index()
-              |> Enum.take(max_items)
-              |> Enum.map(fn {_item, idx} -> to_string(idx) end)
+        render_template_collection(assigns, collection, template_id, base_path, template_weight, max_items)
 
-            assigns =
-              assign(assigns,
-                indices: indices,
-                template_id: template_id,
-                base_path: base_path,
-                template_weight: template_weight
-              )
+      true ->
+        ~H""
+    end
+  end
 
-            ~H"""
-            <%= for idx <- @indices do %>
-              <%= if is_number(@template_weight) do %>
-                <div
-                  class="a2ui-weighted"
-                  style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
-                >
-                  <.render_component
-                    id={@template_id}
-                    surface={@surface}
-                    scope_path={Binding.append_pointer_segment(@base_path, idx)}
-                    depth={@depth + 1}
-                    suppress_events={@suppress_events}
-                    visited={@visited}
-                  />
-                </div>
-              <% else %>
-                <.render_component
-                  id={@template_id}
-                  surface={@surface}
-                  scope_path={Binding.append_pointer_segment(@base_path, idx)}
-                  depth={@depth + 1}
-                  suppress_events={@suppress_events}
-                  visited={@visited}
-                />
-              <% end %>
-            <% end %>
-            """
+  # Helper to render a template collection (shared by v0.8 and v0.9 template formats)
+  defp render_template_collection(assigns, collection, template_id, base_path, template_weight, max_items) do
+    cond do
+      # v0.9 semantics: collections are native JSON arrays
+      is_list(collection) ->
+        indices =
+          collection
+          |> Enum.with_index()
+          |> Enum.take(max_items)
+          |> Enum.map(fn {_item, idx} -> to_string(idx) end)
 
-          # v0.8 wire schema produced maps with numeric string keys:
-          # {"0": item0, "1": item1, ...}
-          # The stable_template_keys function sorts numeric keys numerically.
-          is_map(collection) ->
-            keys =
-              collection
-              |> stable_template_keys()
-              |> Enum.take(max_items)
+        assigns =
+          assign(assigns,
+            indices: indices,
+            template_id: template_id,
+            base_path: base_path,
+            template_weight: template_weight
+          )
 
-            assigns =
-              assign(assigns,
-                keys: keys,
-                template_id: template_id,
-                base_path: base_path,
-                template_weight: template_weight
-              )
+        ~H"""
+        <%= for idx <- @indices do %>
+          <%= if is_number(@template_weight) do %>
+            <div
+              class="a2ui-weighted"
+              style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
+            >
+              <.render_component
+                id={@template_id}
+                surface={@surface}
+                scope_path={Binding.append_pointer_segment(@base_path, idx)}
+                depth={@depth + 1}
+                suppress_events={@suppress_events}
+                visited={@visited}
+              />
+            </div>
+          <% else %>
+            <.render_component
+              id={@template_id}
+              surface={@surface}
+              scope_path={Binding.append_pointer_segment(@base_path, idx)}
+              depth={@depth + 1}
+              suppress_events={@suppress_events}
+              visited={@visited}
+            />
+          <% end %>
+        <% end %>
+        """
 
-            ~H"""
-            <%= for key <- @keys do %>
-              <%= if is_number(@template_weight) do %>
-                <div
-                  class="a2ui-weighted"
-                  style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
-                >
-                  <.render_component
-                    id={@template_id}
-                    surface={@surface}
-                    scope_path={Binding.append_pointer_segment(@base_path, key)}
-                    depth={@depth + 1}
-                    suppress_events={@suppress_events}
-                    visited={@visited}
-                  />
-                </div>
-              <% else %>
-                <.render_component
-                  id={@template_id}
-                  surface={@surface}
-                  scope_path={Binding.append_pointer_segment(@base_path, key)}
-                  depth={@depth + 1}
-                  suppress_events={@suppress_events}
-                  visited={@visited}
-                />
-              <% end %>
-            <% end %>
-            """
+      # v0.8 wire schema produced maps with numeric string keys:
+      # {"0": item0, "1": item1, ...}
+      # The stable_template_keys function sorts numeric keys numerically.
+      is_map(collection) ->
+        keys =
+          collection
+          |> stable_template_keys()
+          |> Enum.take(max_items)
 
-          true ->
-            ~H""
-        end
+        assigns =
+          assign(assigns,
+            keys: keys,
+            template_id: template_id,
+            base_path: base_path,
+            template_weight: template_weight
+          )
+
+        ~H"""
+        <%= for key <- @keys do %>
+          <%= if is_number(@template_weight) do %>
+            <div
+              class="a2ui-weighted"
+              style={"flex: #{@template_weight} 1 0%; min-width: 0; display: flex; align-items: stretch;"}
+            >
+              <.render_component
+                id={@template_id}
+                surface={@surface}
+                scope_path={Binding.append_pointer_segment(@base_path, key)}
+                depth={@depth + 1}
+                suppress_events={@suppress_events}
+                visited={@visited}
+              />
+            </div>
+          <% else %>
+            <.render_component
+              id={@template_id}
+              surface={@surface}
+              scope_path={Binding.append_pointer_segment(@base_path, key)}
+              depth={@depth + 1}
+              suppress_events={@suppress_events}
+              visited={@visited}
+            />
+          <% end %>
+        <% end %>
+        """
 
       true ->
         ~H""

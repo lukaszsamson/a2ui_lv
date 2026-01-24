@@ -275,9 +275,9 @@ defmodule A2UIDemoWeb.DemoLive do
     surface = socket.assigns.a2ui_surfaces["template-list"]
 
     if surface do
-      # Products are stored as a map with string keys ("0", "1", "2", etc.)
-      products = get_in(surface.data_model, ["products"]) || %{}
-      new_index = map_size(products)
+      # Products can be a list or a map depending on how data was set
+      products = get_in(surface.data_model, ["products"]) || []
+      new_index = collection_size(products)
 
       new_item_json =
         ~s({"dataModelUpdate":{"surfaceId":"template-list","path":"/products/#{new_index}","contents":[{"key":"name","valueString":"New Product #{new_index + 1}"},{"key":"price","valueString":"$#{:rand.uniform(100)}.99"},{"key":"id","valueString":"prod-#{new_index}"}]}})
@@ -293,13 +293,12 @@ defmodule A2UIDemoWeb.DemoLive do
     surface = socket.assigns.a2ui_surfaces["template-list"]
 
     if surface do
-      products = get_in(surface.data_model, ["products"]) || %{}
-      count = map_size(products)
+      products = get_in(surface.data_model, ["products"]) || []
+      count = collection_size(products)
 
       if count > 0 do
-        # Remove last item by deleting the highest index key
-        last_key = Integer.to_string(count - 1)
-        new_products = Map.delete(products, last_key)
+        # Remove last item
+        new_products = collection_drop_last(products)
 
         new_data_model = put_in(surface.data_model, ["products"], new_products)
 
@@ -318,6 +317,21 @@ defmodule A2UIDemoWeb.DemoLive do
       {:noreply, socket}
     end
   end
+
+  # Helper to get size of list or map
+  defp collection_size(list) when is_list(list), do: length(list)
+  defp collection_size(map) when is_map(map), do: map_size(map)
+  defp collection_size(_), do: 0
+
+  # Helper to drop the last element from a list or map
+  defp collection_drop_last(list) when is_list(list) and length(list) > 0 do
+    Enum.take(list, length(list) - 1)
+  end
+  defp collection_drop_last(map) when is_map(map) and map_size(map) > 0 do
+    last_key = Integer.to_string(map_size(map) - 1)
+    Map.delete(map, last_key)
+  end
+  defp collection_drop_last(other), do: other
 
   # Add another surface
   def handle_event("add_surface", _, socket) do
