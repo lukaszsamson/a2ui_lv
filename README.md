@@ -63,6 +63,10 @@ The demo application lives in `demo/` and shows both v0.8 and v0.9 flows with Li
 
 ## Links
 
-- A2UI docs: `docs/A2UI/docs`
-- A2UI protocol specs: `docs/A2UI/specification`
-- Demo app: `demo/`
+- [A2UI docs](https://a2ui.org/)
+- A2UI protocol specs:
+-- [v0.8 (stable)](https://a2ui.org/specification/v0.8-a2ui/)
+-- [v0.9 (draft)](https://a2ui.org/specification/v0.9-a2ui/)
+-- [A2UI Extension for A2A Protocol](https://a2ui.org/specification/v0.8-a2a-extension/)
+- [A2A docs](https://a2a-protocol.org/latest/)
+- Demo app: [demo]
