@@ -25,6 +25,7 @@ defmodule A2UIDemo.Demo.StorybookSamples do
       # Display Components
       {"Display", "Text - Headings", "text-headings", text_headings()},
       {"Display", "Text - Body & Caption", "text-body", text_body()},
+      {"Display", "Text - Markdown", "text-markdown", text_markdown()},
       {"Display", "Divider - Basic", "divider", divider()},
       {"Display", "Divider - Variants", "divider-variants", divider_variants()},
       {"Display", "Icon - Common", "icon-common", icon_common()},
@@ -250,6 +251,15 @@ defmodule A2UIDemo.Demo.StorybookSamples do
         {"id":"caption","component":{"Text":{"text":{"literalString":"This is caption text, typically used for labels or secondary information."},"usageHint":"caption"}}}
       ]}}),
       ~s({"beginRendering":{"surfaceId":"text-body","root":"root"}})
+    ]
+  end
+
+  defp text_markdown do
+    # Markdown is rendered when NO variant/usageHint is specified
+    # When variant IS specified, text renders as plain styled text
+    [
+      ~S|{"surfaceUpdate":{"surfaceId":"text-markdown","components":[{"id":"root","component":{"Column":{"children":{"explicitList":["label1","md-text","divider1","label2","plain-text"]}}}},{"id":"label1","component":{"Text":{"text":{"literalString":"Text WITHOUT variant (renders markdown):"},"usageHint":"caption"}}},{"id":"md-text","component":{"Text":{"text":{"literalString":"# Markdown Heading\n\nThis is a paragraph with **bold text**, *italic text*, and `inline code`.\n\n## Lists\n\n- First item\n- Second item\n- Third item\n\n1. Numbered one\n2. Numbered two\n\n> This is a blockquote with some wisdom.\n\n```\ncode block example\n```\n\nNote: Links and images are stripped per A2UI spec."}}}},{"id":"divider1","component":{"Divider":{"axis":"horizontal"}}},{"id":"label2","component":{"Text":{"text":{"literalString":"Text WITH variant='body' (plain text, no markdown):"},"usageHint":"caption"}}},{"id":"plain-text","component":{"Text":{"text":{"literalString":"This has **asterisks** but they are NOT rendered as bold because variant is set."},"usageHint":"body"}}}]}}|,
+      ~s({"beginRendering":{"surfaceId":"text-markdown","root":"root"}})
     ]
   end
 

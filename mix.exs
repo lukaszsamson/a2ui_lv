@@ -64,6 +64,7 @@ defmodule A2UI.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_view, "~> 1.1"},
       {:jason, "~> 1.2"},
+      {:earmark, "~> 1.4"},
       # Optional: HTTP transport (SSE client)
       {:req, "~> 0.5", optional: true},
       # Dev/test only

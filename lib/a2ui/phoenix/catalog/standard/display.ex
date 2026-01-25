@@ -72,13 +72,28 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
     text =
       Binding.resolve(assigns.props["text"], assigns.surface.data_model, assigns.scope_path, opts)
 
-    hint = Adapter.variant_prop(assigns.props, "body")
-    {style, class} = text_style(hint)
-    assigns = assign(assigns, text: text, style: style, class: class)
+    # Get variant without default - nil means no variant specified
+    variant = Adapter.variant_prop(assigns.props)
 
-    ~H"""
-    <span class={@class} style={@style}>{@text}</span>
-    """
+    if variant == nil do
+      # No variant specified - render with markdown support
+      rendered_html = render_markdown(text)
+      assigns = assign(assigns, rendered_html: rendered_html)
+
+      ~H"""
+      <div class="a2ui-text-markdown text-zinc-900 dark:text-zinc-50">
+        {Phoenix.HTML.raw(@rendered_html)}
+      </div>
+      """
+    else
+      # Variant specified - render as plain styled text
+      {style, class} = text_style(variant)
+      assigns = assign(assigns, text: text, style: style, class: class)
+
+      ~H"""
+      <span class={@class} style={@style}>{@text}</span>
+      """
+    end
   end
 
   attr :props, :map, required: true

@@ -3,6 +3,79 @@ defmodule A2UI.Phoenix.Catalog.Standard.Helpers do
 
   alias A2UI.Checks
 
+  @doc """
+  Renders simple markdown text to safe HTML.
+
+  Per A2UI spec, this supports basic markdown formatting but strips:
+  - HTML tags
+  - Images
+  - Links (converted to plain text)
+
+  Supported: bold, italic, code, lists, blockquotes, headings.
+  """
+  def render_markdown(nil), do: ""
+  def render_markdown(""), do: ""
+
+  def render_markdown(text) when is_binary(text) do
+    text
+    |> Earmark.as_html!(
+      compact_output: true,
+      code_class_prefix: "a2ui-code-",
+      smartypants: false
+    )
+    |> sanitize_markdown_html()
+  end
+
+  def render_markdown(other), do: to_string(other)
+
+  # Sanitize markdown HTML output per A2UI spec:
+  # - Strip <img> tags completely
+  # - Convert <a> links to plain text (keep inner content)
+  # - Strip any raw HTML that might have been in the source
+  defp sanitize_markdown_html(html) do
+    html
+    # Remove image tags completely
+    |> String.replace(~r/<img[^>]*>/i, "")
+    # Convert links to plain text (keep the link text, remove the anchor)
+    |> String.replace(~r/<a[^>]*>([^<]*)<\/a>/i, "\\1")
+    # Remove dangerous tags with their content
+    |> remove_dangerous_tags_with_content()
+    # Remove any other potentially dangerous tags but keep safe ones
+    |> sanitize_allowed_tags()
+  end
+
+  # Tags that should be removed along with their content
+  @dangerous_tags_with_content ~w(script style iframe object embed form)
+
+  defp remove_dangerous_tags_with_content(html) do
+    Enum.reduce(@dangerous_tags_with_content, html, fn tag, acc ->
+      # Remove opening/closing tag pairs with content
+      acc
+      |> String.replace(~r/<#{tag}[^>]*>.*?<\/#{tag}>/is, "")
+      # Remove self-closing variants
+      |> String.replace(~r/<#{tag}[^>]*\/?>/i, "")
+    end)
+  end
+
+  # Allow only safe markdown-generated tags
+  @allowed_tags ~w(p br strong em b i code pre ul ol li blockquote h1 h2 h3 h4 h5 h6 hr)
+
+  defp sanitize_allowed_tags(html) do
+    # Remove any tag that's not in our allowed list
+    # This handles any raw HTML that was in the markdown source
+    Regex.replace(
+      ~r/<\/?([a-zA-Z][a-zA-Z0-9]*)[^>]*>/,
+      html,
+      fn full_match, tag_name ->
+        if String.downcase(tag_name) in @allowed_tags do
+          full_match
+        else
+          ""
+        end
+      end
+    )
+  end
+
   def flex_style(distribution, alignment) do
     justify =
       case distribution do
