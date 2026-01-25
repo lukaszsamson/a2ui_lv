@@ -1,0 +1,6 @@
+[submodule "docs/A2UI"]
+	path = docs/A2UI
+	url = git@github.com:google/A2UI.git
+[submodule "docs/A2A"]
+	path = docs/A2A
+	url = git@github.com:a2aproject/A2A.git
