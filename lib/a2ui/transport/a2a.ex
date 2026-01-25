@@ -12,7 +12,7 @@ defmodule A2UI.Transport.A2A do
   ┌─────────────────────────────┐             ┌─────────────────────────────┐
   │ A2UI.Phoenix.Live           │             │ A2A-compliant Agent         │
   │   ↓                         │             │   ↓                         │
-  │ A2A.Client (UIStream+Events)│◄─── A2A ───│ /.well-known/agent.json     │
+  │ A2A.Client (UIStream+Events)│◄─── A2A ───-│ /.well-known/agent.json     │
   │   │                         │             │   ↓                         │
   │   ├── X-A2A-Extensions hdr  │             │ POST /a2a/tasks             │
   │   ├── a2uiClientCapabilities│             │ GET  /a2a/tasks/:id (SSE)   │
