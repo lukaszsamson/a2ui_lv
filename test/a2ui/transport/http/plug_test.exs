@@ -57,10 +57,13 @@ defmodule A2UI.Transport.HTTP.PlugTest do
         |> HTTPPlug.call(opts)
 
       assert conn.status == 200
-      assert Jason.decode!(conn.resp_body) == %{"ok" => true}
+      body = Jason.decode!(conn.resp_body)
+      assert body["ok"] == true
+      assert is_integer(body["eventId"])
 
-      # Should receive the broadcast
-      assert_receive {:a2ui, ~s({"surfaceUpdate":{"surfaceId":"test"}})}
+      # Should receive the broadcast with event ID
+      assert_receive {:a2ui, ~s({"surfaceUpdate":{"surfaceId":"test"}}), event_id}
+      assert is_integer(event_id)
     end
 
     test "returns 404 for non-existent session", %{opts: opts} do

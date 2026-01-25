@@ -48,6 +48,12 @@ try {
   process.exit(1);
 }
 
+// Event entry for replay support
+interface EventEntry {
+  id: number;
+  data: string;  // The wrapped A2A message JSON
+}
+
 // Task storage
 interface Task {
   id: string;
@@ -55,6 +61,8 @@ interface Task {
   surfaceId: string;
   status: "pending" | "generating" | "done" | "error";
   messages: string[];
+  eventHistory: EventEntry[];  // For SSE replay support
+  eventCounter: number;        // Counter for event IDs
   error?: string;
   // For handling actions
   originalPrompt?: string;
@@ -142,6 +150,8 @@ app.post("/a2a/tasks", async (req: Request, res: Response) => {
     surfaceId,
     status: "pending",
     messages: [],
+    eventHistory: [],
+    eventCounter: 0,
     originalPrompt: prompt,
   };
 
@@ -173,6 +183,10 @@ app.get("/a2a/tasks/:taskId", async (req: Request, res: Response) => {
     return res.status(404).json({ error: "Task not found" });
   }
 
+  // Check for Last-Event-ID header for replay support
+  const lastEventIdHeader = req.headers["last-event-id"];
+  const lastEventId = lastEventIdHeader ? parseInt(lastEventIdHeader as string, 10) : 0;
+
   // Set SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -180,13 +194,22 @@ app.get("/a2a/tasks/:taskId", async (req: Request, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
+  // Send retry hint for reconnection
+  res.write(`retry: 3000\n\n`);
+
   // Store SSE response for async writing
   task.sseResponse = res;
 
-  // Send any already-generated messages (wrapped in A2A format)
-  for (const msg of task.messages) {
-    const a2aMsg = wrapA2UIMessage(msg);
-    res.write(`data: ${JSON.stringify(a2aMsg)}\n\n`);
+  // Replay events since Last-Event-ID (or send all events if no header)
+  const eventsToReplay = task.eventHistory.filter(e => e.id > lastEventId);
+  // Sort by ID ascending for chronological order
+  eventsToReplay.sort((a, b) => a.id - b.id);
+
+  if (eventsToReplay.length > 0) {
+    console.log(`[A2A] Replaying ${eventsToReplay.length} events for task ${taskId} (after event ${lastEventId})`);
+    for (const event of eventsToReplay) {
+      res.write(`id: ${event.id}\ndata: ${event.data}\n\n`);
+    }
   }
 
   // If already done or error, close immediately
@@ -260,6 +283,8 @@ app.post("/a2a/tasks/:taskId", async (req: Request, res: Response) => {
     surfaceId: task.surfaceId,
     status: "pending",
     messages: [],
+    eventHistory: [],
+    eventCounter: 0,
     originalPrompt: task.originalPrompt || task.prompt,
     dataModel: task.dataModel,
   };
@@ -302,16 +327,29 @@ async function generateForTask(task: Task): Promise<void> {
   const result = await generateA2UI(prompt, {
     surfaceId,
     onMessage: (msg) => {
+      // Increment event counter
+      task.eventCounter++;
+      const eventId = task.eventCounter;
+
       // Store message
       task.messages.push(msg);
 
-      // Send to SSE if connected (wrapped in A2A format)
-      if (task.sseResponse) {
-        const a2aMsg = wrapA2UIMessage(msg);
-        task.sseResponse.write(`data: ${JSON.stringify(a2aMsg)}\n\n`);
+      // Wrap in A2A format and store in history
+      const a2aMsg = wrapA2UIMessage(msg);
+      const a2aMsgJson = JSON.stringify(a2aMsg);
+      task.eventHistory.push({ id: eventId, data: a2aMsgJson });
+
+      // Keep only last 100 events in history
+      if (task.eventHistory.length > 100) {
+        task.eventHistory.shift();
       }
 
-      console.log(`[A2A] Sent message: ${msg.substring(0, 100)}...`);
+      // Send to SSE if connected (with event ID)
+      if (task.sseResponse) {
+        task.sseResponse.write(`id: ${eventId}\ndata: ${a2aMsgJson}\n\n`);
+      }
+
+      console.log(`[A2A] Sent message (id=${eventId}): ${msg.substring(0, 100)}...`);
     },
   });
 

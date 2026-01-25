@@ -1,8 +1,6 @@
 # A2UI v0.8/v0.9 Conformance TODO
 
-Concrete items still required for full protocol conformance based on
-`SPEC_V08_TODO.md`, `SPEC_V09_TODO.md`, `CATALOG_NEGOTIATION.md`,
-`TRANSPORT_SSE.md`, `TRANSPORT_A2A.md`, and the current code in `lib/a2ui/*`.
+Concrete items still required for full protocol conformance based on the current code in `lib/a2ui/*`.
 
 ## Shared (v0.8 + v0.9)
 - Catalog schema validation: add `A2UI.Catalog.Validator` to load JSON schemas
@@ -18,8 +16,6 @@ Concrete items still required for full protocol conformance based on
 - Validation error propagation: decide and implement when to emit client error
   envelopes for invalid `surfaceUpdate`/`updateComponents`/`dataModelUpdate` vs
   silently ignoring, and wire those errors through event transports.
-- Text markdown rendering: implement restricted Markdown rendering (no HTML,
-  images, or links) or document unsupported behavior in a spec-accurate way.
 
 ## v0.8-specific
 - Component wrapper validation: enforce exactly one component type key in v0.8
@@ -37,9 +33,6 @@ Concrete items still required for full protocol conformance based on
 - Ordering strictness: optionally reject `updateComponents` before
   `createSurface` and emit `VALIDATION_FAILED` errors in strict mode.
 
-## Transport (SSE) conformance gaps
-- Resume/replay: emit SSE `id:` fields, persist recent events (or replay full
-  surface state), and honor `Last-Event-ID` for reconnect.
 
 ## Transport (A2A) conformance gaps
 Note: current target is legacy A2A flavor (`X-A2A-Extensions`, `kind` fields).

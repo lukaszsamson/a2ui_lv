@@ -74,15 +74,70 @@ defmodule A2UI.Transport.HTTP.RegistryTest do
       topic = Registry.topic(registry, session_id)
       Phoenix.PubSub.subscribe(pubsub, topic)
 
-      # Broadcast message
-      :ok = Registry.broadcast(registry, session_id, ~s({"test": 1}))
+      # Broadcast message - returns event ID
+      {:ok, event_id} = Registry.broadcast(registry, session_id, ~s({"test": 1}))
+      assert is_integer(event_id)
+      assert event_id > 0
 
-      # Should receive the message
-      assert_receive {:a2ui, ~s({"test": 1})}
+      # Should receive the message with event ID
+      assert_receive {:a2ui, ~s({"test": 1}), ^event_id}
     end
 
     test "returns error for non-existent session", %{registry: registry} do
       assert {:error, :not_found} = Registry.broadcast(registry, "nonexistent", "data")
+    end
+
+    test "increments event IDs", %{registry: registry, pubsub: pubsub} do
+      {:ok, session_id} = Registry.create_session(registry)
+
+      topic = Registry.topic(registry, session_id)
+      Phoenix.PubSub.subscribe(pubsub, topic)
+
+      {:ok, id1} = Registry.broadcast(registry, session_id, "msg1")
+      {:ok, id2} = Registry.broadcast(registry, session_id, "msg2")
+      {:ok, id3} = Registry.broadcast(registry, session_id, "msg3")
+
+      assert id1 == 1
+      assert id2 == 2
+      assert id3 == 3
+    end
+  end
+
+  describe "get_events_since/3" do
+    test "returns events after given ID", %{registry: registry} do
+      {:ok, session_id} = Registry.create_session(registry)
+
+      {:ok, _id1} = Registry.broadcast(registry, session_id, "msg1")
+      {:ok, _id2} = Registry.broadcast(registry, session_id, "msg2")
+      {:ok, _id3} = Registry.broadcast(registry, session_id, "msg3")
+
+      {:ok, events} = Registry.get_events_since(registry, session_id, 1)
+      assert length(events) == 2
+      assert {2, "msg2"} in events
+      assert {3, "msg3"} in events
+    end
+
+    test "returns all events when after_event_id is 0", %{registry: registry} do
+      {:ok, session_id} = Registry.create_session(registry)
+
+      {:ok, _} = Registry.broadcast(registry, session_id, "msg1")
+      {:ok, _} = Registry.broadcast(registry, session_id, "msg2")
+
+      {:ok, events} = Registry.get_events_since(registry, session_id, 0)
+      assert length(events) == 2
+    end
+
+    test "returns empty list when no events after ID", %{registry: registry} do
+      {:ok, session_id} = Registry.create_session(registry)
+
+      {:ok, id} = Registry.broadcast(registry, session_id, "msg1")
+
+      {:ok, events} = Registry.get_events_since(registry, session_id, id)
+      assert events == []
+    end
+
+    test "returns error for non-existent session", %{registry: registry} do
+      assert {:error, :not_found} = Registry.get_events_since(registry, "nonexistent", 0)
     end
   end
 

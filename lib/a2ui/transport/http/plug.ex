@@ -221,8 +221,8 @@ defmodule A2UI.Transport.HTTP.Plug do
 
       registry ->
         case Registry.broadcast(registry, session_id, json_line) do
-          :ok ->
-            send_json(conn, 200, %{ok: true})
+          {:ok, event_id} ->
+            send_json(conn, 200, %{ok: true, eventId: event_id})
 
           {:error, :not_found} ->
             send_json(conn, 404, %{error: "Session not found"})

@@ -31,13 +31,23 @@ defmodule A2UI.Transport.HTTP.Registry do
   require Logger
 
   @type session_id :: String.t()
+  @type event_entry :: %{
+          id: pos_integer(),
+          data: String.t(),
+          timestamp: DateTime.t()
+        }
   @type session :: %{
           id: session_id(),
           created_at: DateTime.t(),
-          metadata: map()
+          metadata: map(),
+          event_counter: pos_integer(),
+          event_history: [event_entry()]
         }
 
-  defstruct [:pubsub, :topic_prefix, sessions: %{}]
+  defstruct [:pubsub, :topic_prefix, :max_event_history, sessions: %{}]
+
+  # Default maximum events to keep per session for replay
+  @default_max_event_history 100
 
   @default_topic_prefix "a2ui:session:"
 
@@ -99,14 +109,43 @@ defmodule A2UI.Transport.HTTP.Registry do
   Broadcasts a JSON line to all consumers of a session.
 
   The message is sent via PubSub to the topic `"a2ui:session:<session_id>"`.
-  Consumers receive `{:a2ui, json_line}`.
+  Consumers receive `{:a2ui, json_line, event_id}`.
 
-  Returns `:ok` if the session exists, or `{:error, :not_found}`.
+  Returns `{:ok, event_id}` if the session exists, or `{:error, :not_found}`.
+  The event_id can be used by clients for resume/replay via `Last-Event-ID`.
   """
-  @spec broadcast(session_id(), String.t()) :: :ok | {:error, :not_found}
-  @spec broadcast(GenServer.server(), session_id(), String.t()) :: :ok | {:error, :not_found}
+  @spec broadcast(session_id(), String.t()) :: {:ok, pos_integer()} | {:error, :not_found}
+  @spec broadcast(GenServer.server(), session_id(), String.t()) ::
+          {:ok, pos_integer()} | {:error, :not_found}
   def broadcast(server \\ __MODULE__, session_id, json_line) do
     GenServer.call(server, {:broadcast, session_id, json_line})
+  end
+
+  @doc """
+  Gets events for replay starting after the given event ID.
+
+  Returns a list of `{event_id, json_line}` tuples in chronological order
+  for all events with ID > `after_event_id`.
+
+  This is used by SSE servers to replay missed events when a client reconnects
+  with `Last-Event-ID` header.
+
+  ## Parameters
+
+  - `session_id` - The session to get events from
+  - `after_event_id` - Only return events with ID greater than this (use 0 for all)
+
+  ## Returns
+
+  - `{:ok, events}` - List of `{event_id, json_line}` tuples
+  - `{:error, :not_found}` - Session doesn't exist
+  """
+  @spec get_events_since(session_id(), non_neg_integer()) ::
+          {:ok, [{pos_integer(), String.t()}]} | {:error, :not_found}
+  @spec get_events_since(GenServer.server(), session_id(), non_neg_integer()) ::
+          {:ok, [{pos_integer(), String.t()}]} | {:error, :not_found}
+  def get_events_since(server \\ __MODULE__, session_id, after_event_id) do
+    GenServer.call(server, {:get_events_since, session_id, after_event_id})
   end
 
   @doc """
@@ -179,11 +218,13 @@ defmodule A2UI.Transport.HTTP.Registry do
   def init(opts) do
     pubsub = Keyword.fetch!(opts, :pubsub)
     topic_prefix = Keyword.get(opts, :topic_prefix, @default_topic_prefix)
+    max_event_history = Keyword.get(opts, :max_event_history, @default_max_event_history)
 
     {:ok,
      %__MODULE__{
        pubsub: pubsub,
        topic_prefix: topic_prefix,
+       max_event_history: max_event_history,
        sessions: %{}
      }}
   end
@@ -196,7 +237,9 @@ defmodule A2UI.Transport.HTTP.Registry do
     session = %{
       id: session_id,
       created_at: DateTime.utc_now(),
-      metadata: metadata
+      metadata: metadata,
+      event_counter: 0,
+      event_history: []
     }
 
     sessions = Map.put(state.sessions, session_id, session)
@@ -220,16 +263,52 @@ defmodule A2UI.Transport.HTTP.Registry do
   end
 
   def handle_call({:broadcast, session_id, json_line}, _from, state) do
-    result =
-      if Map.has_key?(state.sessions, session_id) do
-        topic = state.topic_prefix <> session_id
-        Phoenix.PubSub.broadcast(state.pubsub, topic, {:a2ui, json_line})
-        :ok
-      else
-        {:error, :not_found}
-      end
+    case Map.fetch(state.sessions, session_id) do
+      {:ok, session} ->
+        # Increment event counter and create event entry
+        event_id = session.event_counter + 1
 
-    {:reply, result, state}
+        event_entry = %{
+          id: event_id,
+          data: json_line,
+          timestamp: DateTime.utc_now()
+        }
+
+        # Add to history, keeping only max_event_history entries
+        new_history =
+          [event_entry | session.event_history]
+          |> Enum.take(state.max_event_history)
+
+        # Update session with new counter and history
+        updated_session = %{session | event_counter: event_id, event_history: new_history}
+        sessions = Map.put(state.sessions, session_id, updated_session)
+
+        # Broadcast with event ID
+        topic = state.topic_prefix <> session_id
+        Phoenix.PubSub.broadcast(state.pubsub, topic, {:a2ui, json_line, event_id})
+
+        {:reply, {:ok, event_id}, %{state | sessions: sessions}}
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:get_events_since, session_id, after_event_id}, _from, state) do
+    case Map.fetch(state.sessions, session_id) do
+      {:ok, session} ->
+        # Filter events with ID > after_event_id and return in chronological order
+        events =
+          session.event_history
+          |> Enum.filter(fn entry -> entry.id > after_event_id end)
+          |> Enum.sort_by(fn entry -> entry.id end)
+          |> Enum.map(fn entry -> {entry.id, entry.data} end)
+
+        {:reply, {:ok, events}, state}
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
   end
 
   def handle_call({:broadcast_done, session_id, meta}, _from, state) do

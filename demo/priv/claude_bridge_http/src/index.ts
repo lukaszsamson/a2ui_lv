@@ -36,6 +36,12 @@ function getA2uiVersion(): "v0.8" | "v0.9" {
   return process.env.A2UI_VERSION === "v0.9" ? "v0.9" : "v0.8";
 }
 
+// Event entry for replay support
+interface EventEntry {
+  id: number;
+  data: string;
+}
+
 // Session storage
 interface Session {
   id: string;
@@ -43,6 +49,8 @@ interface Session {
   surfaceId: string;
   status: "pending" | "generating" | "done" | "error";
   messages: string[];
+  eventHistory: EventEntry[];  // For SSE replay support
+  eventCounter: number;        // Counter for event IDs
   error?: string;
   // For handling actions
   originalPrompt?: string;
@@ -94,6 +102,8 @@ app.post("/sessions", async (req: Request, res: Response) => {
     surfaceId,
     status: "pending",
     messages: [],
+    eventHistory: [],
+    eventCounter: 0,
   };
 
   sessions.set(sessionId, session);
@@ -128,6 +138,10 @@ app.get("/stream/:sessionId", async (req: Request, res: Response) => {
     return res.status(404).json({ error: "Session not found" });
   }
 
+  // Check for Last-Event-ID header for replay support
+  const lastEventIdHeader = req.headers["last-event-id"];
+  const lastEventId = lastEventIdHeader ? parseInt(lastEventIdHeader as string, 10) : 0;
+
   // Set SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -135,12 +149,22 @@ app.get("/stream/:sessionId", async (req: Request, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
+  // Send retry hint for reconnection
+  res.write(`retry: 3000\n\n`);
+
   // Store SSE response for async writing
   session.sseResponse = res;
 
-  // Send any already-generated messages
-  for (const msg of session.messages) {
-    res.write(`data: ${msg}\n\n`);
+  // Replay events since Last-Event-ID (or send all events if no header)
+  const eventsToReplay = session.eventHistory.filter(e => e.id > lastEventId);
+  // Sort by ID ascending for chronological order
+  eventsToReplay.sort((a, b) => a.id - b.id);
+
+  if (eventsToReplay.length > 0) {
+    console.log(`[HTTP] Replaying ${eventsToReplay.length} events for session ${sessionId} (after event ${lastEventId})`);
+    for (const event of eventsToReplay) {
+      res.write(`id: ${event.id}\ndata: ${event.data}\n\n`);
+    }
   }
 
   // If already done or error, close immediately
@@ -214,6 +238,8 @@ app.post("/events", async (req: Request, res: Response) => {
     surfaceId: session.surfaceId,
     status: "pending",
     messages: [],
+    eventHistory: [],
+    eventCounter: 0,
     originalPrompt: session.originalPrompt || session.prompt,
     dataModel: session.dataModel,
   };
@@ -249,13 +275,24 @@ app.post("/message", async (req: Request, res: Response) => {
   }
 
   const msgStr = typeof message === "string" ? message : JSON.stringify(message);
-  session.messages.push(msgStr);
 
-  if (session.sseResponse) {
-    session.sseResponse.write(`data: ${msgStr}\n\n`);
+  // Increment event counter and store in history
+  session.eventCounter++;
+  const eventId = session.eventCounter;
+
+  session.messages.push(msgStr);
+  session.eventHistory.push({ id: eventId, data: msgStr });
+
+  // Keep only last 100 events in history
+  if (session.eventHistory.length > 100) {
+    session.eventHistory.shift();
   }
 
-  res.json({ ok: true });
+  if (session.sseResponse) {
+    session.sseResponse.write(`id: ${eventId}\ndata: ${msgStr}\n\n`);
+  }
+
+  res.json({ ok: true, eventId });
 });
 
 /**
@@ -399,13 +436,24 @@ Generate the A2UI JSON response now. Output ONLY valid JSON.`;
         ? buildA2uiMessagesV09(parsed, surfaceId)
         : buildA2uiMessages(parsed, surfaceId);
 
-    // Send messages
+    // Send messages with event IDs
     for (const msg of messages) {
+      // Increment event counter and store in history
+      session.eventCounter++;
+      const eventId = session.eventCounter;
+
       session.messages.push(msg);
-      if (session.sseResponse) {
-        session.sseResponse.write(`data: ${msg}\n\n`);
+      session.eventHistory.push({ id: eventId, data: msg });
+
+      // Keep only last 100 events in history
+      if (session.eventHistory.length > 100) {
+        session.eventHistory.shift();
       }
-      console.log(`[HTTP] Sent message: ${msg.substring(0, 100)}...`);
+
+      if (session.sseResponse) {
+        session.sseResponse.write(`id: ${eventId}\ndata: ${msg}\n\n`);
+      }
+      console.log(`[HTTP] Sent message (id=${eventId}): ${msg.substring(0, 100)}...`);
     }
 
     session.status = "done";
