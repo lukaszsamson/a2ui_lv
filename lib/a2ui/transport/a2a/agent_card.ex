@@ -64,6 +64,33 @@ defmodule A2UI.Transport.A2A.AgentCard do
   ]
 
   @doc """
+  Converts an a2a_ex AgentCard struct to an A2UI AgentCard.
+
+  This adapter allows using the a2a_ex library for agent card discovery
+  while maintaining the A2UI-specific AgentCard structure.
+
+  ## Examples
+
+      iex> a2a_card = %A2A.Types.AgentCard{name: "Test", url: "http://localhost:3002"}
+      iex> card = A2UI.Transport.A2A.AgentCard.from_a2a_ex(a2a_card)
+      iex> card.name
+      "Test"
+  """
+  @spec from_a2a_ex(A2A.Types.AgentCard.t()) :: t()
+  def from_a2a_ex(%A2A.Types.AgentCard{} = a2a_card) do
+    extensions = extract_extensions_from_capabilities(a2a_card.capabilities)
+
+    %__MODULE__{
+      name: a2a_card.name,
+      url: a2a_card.url,
+      description: a2a_card.description,
+      extensions: extensions,
+      capabilities: capabilities_to_map(a2a_card.capabilities),
+      raw: A2A.Types.AgentCard.to_map(a2a_card)
+    }
+  end
+
+  @doc """
   Parses an agent card JSON response into an AgentCard struct.
 
   ## Examples
@@ -239,4 +266,30 @@ defmodule A2UI.Transport.A2A.AgentCard do
   end
 
   defp parse_extensions(_), do: []
+
+  # Helper functions for from_a2a_ex/1
+
+  defp extract_extensions_from_capabilities(nil), do: []
+
+  defp extract_extensions_from_capabilities(%A2A.Types.AgentCapabilities{extensions: nil}), do: []
+
+  defp extract_extensions_from_capabilities(%A2A.Types.AgentCapabilities{extensions: extensions}) do
+    Enum.map(extensions, fn
+      %A2A.Types.AgentExtension{uri: uri, metadata: metadata} ->
+        %{
+          uri: uri,
+          params: metadata || %{}
+        }
+
+      _ ->
+        nil
+    end)
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp capabilities_to_map(nil), do: %{}
+
+  defp capabilities_to_map(%A2A.Types.AgentCapabilities{} = capabilities) do
+    A2A.Types.AgentCapabilities.to_map(capabilities)
+  end
 end

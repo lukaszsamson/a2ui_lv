@@ -67,8 +67,11 @@ defmodule A2UI.MixProject do
       {:earmark, "~> 1.4"},
       # Optional: HTTP transport (SSE client)
       {:req, "~> 0.5", optional: true},
+      # A2A protocol library
+      {:a2a_ex, optional: true},
       # Dev/test only
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.4", only: :dev, runtime: false},
       {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end

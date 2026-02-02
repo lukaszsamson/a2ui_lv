@@ -3,7 +3,8 @@ defmodule A2UIDemo.Demo.A2AClient do
   A2A transport client for communicating with the Claude A2A bridge.
 
   Connects to an A2A-compliant agent that generates A2UI interfaces
-  using the full A2A protocol format.
+  using the full A2A protocol format. Uses the a2a_ex library for
+  HTTP transport and SSE handling.
 
   ## Usage
 
@@ -123,9 +124,13 @@ defmodule A2UIDemo.Demo.A2AClient do
 
   @impl true
   def handle_call(:check_available, _from, state) do
-    # Fetch agent card with short timeout and no retries for quick availability check
-    case fetch_agent_card(state.endpoint, timeout: 2_000, retry: false) do
-      {:ok, card} ->
+    # Fetch agent card with short timeout for quick availability check
+    config_opts = a2a_config_opts(timeout: 2_000)
+
+    case A2A.Client.discover(state.endpoint, config_opts) do
+      {:ok, a2a_card} ->
+        card = AgentCard.from_a2a_ex(a2a_card)
+
         if AgentCard.supports_a2ui?(card) do
           {:reply, :available, %{state | agent_card: card}}
         else
@@ -140,234 +145,164 @@ defmodule A2UIDemo.Demo.A2AClient do
   def handle_call({:generate, prompt, opts}, _from, state) do
     timeout = opts[:timeout] || @recv_timeout
     on_message = opts[:on_message]
-    surface_id = opts[:surface_id] || "llm-surface"
+    _surface_id = opts[:surface_id] || "llm-surface"
 
-    result = do_generate(state, prompt, surface_id, on_message, timeout)
+    result = do_generate(state, prompt, on_message, timeout)
     {:reply, result, state}
   end
 
   # Private functions
 
-  defp fetch_agent_card(endpoint, opts) do
-    url = endpoint <> "/.well-known/agent.json"
-    headers = a2a_headers()
-
-    # Use short timeout and no retries for availability checks
-    timeout = Keyword.get(opts, :timeout, 10_000)
-    retry = Keyword.get(opts, :retry, :transient)
-
-    case Req.get(url, headers: headers, receive_timeout: timeout, retry: retry) do
-      {:ok, %{status: 200, body: body}} ->
-        AgentCard.parse(body)
-
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("Failed to fetch agent card: status=#{status}")
-        {:error, {:http_error, status, body}}
-
-      {:error, reason} ->
-        Logger.error("Failed to fetch agent card: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  defp do_generate(state, prompt, _surface_id, on_message, timeout) do
-    # Step 1: Create task
-    create_url = state.endpoint <> "/a2a/tasks"
-    headers = a2a_headers()
-
+  defp do_generate(state, prompt, on_message, timeout) do
     # Build A2A message with text content
-    create_body = build_initial_message(state.capabilities, prompt)
+    message = build_a2a_message(state.capabilities, prompt)
+    config_opts = a2a_config_opts(timeout: timeout)
 
-    case Req.post(create_url, headers: headers, json: create_body, receive_timeout: 30_000) do
-      {:ok, %{status: status, body: %{"taskId" => task_id}}} when status in [200, 201] ->
-        Logger.info("A2AClient created task #{task_id}")
+    # Use stream_message to get streaming response
+    case A2A.Client.stream_message(state.endpoint, [message: message], config_opts) do
+      {:ok, stream} ->
+        Logger.info("A2AClient streaming started")
+        collect_stream_messages(stream, on_message, timeout)
 
-        # Step 2: Stream SSE
-        stream_url = state.endpoint <> "/a2a/tasks/" <> task_id
-        stream_messages(stream_url, headers, on_message, timeout)
-
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("Failed to create task: status=#{status}, body=#{inspect(body)}")
-        {:error, {:http_error, status, body}}
-
-      {:error, reason} ->
-        Logger.error("Failed to create task: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
-
-  defp stream_messages(url, headers, on_message, timeout) do
-    parent = self()
-    messages = []
-
-    # Process dictionary to maintain buffer state across chunks
-    Process.put(:sse_buffer, "")
-
-    # Use a streaming request to collect SSE messages
-    req_opts = [
-      headers: headers ++ [{"accept", "text/event-stream"}],
-      receive_timeout: timeout,
-      into: fn {:data, chunk}, {req, resp} ->
-        # Get current buffer from process dictionary
-        buffer = Process.get(:sse_buffer, "")
-
-        # Parse SSE events from chunk
-        {events, new_buffer} = parse_sse_chunk(chunk, buffer)
-        Process.put(:sse_buffer, new_buffer)
-
-        # Process each event
-        for event <- events do
-          case parse_sse_data(event) do
-            {:ok, data} when data != "" ->
-              # Parse A2A message and extract A2UI envelopes
-              process_a2a_message(data, on_message, parent)
-
-            _ ->
-              :ok
-          end
-        end
-
-        {:cont, {req, resp}}
-      end
-    ]
-
-    # Start streaming in a task
-    task =
-      Task.async(fn ->
-        case Req.get(url, req_opts) do
-          {:ok, _} -> :ok
-          {:error, reason} -> {:error, reason}
-        end
-      end)
-
-    # Collect messages
-    collect_messages(task, messages, timeout)
-  end
-
-  defp process_a2a_message(data, on_message, parent) do
-    case Jason.decode(data) do
-      {:ok, %{"message" => _} = a2a_msg} ->
-        # Extract A2UI envelopes from DataParts
-        envelopes = DataPart.extract_envelopes(a2a_msg)
-
-        for envelope <- envelopes do
-          json = Jason.encode!(envelope)
-
-          if on_message, do: on_message.(json)
-          send(parent, {:stream_message, json})
-        end
-
-      {:ok, envelope} when is_map(envelope) ->
-        # Not wrapped in A2A message, handle directly (backward compat)
-        if on_message, do: on_message.(data)
-        send(parent, {:stream_message, data})
-
-      {:error, _} ->
-        # Not valid JSON, skip
-        :ok
-    end
-  end
-
-  defp collect_messages(%Task{ref: ref} = task, messages, timeout) do
-    deadline = System.monotonic_time(:millisecond) + timeout
-
-    receive do
-      {:stream_message, data} ->
-        collect_messages(task, [data | messages], remaining_timeout(deadline))
-
-      {:stream_done, _} ->
-        Task.shutdown(task, :brutal_kill)
-        {:ok, Enum.reverse(messages)}
-
-      {:stream_error, error} ->
-        Task.shutdown(task, :brutal_kill)
+      {:error, %A2A.Error{} = error} ->
+        Logger.error("Failed to start streaming: #{inspect(error)}")
         {:error, error}
 
-      {^ref, :ok} ->
-        # Task completed successfully - flush the DOWN message
-        receive do
-          {:DOWN, ^ref, :process, _, _} -> :ok
-        after
-          0 -> :ok
+      {:error, reason} ->
+        Logger.error("Failed to start streaming: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp collect_stream_messages(stream, on_message, timeout) do
+    parent = self()
+
+    # Start async task to process stream
+    task =
+      Task.async(fn ->
+        try do
+          Enum.reduce(stream, [], fn item, acc ->
+            case process_stream_item(item, on_message, parent) do
+              {:ok, new_messages} -> acc ++ new_messages
+              :skip -> acc
+            end
+          end)
+        rescue
+          e ->
+            Logger.error("Stream processing error: #{inspect(e)}")
+            {:error, e}
         end
+      end)
 
-        {:ok, Enum.reverse(messages)}
-
-      {^ref, {:error, reason}} ->
-        # Task completed with error - flush the DOWN message
-        receive do
-          {:DOWN, ^ref, :process, _, _} -> :ok
-        after
-          0 -> :ok
-        end
-
+    # Wait for task with timeout
+    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {:error, reason}} ->
         {:error, reason}
 
-      {:DOWN, ^ref, :process, _, reason} ->
-        {:error, {:task_crashed, reason}}
-    after
-      remaining_timeout(deadline) ->
-        Task.shutdown(task, :brutal_kill)
+      {:ok, collected} when is_list(collected) ->
+        {:ok, collected}
+
+      nil ->
         {:error, :timeout}
+
+      {:exit, reason} ->
+        {:error, {:task_crashed, reason}}
     end
   end
 
-  defp remaining_timeout(deadline) do
-    max(0, deadline - System.monotonic_time(:millisecond))
+  defp process_stream_item(%A2A.Types.StreamResponse{message: msg}, on_message, _parent)
+       when not is_nil(msg) do
+    # Convert message to map and extract A2UI envelopes
+    message_map = A2A.Types.Message.to_map(msg)
+    envelopes = DataPart.extract_envelopes(%{"message" => message_map})
+
+    messages =
+      for envelope <- envelopes do
+        json = Jason.encode!(envelope)
+        if on_message, do: on_message.(json)
+        json
+      end
+
+    {:ok, messages}
   end
 
-  defp parse_sse_chunk(chunk, buffer) do
-    combined = buffer <> chunk
+  defp process_stream_item(%A2A.Types.StreamResponse{status_update: update}, on_message, _parent)
+       when not is_nil(update) do
+    # Status updates may contain messages too
+    if update.status && update.status.message do
+      message_map = A2A.Types.Message.to_map(update.status.message)
+      envelopes = DataPart.extract_envelopes(%{"message" => message_map})
 
-    # Split on double newlines (SSE event boundary)
-    parts = String.split(combined, ~r/\r?\n\r?\n/)
+      messages =
+        for envelope <- envelopes do
+          json = Jason.encode!(envelope)
+          if on_message, do: on_message.(json)
+          json
+        end
 
-    case parts do
-      [incomplete] ->
-        {[], incomplete}
-
-      parts ->
-        {complete, [maybe_incomplete]} = Enum.split(parts, -1)
-        {complete, maybe_incomplete}
+      {:ok, messages}
+    else
+      :skip
     end
   end
 
-  defp parse_sse_data(event_text) do
-    lines = String.split(event_text, ~r/\r?\n/)
+  defp process_stream_item(%A2A.Types.StreamResponse{task: task}, on_message, _parent)
+       when not is_nil(task) do
+    # Task updates - check for messages in history
+    if task.history do
+      messages =
+        for msg <- task.history do
+          message_map = A2A.Types.Message.to_map(msg)
+          envelopes = DataPart.extract_envelopes(%{"message" => message_map})
 
-    data =
-      lines
-      |> Enum.filter(&String.starts_with?(&1, "data:"))
-      |> Enum.map(fn line ->
-        line
-        |> String.trim_leading("data:")
-        |> String.trim_leading(" ")
-      end)
-      |> Enum.join("\n")
+          for envelope <- envelopes do
+            json = Jason.encode!(envelope)
+            if on_message, do: on_message.(json)
+            json
+          end
+        end
+        |> List.flatten()
 
-    {:ok, data}
+      {:ok, messages}
+    else
+      :skip
+    end
   end
 
-  defp a2a_headers do
+  defp process_stream_item(%A2A.Types.StreamError{error: error}, _on_message, _parent) do
+    Logger.warning("Stream error received: #{inspect(error)}")
+    :skip
+  end
+
+  defp process_stream_item(_item, _on_message, _parent), do: :skip
+
+  defp a2a_config_opts(opts) do
+    timeout = Keyword.get(opts, :timeout, 30_000)
     extension_uri = Protocol.extension_uri(:v0_8)
 
     [
-      {"x-a2a-extensions", extension_uri},
-      {"content-type", "application/json"}
+      agent_card_path: "/.well-known/agent.json",
+      legacy_extensions_header: true,
+      extensions: [extension_uri],
+      rest_base_path: "/a2a",
+      version: :v0_3,
+      req_options: [receive_timeout: timeout]
     ]
   end
 
-  defp build_initial_message(capabilities, content) do
-    %{
-      "message" => %{
-        "role" => Protocol.client_role(),
-        "metadata" => %{
-          Protocol.client_capabilities_key() => ClientCapabilities.to_a2a_metadata(capabilities)
-        },
-        "parts" => [
-          %{"text" => content}
-        ]
-      }
+  defp build_a2a_message(capabilities, content) do
+    %A2A.Types.Message{
+      role: :user,
+      metadata: %{
+        Protocol.client_capabilities_key() =>
+          ClientCapabilities.to_a2a_metadata(capabilities)
+      },
+      parts: [
+        %A2A.Types.TextPart{
+          kind: "text",
+          text: content
+        }
+      ]
     }
   end
 end

@@ -3,14 +3,15 @@ defmodule A2UI.Transport.A2A.Client do
   A2A transport client for A2UI.
 
   Implements both `A2UI.Transport.UIStream` and `A2UI.Transport.Events` behaviors
-  using the A2A protocol format. This client can communicate with any A2A-compliant
-  agent that supports the A2UI extension.
+  using the A2A protocol format. This client wraps the `a2a_ex` library to
+  communicate with any A2A-compliant agent that supports the A2UI extension.
 
   ## Requirements
 
-  This module requires the `req` library. Add to your `mix.exs`:
+  This module requires the `req` and `a2a_ex` libraries. Add to your `mix.exs`:
 
       {:req, "~> 0.5"}
+      {:a2a_ex, path: "../a2a_ex"}
 
   ## Usage
 
@@ -57,8 +58,6 @@ defmodule A2UI.Transport.A2A.Client do
   alias A2UI.A2A.DataPart
   alias A2UI.ClientCapabilities
   alias A2UI.Transport.A2A.AgentCard
-  alias A2UI.SSE.Event
-  alias A2UI.SSE.StreamState
 
   defstruct [
     :base_url,
@@ -66,14 +65,17 @@ defmodule A2UI.Transport.A2A.Client do
     :protocol_version,
     :req_options,
     :agent_card,
+    :a2a_agent_card,
     :current_task_id,
     :stream_task,
-    :stream_state,
+    :stream_cancel_fun,
+    :last_event_id,
     consumers: %{},
     connected: false
   ]
 
-  # Check if Req is available at compile time
+  # Check if dependencies are available at compile time
+  @a2a_available Code.ensure_loaded?(A2A.Client)
   @req_available Code.ensure_loaded?(Req)
 
   # ============================================
@@ -92,7 +94,7 @@ defmodule A2UI.Transport.A2A.Client do
   - `:name` - Process name
   """
   @impl A2UI.Transport.UIStream
-  if @req_available do
+  if @a2a_available and @req_available do
     def start_link(opts) do
       name = Keyword.get(opts, :name)
       gen_opts = if name, do: [name: name], else: []
@@ -195,7 +197,7 @@ defmodule A2UI.Transport.A2A.Client do
   # GenServer Callbacks
   # ============================================
 
-  if @req_available do
+  if @a2a_available and @req_available do
     @impl true
     def init(opts) do
       base_url = Keyword.fetch!(opts, :base_url)
@@ -207,8 +209,7 @@ defmodule A2UI.Transport.A2A.Client do
         base_url: base_url,
         capabilities: capabilities,
         protocol_version: protocol_version,
-        req_options: req_options,
-        stream_state: StreamState.new(session_id: "a2a")
+        req_options: req_options
       }
 
       {:ok, state}
@@ -217,10 +218,10 @@ defmodule A2UI.Transport.A2A.Client do
     @impl true
     def handle_call(:fetch_agent_card, _from, state) do
       case do_fetch_agent_card(state) do
-        {:ok, card} = result ->
-          {:reply, result, %{state | agent_card: card}}
+        {:ok, a2a_card, card} ->
+          {:reply, {:ok, card}, %{state | agent_card: card, a2a_agent_card: a2a_card}}
 
-        error ->
+        {:error, _} = error ->
           {:reply, error, state}
       end
     end
@@ -298,52 +299,35 @@ defmodule A2UI.Transport.A2A.Client do
     end
 
     @impl true
-    def handle_info({:sse_chunk, chunk}, state) do
-      {events, stream_state} = StreamState.process_chunk(state.stream_state, chunk)
-      state = %{state | stream_state: stream_state}
+    def handle_info({:stream_connected}, state) do
+      Logger.debug("A2A client connected to #{state.base_url}")
+      {:noreply, %{state | connected: true}}
+    end
 
-      # Process each SSE event
-      for event <- events do
-        case Event.extract_payload(event) do
-          {:ok, json_line} ->
-            # Try to parse as A2A message and extract DataParts
-            process_a2a_message(json_line, state.consumers)
+    def handle_info({:stream_item, item}, state) do
+      state = process_stream_item(item, state)
+      {:noreply, state}
+    end
 
-          {:error, _} ->
-            :skip
-        end
+    def handle_info({:stream_done}, state) do
+      Logger.debug("A2A client stream completed")
+      dispatch_to_consumers(state.consumers, {:a2ui_stream_done, %{}})
+
+      {:noreply, %{state | connected: false, stream_task: nil, stream_cancel_fun: nil}}
+    end
+
+    def handle_info({:stream_error, reason}, state) do
+      Logger.error("A2A client stream error: #{inspect(reason)}")
+      dispatch_to_consumers(state.consumers, {:a2ui_stream_error, reason})
+
+      state = %{state | connected: false, stream_task: nil, stream_cancel_fun: nil}
+
+      # Schedule reconnect if we have consumers
+      if map_size(state.consumers) > 0 do
+        Process.send_after(self(), :reconnect, 1000)
       end
 
       {:noreply, state}
-    end
-
-    def handle_info({:sse_connected}, state) do
-      Logger.debug("A2A client connected to #{state.base_url}")
-      stream_state = StreamState.mark_connected(state.stream_state)
-      {:noreply, %{state | connected: true, stream_state: stream_state}}
-    end
-
-    def handle_info({:sse_error, reason}, state) do
-      Logger.error("A2A client error: #{inspect(reason)}")
-      dispatch_to_consumers(state.consumers, {:a2ui_stream_error, reason})
-
-      stream_state = StreamState.mark_disconnected(state.stream_state)
-      state = %{state | connected: false, stream_state: stream_state, stream_task: nil}
-
-      # Schedule reconnect
-      retry_delay = StreamState.retry_delay(stream_state)
-      Process.send_after(self(), :reconnect, retry_delay)
-
-      {:noreply, state}
-    end
-
-    def handle_info({:sse_done}, state) do
-      Logger.debug("A2A client stream completed")
-      meta = StreamState.completion_meta(state.stream_state)
-      dispatch_to_consumers(state.consumers, {:a2ui_stream_done, meta})
-
-      stream_state = StreamState.mark_disconnected(state.stream_state)
-      {:noreply, %{state | connected: false, stream_state: stream_state, stream_task: nil}}
     end
 
     def handle_info(:reconnect, state) do
@@ -374,6 +358,10 @@ defmodule A2UI.Transport.A2A.Client do
 
     @impl true
     def terminate(_reason, state) do
+      if state.stream_cancel_fun do
+        state.stream_cancel_fun.()
+      end
+
       if state.stream_task do
         Task.shutdown(state.stream_task, :brutal_kill)
       end
@@ -386,25 +374,16 @@ defmodule A2UI.Transport.A2A.Client do
     # ============================================
 
     defp do_fetch_agent_card(state) do
-      url = build_agent_card_url(state)
-      headers = a2a_headers(state)
+      config_opts = a2a_config_opts(state)
 
-      req_opts =
-        Keyword.merge(
-          [
-            headers: headers,
-            receive_timeout: 10_000
-          ],
-          state.req_options
-        )
+      case A2A.Client.discover(state.base_url, config_opts) do
+        {:ok, a2a_card} ->
+          card = AgentCard.from_a2a_ex(a2a_card)
+          {:ok, a2a_card, card}
 
-      case Req.get(url, req_opts) do
-        {:ok, %Req.Response{status: 200, body: body}} ->
-          AgentCard.parse(body)
-
-        {:ok, %Req.Response{status: status, body: body}} ->
-          Logger.error("Failed to fetch agent card: status=#{status}")
-          {:error, {:http_error, status, body}}
+        {:error, %A2A.Error{} = error} ->
+          Logger.error("Failed to fetch agent card: #{inspect(error)}")
+          {:error, error}
 
         {:error, reason} ->
           Logger.error("Failed to fetch agent card: #{inspect(reason)}")
@@ -413,39 +392,25 @@ defmodule A2UI.Transport.A2A.Client do
     end
 
     defp do_create_task(state, initial_content) do
-      url = build_tasks_url(state)
-      headers = a2a_headers(state)
+      message = build_a2a_message(state.capabilities, initial_content)
+      config_opts = a2a_config_opts(state)
 
-      # Build the initial A2A message
-      # The initial message contains a text part with the prompt
-      a2a_message = build_initial_task_message(state, initial_content)
+      case A2A.Client.send_message(state.base_url, [message: message], config_opts) do
+        {:ok, %A2A.Types.Task{id: task_id}} when is_binary(task_id) ->
+          Logger.info("A2A task created: #{task_id}")
+          {:ok, task_id}
 
-      req_opts =
-        Keyword.merge(
-          [
-            headers: headers,
-            json: a2a_message,
-            receive_timeout: 30_000
-          ],
-          state.req_options
-        )
+        {:ok, %A2A.Types.Message{task_id: task_id}} when is_binary(task_id) ->
+          Logger.info("A2A task created: #{task_id}")
+          {:ok, task_id}
 
-      case Req.post(url, req_opts) do
-        {:ok, %Req.Response{status: status, body: body}} when status in [200, 201] ->
-          # Extract task ID from response
-          case extract_task_id(body) do
-            {:ok, task_id} ->
-              Logger.info("A2A task created: #{task_id}")
-              {:ok, task_id}
+        {:ok, other} ->
+          Logger.error("Failed to extract task ID from response: #{inspect(other)}")
+          {:error, :missing_task_id}
 
-            :error ->
-              Logger.error("Failed to extract task ID from response")
-              {:error, :missing_task_id}
-          end
-
-        {:ok, %Req.Response{status: status, body: body}} ->
-          Logger.error("Failed to create task: status=#{status}")
-          {:error, {:http_error, status, body}}
+        {:error, %A2A.Error{} = error} ->
+          Logger.error("Failed to create task: #{inspect(error)}")
+          {:error, error}
 
         {:error, reason} ->
           Logger.error("Failed to create task: #{inspect(reason)}")
@@ -465,44 +430,43 @@ defmodule A2UI.Transport.A2A.Client do
     end
 
     defp post_event(state, event_envelope, task_id, opts) do
-      url = build_task_url(state, task_id)
-      headers = a2a_headers(state)
-      timeout = Keyword.get(opts, :timeout, 5_000)
-
       # Build A2A message with capabilities
-      a2a_message = DataPart.build_client_message(event_envelope, state.capabilities)
+      a2a_message_map = DataPart.build_client_message(event_envelope, state.capabilities)
 
       # Add data broadcast if present
-      a2a_message =
+      a2a_message_map =
         case Keyword.get(opts, :data_broadcast) do
           nil ->
-            a2a_message
+            a2a_message_map
 
           broadcast ->
             put_in(
-              a2a_message,
+              a2a_message_map,
               ["message", "metadata", "a2uiDataBroadcast"],
               broadcast
             )
         end
 
-      req_opts =
-        Keyword.merge(
-          [
-            headers: headers,
-            json: a2a_message,
-            receive_timeout: timeout
-          ],
-          state.req_options
-        )
+      # Convert to A2A.Types.Message
+      message = A2A.Types.Message.from_map(a2a_message_map["message"])
 
-      case Req.post(url, req_opts) do
-        {:ok, %Req.Response{status: status}} when status in 200..299 ->
+      config_opts =
+        a2a_config_opts(state)
+        |> Keyword.put(:req_options, Keyword.merge(state.req_options, receive_timeout: 5_000))
+
+      # Send the message with task_id in metadata
+      request_opts = [
+        message: message,
+        metadata: %{"taskId" => task_id}
+      ]
+
+      case A2A.Client.send_message(state.base_url, request_opts, config_opts) do
+        {:ok, _} ->
           :ok
 
-        {:ok, %Req.Response{status: status, body: body}} ->
-          Logger.error("A2A event POST failed: status=#{status}")
-          {:error, {:http_error, status, body}}
+        {:error, %A2A.Error{} = error} ->
+          Logger.error("A2A event POST failed: #{inspect(error)}")
+          {:error, error}
 
         {:error, reason} ->
           Logger.error("A2A event POST error: #{inspect(reason)}")
@@ -513,76 +477,123 @@ defmodule A2UI.Transport.A2A.Client do
     defp maybe_start_stream(%{stream_task: nil, consumers: consumers} = state, task_id)
          when map_size(consumers) > 0 do
       parent = self()
-      url = build_task_stream_url(state, task_id)
-      headers = a2a_headers(state) ++ StreamState.reconnect_headers(state.stream_state)
+      config_opts = a2a_config_opts(state)
 
-      task =
-        Task.async(fn ->
-          stream_sse(parent, url, headers, state.req_options)
-        end)
+      # Use resubscribe if we have a last_event_id, otherwise subscribe
+      stream_result =
+        if state.last_event_id do
+          A2A.Client.resubscribe(
+            state.base_url,
+            task_id,
+            %{cursor: state.last_event_id},
+            config_opts
+          )
+        else
+          A2A.Client.subscribe(state.base_url, task_id, config_opts)
+        end
 
-      %{state | stream_task: task}
+      case stream_result do
+        {:ok, stream} ->
+          send(parent, {:stream_connected})
+
+          task =
+            Task.async(fn ->
+              try do
+                Enum.each(stream, fn item ->
+                  send(parent, {:stream_item, item})
+                end)
+
+                send(parent, {:stream_done})
+              rescue
+                e ->
+                  send(parent, {:stream_error, e})
+              end
+            end)
+
+          %{state | stream_task: task, stream_cancel_fun: fn -> A2A.Client.Stream.cancel(stream) end}
+
+        {:error, reason} ->
+          Logger.error("Failed to start stream: #{inspect(reason)}")
+          send(parent, {:stream_error, reason})
+          state
+      end
     end
 
     defp maybe_start_stream(state, _task_id), do: state
 
     defp maybe_stop_stream(%{stream_task: task, consumers: consumers} = state)
          when map_size(consumers) == 0 and not is_nil(task) do
+      if state.stream_cancel_fun do
+        state.stream_cancel_fun.()
+      end
+
       Task.shutdown(task, :brutal_kill)
-      %{state | stream_task: nil, connected: false}
+      %{state | stream_task: nil, stream_cancel_fun: nil, connected: false}
     end
 
     defp maybe_stop_stream(state), do: state
 
-    defp stream_sse(parent, url, headers, req_options) do
-      send(parent, {:sse_connected})
+    defp process_stream_item(%A2A.Types.StreamResponse{message: msg}, state)
+         when not is_nil(msg) do
+      # Convert message to map and extract envelopes
+      message_map = A2A.Types.Message.to_map(msg)
+      envelopes = DataPart.extract_envelopes(%{"message" => message_map})
 
-      req_opts =
-        Keyword.merge(
-          [
-            headers: headers,
-            into: fn {:data, chunk}, acc ->
-              send(parent, {:sse_chunk, chunk})
-              {:cont, acc}
-            end,
-            receive_timeout: :infinity
-          ],
-          req_options
-        )
-
-      case Req.get(url, req_opts) do
-        {:ok, %Req.Response{status: 200}} ->
-          send(parent, {:sse_done})
-
-        {:ok, %Req.Response{status: status, body: body}} ->
-          send(parent, {:sse_error, {:http_error, status, body}})
-
-        {:error, reason} ->
-          send(parent, {:sse_error, reason})
+      for envelope <- envelopes do
+        json = Jason.encode!(envelope)
+        dispatch_to_consumers(state.consumers, {:a2ui, json})
       end
+
+      # Update last_event_id if available
+      update_last_event_id(state, msg)
     end
 
-    defp process_a2a_message(json_line, consumers) do
-      case Jason.decode(json_line) do
-        {:ok, %{"message" => _} = a2a_msg} ->
-          # Extract A2UI envelopes from DataParts
-          envelopes = DataPart.extract_envelopes(a2a_msg)
+    defp process_stream_item(%A2A.Types.StreamResponse{status_update: update}, state)
+         when not is_nil(update) do
+      # Status updates may contain messages too
+      if update.status && update.status.message do
+        message_map = A2A.Types.Message.to_map(update.status.message)
+        envelopes = DataPart.extract_envelopes(%{"message" => message_map})
+
+        for envelope <- envelopes do
+          json = Jason.encode!(envelope)
+          dispatch_to_consumers(state.consumers, {:a2ui, json})
+        end
+      end
+
+      state
+    end
+
+    defp process_stream_item(%A2A.Types.StreamResponse{task: task}, state)
+         when not is_nil(task) do
+      # Task updates - check for messages in history
+      if task.history do
+        for msg <- task.history do
+          message_map = A2A.Types.Message.to_map(msg)
+          envelopes = DataPart.extract_envelopes(%{"message" => message_map})
 
           for envelope <- envelopes do
             json = Jason.encode!(envelope)
-            dispatch_to_consumers(consumers, {:a2ui, json})
+            dispatch_to_consumers(state.consumers, {:a2ui, json})
           end
-
-        {:ok, envelope} when is_map(envelope) ->
-          # Not wrapped in A2A message, dispatch directly
-          # (for backwards compatibility or raw A2UI streams)
-          dispatch_to_consumers(consumers, {:a2ui, json_line})
-
-        {:error, _} ->
-          # Not valid JSON, skip
-          :ok
+        end
       end
+
+      state
     end
+
+    defp process_stream_item(%A2A.Types.StreamError{error: error}, state) do
+      Logger.warning("Stream error received: #{inspect(error)}")
+      state
+    end
+
+    defp process_stream_item(_item, state), do: state
+
+    defp update_last_event_id(state, %A2A.Types.Message{message_id: id}) when is_binary(id) do
+      %{state | last_event_id: id}
+    end
+
+    defp update_last_event_id(state, _msg), do: state
 
     defp dispatch_to_consumers(consumers, message) do
       for {_surface_id, consumer} <- consumers do
@@ -590,86 +601,39 @@ defmodule A2UI.Transport.A2A.Client do
       end
     end
 
-    defp build_agent_card_url(state) do
-      uri =
-        state.base_url
-        |> URI.parse()
-        |> Map.put(:path, "/.well-known/agent.json")
-
-      URI.to_string(uri)
-    end
-
-    defp build_tasks_url(state) do
-      case state.agent_card do
-        %AgentCard{} = card ->
-          AgentCard.tasks_url(card)
-
-        _ ->
-          uri =
-            state.base_url
-            |> URI.parse()
-            |> Map.update!(:path, fn
-              nil -> "/a2a/tasks"
-              path -> String.trim_trailing(path, "/") <> "/a2a/tasks"
-            end)
-
-          URI.to_string(uri)
-      end
-    end
-
-    defp build_task_url(state, task_id) do
-      case state.agent_card do
-        %AgentCard{} = card ->
-          AgentCard.task_url(card, task_id)
-
-        _ ->
-          build_tasks_url(state) <> "/" <> task_id
-      end
-    end
-
-    defp build_task_stream_url(state, task_id) do
-      # SSE stream endpoint - just GET the task URL
-      build_task_url(state, task_id)
-    end
-
-    defp a2a_headers(state) do
+    defp a2a_config_opts(state) do
       extension_uri = Protocol.extension_uri(state.protocol_version)
 
       [
-        {"x-a2a-extensions", extension_uri},
-        {"accept", "application/json, text/event-stream"},
-        {"content-type", "application/json"}
+        agent_card_path: "/.well-known/agent.json",
+        legacy_extensions_header: true,
+        extensions: [extension_uri],
+        rest_base_path: "/a2a",
+        subscribe_verb: :get,
+        version: :v0_3,
+        req_options: state.req_options
       ]
     end
 
-    defp build_initial_task_message(state, content) do
-      # Build a proper A2A task creation message
-      # The initial message has a text part with the prompt
-      %{
-        "message" => %{
-          "role" => Protocol.client_role(),
-          "metadata" => %{
-            Protocol.client_capabilities_key() =>
-              ClientCapabilities.to_a2a_metadata(state.capabilities)
-          },
-          "parts" => [
-            %{
-              "kind" => "text",
-              "text" => content
-            }
-          ]
-        }
+    defp build_a2a_message(capabilities, content) do
+      %A2A.Types.Message{
+        role: :user,
+        metadata: %{
+          Protocol.client_capabilities_key() =>
+            ClientCapabilities.to_a2a_metadata(capabilities)
+        },
+        parts: [
+          %A2A.Types.TextPart{
+            kind: "text",
+            text: content
+          }
+        ]
       }
     end
-
-    defp extract_task_id(%{"taskId" => task_id}) when is_binary(task_id), do: {:ok, task_id}
-    defp extract_task_id(%{"task_id" => task_id}) when is_binary(task_id), do: {:ok, task_id}
-    defp extract_task_id(%{"id" => task_id}) when is_binary(task_id), do: {:ok, task_id}
-    defp extract_task_id(_), do: :error
   else
     @impl true
     def init(_opts) do
-      {:stop, {:missing_dependency, :req}}
+      {:stop, {:missing_dependency, :a2a_ex}}
     end
   end
 end
