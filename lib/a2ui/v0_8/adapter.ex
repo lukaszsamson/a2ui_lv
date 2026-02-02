@@ -246,8 +246,6 @@ defmodule A2UI.V0_8.Adapter do
     Enum.any?(BoundValue.literal_keys(), &Map.has_key?(term, &1))
   end
 
-  defp bound_value?(_), do: false
-
   defp data_model_patches(path, %{} = value) when not is_nil(path) do
     v0_8_merge_patches(Binding.expand_path(path, nil), value)
   end

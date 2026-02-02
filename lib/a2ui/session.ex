@@ -122,13 +122,13 @@ defmodule A2UI.Session do
           SurfaceUpdate.t() | DataModelUpdate.t() | BeginRendering.t() | DeleteSurface.t()
         ) ::
           {:ok, t()} | {:error, map()}
-  def apply_message(session, %SurfaceUpdate{surface_id: sid} = msg) do
+  def apply_message(session, %SurfaceUpdate{surface_id: sid, components: components} = msg) do
     # Get the surface's catalog_id if it exists (set by prior createSurface/beginRendering)
     # If nil, validator uses permissive mode (all known types across catalogs)
     surface = Map.get(session.surfaces, sid)
     catalog_id = if surface, do: surface.catalog_id, else: nil
 
-    case Validator.validate_surface_update(msg, catalog_id) do
+    case Validator.validate_surface_update(%{components: components}, catalog_id) do
       :ok ->
         {:ok, update_surface(session, sid, msg)}
 
@@ -144,9 +144,6 @@ defmodule A2UI.Session do
 
       {:error, {:unknown_component_types, types}} ->
         {:error, Error.unknown_component(types, sid)}
-
-      {:error, reason} ->
-        {:error, Error.validation_error("Validation failed: #{inspect(reason)}", sid)}
     end
   end
 
@@ -168,9 +165,6 @@ defmodule A2UI.Session do
           )
 
         {:error, error}
-
-      {:error, reason} ->
-        {:error, Error.validation_error("Data model validation failed: #{inspect(reason)}", sid)}
     end
   end
 
@@ -268,10 +262,6 @@ defmodule A2UI.Session do
               )
 
             {:error, error}
-
-          {:error, reason} ->
-            {:error,
-             Error.validation_error("Data validation failed: #{inspect(reason)}", surface_id)}
         end
 
       :error ->

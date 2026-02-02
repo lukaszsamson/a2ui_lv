@@ -170,7 +170,10 @@ defmodule A2UI.Transport.HTTP.SSEServer do
         end)
 
       {:ok, []} ->
-        Logger.debug("No events to replay for session #{session_id} (after event #{after_event_id})")
+        Logger.debug(
+          "No events to replay for session #{session_id} (after event #{after_event_id})"
+        )
+
         conn
 
       {:error, :not_found} ->

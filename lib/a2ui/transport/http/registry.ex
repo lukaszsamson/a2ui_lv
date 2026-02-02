@@ -79,7 +79,8 @@ defmodule A2UI.Transport.HTTP.Registry do
   - `:id` - Custom session ID (default: auto-generated UUID)
   - `:metadata` - Arbitrary metadata to associate with the session
   """
-  @spec create_session(keyword()) :: {:ok, session_id()}
+  @spec create_session() :: {:ok, session_id()}
+  @spec create_session(GenServer.server()) :: {:ok, session_id()}
   @spec create_session(GenServer.server(), keyword()) :: {:ok, session_id()}
   def create_session(server \\ __MODULE__, opts \\ []) do
     GenServer.call(server, {:create_session, opts})
@@ -153,7 +154,8 @@ defmodule A2UI.Transport.HTTP.Registry do
 
   Consumers receive `{:a2ui_stream_done, meta}`.
   """
-  @spec broadcast_done(session_id(), map()) :: :ok | {:error, :not_found}
+  @spec broadcast_done(session_id()) :: :ok | {:error, :not_found}
+  @spec broadcast_done(GenServer.server(), session_id()) :: :ok | {:error, :not_found}
   @spec broadcast_done(GenServer.server(), session_id(), map()) :: :ok | {:error, :not_found}
   def broadcast_done(server \\ __MODULE__, session_id, meta \\ %{}) do
     GenServer.call(server, {:broadcast_done, session_id, meta})

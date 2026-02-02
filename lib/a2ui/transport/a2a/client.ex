@@ -384,10 +384,6 @@ defmodule A2UI.Transport.A2A.Client do
         {:error, %A2A.Error{} = error} ->
           Logger.error("Failed to fetch agent card: #{inspect(error)}")
           {:error, error}
-
-        {:error, reason} ->
-          Logger.error("Failed to fetch agent card: #{inspect(reason)}")
-          {:error, reason}
       end
     end
 
@@ -411,10 +407,6 @@ defmodule A2UI.Transport.A2A.Client do
         {:error, %A2A.Error{} = error} ->
           Logger.error("Failed to create task: #{inspect(error)}")
           {:error, error}
-
-        {:error, reason} ->
-          Logger.error("Failed to create task: #{inspect(reason)}")
-          {:error, reason}
       end
     end
 
@@ -467,10 +459,6 @@ defmodule A2UI.Transport.A2A.Client do
         {:error, %A2A.Error{} = error} ->
           Logger.error("A2A event POST failed: #{inspect(error)}")
           {:error, error}
-
-        {:error, reason} ->
-          Logger.error("A2A event POST error: #{inspect(reason)}")
-          {:error, reason}
       end
     end
 
@@ -510,7 +498,11 @@ defmodule A2UI.Transport.A2A.Client do
               end
             end)
 
-          %{state | stream_task: task, stream_cancel_fun: fn -> A2A.Client.Stream.cancel(stream) end}
+          %{
+            state
+            | stream_task: task,
+              stream_cancel_fun: fn -> A2A.Client.Stream.cancel(stream) end
+          }
 
         {:error, reason} ->
           Logger.error("Failed to start stream: #{inspect(reason)}")
@@ -619,8 +611,7 @@ defmodule A2UI.Transport.A2A.Client do
       %A2A.Types.Message{
         role: :user,
         metadata: %{
-          Protocol.client_capabilities_key() =>
-            ClientCapabilities.to_a2a_metadata(capabilities)
+          Protocol.client_capabilities_key() => ClientCapabilities.to_a2a_metadata(capabilities)
         },
         parts: [
           %A2A.Types.TextPart{
