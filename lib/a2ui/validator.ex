@@ -243,7 +243,8 @@ defmodule A2UI.Validator do
   @doc """
   Creates a new empty visited set for cycle detection.
   """
-  @spec new_visited() :: MapSet.t()
+  @dialyzer {:nowarn_function, new_visited: 0}
+  @spec new_visited() :: MapSet.t(String.t())
   def new_visited, do: MapSet.new()
 
   # ============================================
