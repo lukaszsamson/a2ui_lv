@@ -56,6 +56,7 @@ defmodule A2UI.Messages.BeginRendering do
       root_id: root,
       catalog_id: Map.get(data, "catalogId"),
       styles: Map.get(data, "styles"),
+      send_data_model?: false,
       broadcast_data_model?: false,
       protocol_version: :v0_8
     }

@@ -4,6 +4,8 @@ A2UI LiveView is a Phoenix LiveView renderer and session engine for the Agent-to
 
 It supports A2UI [v0.8](https://a2ui.org/specification/v0.8-a2ui/), released [v0.9](https://a2ui.org/specification/v0.9-a2ui/), and [v0.9.1](https://a2ui.org/specification/v0.9.1-a2ui/), including the released Basic Catalog and A2A extension contracts.
 
+The tested runtime matrix covers Elixir 1.16 through 1.20 on compatible Erlang/OTP 26 through 29 releases.
+
 ## Features
 
 - Parse and apply A2UI JSONL messages with `A2UI.Session`.

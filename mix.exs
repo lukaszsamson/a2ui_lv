@@ -8,7 +8,7 @@ defmodule A2UI.MixProject do
     [
       app: :a2ui_lv,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
       aliases: aliases(),
       start_permanent: Mix.env() == :prod,
@@ -69,6 +69,9 @@ defmodule A2UI.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_view, "~> 1.1"},
       {:jason, "~> 1.2"},
+      # OTP 26 predates the built-in :json module used by digital_token. Keep the
+      # dependency locked on every toolchain, but compile and start it only there.
+      {:json_polyfill, "~> 0.2.2", app: otp_26?(), compile: otp_26?(), runtime: otp_26?()},
       {:jsonschex, "~> 0.8"},
       {:earmark, "~> 1.4"},
       {:ex_cldr_numbers, "~> 2.38"},
@@ -88,5 +91,11 @@ defmodule A2UI.MixProject do
     [
       precommit: ["compile", "deps.unlock --unused", "format --check-formatted", "test"]
     ]
+  end
+
+  defp otp_26? do
+    System.otp_release()
+    |> String.to_integer()
+    |> Kernel.==(26)
   end
 end

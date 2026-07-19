@@ -36,7 +36,7 @@ defmodule A2UI.Session do
   @type t :: %__MODULE__{
           surfaces: %{String.t() => Surface.t()},
           client_capabilities: ClientCapabilities.t(),
-          retired_surface_ids: MapSet.t(String.t())
+          retired_surface_ids: MapSet.t()
         }
 
   defstruct surfaces: %{},

@@ -103,7 +103,7 @@ defmodule A2UI.Schema do
   defp split_formatted_error(formatted, fallback_path) do
     case Regex.run(~r/^At (\/[^:]*):\s*(.*)$/s, formatted) do
       [_, path, message] -> {normalize_control_indices(path), message}
-      _ -> {pointer(fallback_path || []), formatted}
+      _ -> {pointer(fallback_path), formatted}
     end
   end
 

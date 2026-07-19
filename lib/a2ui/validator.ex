@@ -719,7 +719,7 @@ defmodule A2UI.Validator do
       end
 
     require(
-      type == :any or type == expected,
+      type == expected,
       path <> "/call",
       "does not return #{dynamic_type_name(type)}"
     )
