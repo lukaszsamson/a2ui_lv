@@ -71,7 +71,7 @@ defmodule A2UI.MixProject do
       {:jason, "~> 1.2"},
       # OTP 26 predates the built-in :json module used by digital_token. Keep the
       # dependency locked on every toolchain, but compile and start it only there.
-      {:json_polyfill, "~> 0.2.2", app: otp_26?(), compile: otp_26?(), runtime: otp_26?()},
+      {:json_polyfill, "~> 0.2.2", json_polyfill_opts()},
       {:jsonschex, "~> 0.8"},
       {:earmark, "~> 1.4"},
       {:ex_cldr_numbers, "~> 2.38"},
@@ -97,5 +97,9 @@ defmodule A2UI.MixProject do
     System.otp_release()
     |> String.to_integer()
     |> Kernel.==(26)
+  end
+
+  defp json_polyfill_opts do
+    if otp_26?(), do: [], else: [app: false, compile: false, runtime: false]
   end
 end
