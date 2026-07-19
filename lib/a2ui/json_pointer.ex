@@ -38,10 +38,42 @@ defmodule A2UI.JsonPointer do
       iex> A2UI.JsonPointer.upsert(%{}, "/items/0", "first")
       %{"items" => ["first"]}
   """
-  @spec upsert(map() | list() | nil, String.t() | nil, term()) :: map() | list()
+  @spec upsert(term(), String.t() | nil, term()) :: term()
   def upsert(root, pointer, value) do
     segments = decode_pointer(pointer)
-    do_upsert(root || default_root(), segments, value)
+    do_upsert(if(is_nil(root), do: default_root(), else: root), segments, value)
+  end
+
+  @doc "Validates an A2UI absolute or relative JSON Pointer without resolving it."
+  @spec validate(term(), keyword()) :: :ok | {:error, String.t()}
+  def validate(pointer, opts \\ [])
+
+  def validate(pointer, opts) when is_binary(pointer) do
+    absolute? = Keyword.get(opts, :absolute, false)
+
+    cond do
+      absolute? and pointer not in [""] and not String.starts_with?(pointer, "/") ->
+        {:error, "must be an absolute JSON Pointer starting with /"}
+
+      invalid_escape?(pointer) ->
+        {:error, "contains an invalid JSON Pointer escape; only ~0 and ~1 are valid"}
+
+      true ->
+        :ok
+    end
+  end
+
+  def validate(nil, opts) do
+    if Keyword.get(opts, :absolute, false), do: :ok, else: {:error, "must be a string"}
+  end
+
+  def validate(_pointer, _opts), do: {:error, "must be a string"}
+
+  @doc "Validates array-index segments against the containers currently present at a path."
+  @spec validate_indices(term(), String.t() | nil) :: :ok | {:error, String.t()}
+  def validate_indices(root, pointer) when is_binary(pointer) or is_nil(pointer) do
+    segments = decode_pointer(pointer)
+    do_validate_indices(root, segments)
   end
 
   @doc """
@@ -53,12 +85,12 @@ defmodule A2UI.JsonPointer do
       %{"user" => %{"age" => 30}}
 
       iex> A2UI.JsonPointer.delete(%{"items" => ["a", "b", "c"]}, "/items/1")
-      %{"items" => ["a", "c"]}
+      %{"items" => ["a", nil, "c"]}
   """
-  @spec delete(map() | list() | nil, String.t() | nil) :: map() | list()
+  @spec delete(term(), String.t() | nil) :: term()
   def delete(root, pointer) do
     segments = decode_pointer(pointer)
-    do_delete(root || default_root(), segments)
+    do_delete(if(is_nil(root), do: default_root(), else: root), segments)
   end
 
   # ============================================
@@ -84,12 +116,52 @@ defmodule A2UI.JsonPointer do
     |> String.replace("~0", "~")
   end
 
+  defp invalid_escape?(pointer) do
+    String.match?(pointer, ~r/~(?:[^01]|$)/)
+  end
+
   defp numeric_index(seg) do
     case Integer.parse(seg) do
       {i, ""} when i >= 0 -> {:ok, i}
       _ -> :error
     end
   end
+
+  defp canonical_array_index?("0"), do: true
+
+  defp canonical_array_index?(<<first, rest::binary>>) when first in ?1..?9,
+    do: String.match?(rest, ~r/^\d*$/)
+
+  defp canonical_array_index?(_), do: false
+
+  defp do_validate_indices(_current, []), do: :ok
+
+  defp do_validate_indices(current, [segment | rest]) when is_list(current) do
+    if canonical_array_index?(segment) do
+      index = String.to_integer(segment)
+      do_validate_indices(Enum.at(current, index), rest)
+    else
+      {:error, "#{inspect(segment)} is not a valid array index"}
+    end
+  end
+
+  defp do_validate_indices(current, [segment | rest]) when is_map(current) do
+    do_validate_indices(Map.get(current, segment), rest)
+  end
+
+  defp do_validate_indices(nil, [segment | rest]) do
+    case Integer.parse(segment) do
+      {_index, ""} ->
+        if canonical_array_index?(segment),
+          do: do_validate_indices(nil, rest),
+          else: {:error, "#{inspect(segment)} is not a canonical array index"}
+
+      _ ->
+        do_validate_indices(nil, rest)
+    end
+  end
+
+  defp do_validate_indices(_scalar, _rest), do: :ok
 
   # ============================================
   # UPSERT Implementation
@@ -145,8 +217,10 @@ defmodule A2UI.JsonPointer do
     end
   end
 
-  # Non-container (scalar) - can't traverse further
-  defp do_upsert(current, _segments, _value), do: current
+  # Replace a scalar with the container required by the pointer.
+  defp do_upsert(_current, segments, value) do
+    do_upsert(new_container_for_next(segments), segments, value)
+  end
 
   # Determine what container to create based on next segment
   defp new_container_for_next([]), do: %{}
@@ -198,7 +272,8 @@ defmodule A2UI.JsonPointer do
   # List container - single segment (leaf)
   defp do_delete(current, [seg]) when is_list(current) do
     case numeric_index(seg) do
-      {:ok, idx} -> List.delete_at(current, idx)
+      {:ok, idx} when idx < length(current) -> List.replace_at(current, idx, nil)
+      {:ok, _idx} -> current
       :error -> current
     end
   end

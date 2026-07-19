@@ -267,13 +267,13 @@ defmodule A2UI.ChecksTest do
       assert Checks.evaluate_expression(expr, %{"rating" => 6}, nil, []) == false
     end
 
-    test "returns true for unknown function" do
+    test "fails closed for unknown function" do
       expr = %{
         "call" => "unknownFunction",
         "args" => %{"value" => "test"}
       }
 
-      assert Checks.evaluate_expression(expr, %{}, nil, []) == true
+      assert Checks.evaluate_expression(expr, %{}, nil, []) == false
     end
 
     test "resolves literal values directly" do

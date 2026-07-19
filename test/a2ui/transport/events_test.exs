@@ -20,6 +20,7 @@ defmodule A2UI.Transport.EventsTest do
 
     test "accepts valid v0.9 action envelope" do
       envelope = %{
+        "version" => "v0.9",
         "action" => %{
           "name" => "click",
           "surfaceId" => "test",

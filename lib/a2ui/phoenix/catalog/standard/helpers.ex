@@ -101,27 +101,23 @@ defmodule A2UI.Phoenix.Catalog.Standard.Helpers do
   end
 
   def text_style("h1"),
-    do:
-      {"font-size: 2.25rem; font-weight: 700; letter-spacing: -0.025em;",
-       "text-zinc-950 dark:text-zinc-50"}
+    do: {"font-size: 2.25rem; font-weight: 700; letter-spacing: -0.025em;", ""}
 
   def text_style("h2"),
-    do:
-      {"font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em;",
-       "text-zinc-950 dark:text-zinc-50"}
+    do: {"font-size: 1.875rem; font-weight: 600; letter-spacing: -0.025em;", ""}
 
   def text_style("h3"),
-    do: {"font-size: 1.5rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
+    do: {"font-size: 1.5rem; font-weight: 600;", ""}
 
   def text_style("h4"),
-    do: {"font-size: 1.25rem; font-weight: 600;", "text-zinc-950 dark:text-zinc-50"}
+    do: {"font-size: 1.25rem; font-weight: 600;", ""}
 
   def text_style("h5"),
-    do: {"font-size: 1.125rem; font-weight: 500;", "text-zinc-950 dark:text-zinc-50"}
+    do: {"font-size: 1.125rem; font-weight: 500;", ""}
 
-  def text_style("caption"), do: {"font-size: 0.875rem;", "text-zinc-600 dark:text-zinc-400"}
-  def text_style("body"), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
-  def text_style(_), do: {"font-size: 1rem;", "text-zinc-900 dark:text-zinc-50"}
+  def text_style("caption"), do: {"font-size: 0.875rem;", ""}
+  def text_style("body"), do: {"font-size: 1rem;", ""}
+  def text_style(_), do: {"font-size: 1rem;", ""}
 
   def divider_style(axis, thickness, color) do
     thickness_px = parse_thickness(thickness)
@@ -160,7 +156,19 @@ defmodule A2UI.Phoenix.Catalog.Standard.Helpers do
 
   def parse_color(_), do: nil
 
-  def button_classes(primary, disabled)
+  def button_classes(variant, disabled)
+
+  def button_classes("primary", disabled), do: button_classes(true, disabled)
+
+  def button_classes("borderless", true) do
+    "a2ui-button-borderless inline-flex cursor-not-allowed items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-zinc-400 opacity-50"
+  end
+
+  def button_classes("borderless", false) do
+    "a2ui-button-borderless inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+  end
+
+  def button_classes("default", disabled), do: button_classes(false, disabled)
 
   def button_classes(true, true) do
     "a2ui-button-primary inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition opacity-50 cursor-not-allowed"
@@ -349,6 +357,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Helpers do
 
   def binding_opts(surface) do
     version = surface.protocol_version || :v0_8
-    [version: version]
+    locale = Application.get_env(:a2ui_lv, :locale, "en")
+    [version: version, locale: locale]
   end
 end

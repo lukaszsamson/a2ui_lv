@@ -30,7 +30,8 @@ defmodule A2UI.A2A.Protocol do
   # MIME Types
   # ============================================
 
-  @mime_type "application/json+a2ui"
+  @legacy_mime_type "application/json+a2ui"
+  @mime_type "application/a2ui+json"
 
   @doc """
   Returns the MIME type for A2UI messages in A2A DataParts.
@@ -39,7 +40,13 @@ defmodule A2UI.A2A.Protocol do
   in the DataPart's `metadata.mimeType` field.
   """
   @spec mime_type() :: String.t()
-  def mime_type, do: @mime_type
+  def mime_type, do: @legacy_mime_type
+
+  @spec mime_type(A2UI.Protocol.version()) :: String.t()
+  def mime_type(:v0_8), do: @legacy_mime_type
+  def mime_type(version) when version in [:v0_9, :v0_9_1], do: @mime_type
+
+  def mime_type?(mime), do: mime in [@legacy_mime_type, @mime_type]
 
   # ============================================
   # Extension URIs
@@ -47,6 +54,7 @@ defmodule A2UI.A2A.Protocol do
 
   @extension_uri_v0_8 "https://a2ui.org/a2a-extension/a2ui/v0.8"
   @extension_uri_v0_9 "https://a2ui.org/a2a-extension/a2ui/v0.9"
+  @extension_uri_v0_9_1 "https://a2ui.org/a2a-extension/a2ui/v0.9.1"
 
   @doc """
   Returns the A2A extension URI for A2UI v0.8.
@@ -56,8 +64,10 @@ defmodule A2UI.A2A.Protocol do
   """
   @spec extension_uri(:v0_8) :: String.t()
   @spec extension_uri(:v0_9) :: String.t()
+  @spec extension_uri(:v0_9_1) :: String.t()
   def extension_uri(:v0_8), do: @extension_uri_v0_8
   def extension_uri(:v0_9), do: @extension_uri_v0_9
+  def extension_uri(:v0_9_1), do: @extension_uri_v0_9_1
 
   @doc """
   Returns the default (v0.8) A2A extension URI.
@@ -69,13 +79,14 @@ defmodule A2UI.A2A.Protocol do
   Returns all known A2UI extension URIs.
   """
   @spec extension_uris() :: [String.t()]
-  def extension_uris, do: [@extension_uri_v0_8, @extension_uri_v0_9]
+  def extension_uris, do: [@extension_uri_v0_8, @extension_uri_v0_9, @extension_uri_v0_9_1]
 
   # ============================================
   # Metadata Keys
   # ============================================
 
   @client_capabilities_key "a2uiClientCapabilities"
+  @client_data_model_key "a2uiClientDataModel"
   @supported_catalog_ids_key "supportedCatalogIds"
   @inline_catalogs_key "inlineCatalogs"
 
@@ -87,6 +98,8 @@ defmodule A2UI.A2A.Protocol do
   """
   @spec client_capabilities_key() :: String.t()
   def client_capabilities_key, do: @client_capabilities_key
+
+  def client_data_model_key, do: @client_data_model_key
 
   @doc """
   Returns the key for supported catalog IDs within client capabilities.

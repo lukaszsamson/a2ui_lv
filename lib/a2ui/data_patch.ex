@@ -52,15 +52,8 @@ defmodule A2UI.DataPatch do
       iex> A2UI.DataPatch.apply_patch(%{"user" => %{"age" => 30}}, {:set_at, "/user/name", "Alice"})
       %{"user" => %{"age" => 30, "name" => "Alice"}}
   """
-  @spec apply_patch(map(), patch()) :: map()
-  def apply_patch(_data_model, {:replace_root, value}) when is_map(value) do
-    value
-  end
-
-  def apply_patch(_data_model, {:replace_root, _value}) do
-    # Non-map replace_root results in empty map (safety)
-    %{}
-  end
+  @spec apply_patch(term(), patch()) :: term()
+  def apply_patch(_data_model, {:replace_root, value}), do: value
 
   def apply_patch(data_model, {:set_at, pointer, value}) do
     JsonPointer.upsert(data_model, pointer, value)
@@ -82,7 +75,7 @@ defmodule A2UI.DataPatch do
       iex> A2UI.DataPatch.apply_all(%{}, patches)
       %{"user" => %{"name" => "Alice", "age" => 30}}
   """
-  @spec apply_all(map(), [patch()]) :: map()
+  @spec apply_all(term(), [patch()]) :: term()
   def apply_all(data_model, patches) when is_list(patches) do
     Enum.reduce(patches, data_model, &apply_patch(&2, &1))
   end
@@ -132,13 +125,7 @@ defmodule A2UI.DataPatch do
 
     case pointer do
       p when p in ["", "/"] ->
-        if is_map(value) do
-          {:replace_root, value}
-        else
-          # Allow any JSON value at root, but our internal model expects a map
-          # Wrap non-map values (this is an edge case)
-          {:replace_root, %{"_root" => value}}
-        end
+        {:replace_root, value}
 
       _ ->
         {:set_at, pointer, value}

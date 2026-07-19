@@ -67,14 +67,25 @@ defmodule A2UI.A2A.DataPart do
         "metadata" => %{"mimeType" => "application/json+a2ui"}
       }
   """
-  @spec wrap_envelope(a2ui_envelope()) :: data_part()
-  def wrap_envelope(envelope) when is_map(envelope) do
+  @spec wrap_envelope(a2ui_envelope(), A2UI.Protocol.version()) :: data_part()
+  def wrap_envelope(envelope, version \\ :v0_8) when is_map(envelope) do
+    data = if version == :v0_8, do: envelope, else: [envelope]
+
     %{
       "kind" => "data",
-      "data" => envelope,
+      "data" => data,
       "metadata" => %{
-        "mimeType" => Protocol.mime_type()
+        "mimeType" => Protocol.mime_type(version)
       }
+    }
+  end
+
+  @doc "Wraps an ordered batch of released A2UI messages in one DataPart."
+  def wrap_envelopes(envelopes, version \\ :v0_9_1) when is_list(envelopes) do
+    %{
+      "kind" => "data",
+      "data" => envelopes,
+      "metadata" => %{"mimeType" => Protocol.mime_type(version)}
     }
   end
 
@@ -92,8 +103,12 @@ defmodule A2UI.A2A.DataPart do
   """
   @spec unwrap_envelope(data_part()) :: {:ok, a2ui_envelope()} | {:error, atom()}
   def unwrap_envelope(%{"data" => data, "metadata" => %{"mimeType" => mime}}) do
-    if mime == Protocol.mime_type() do
-      {:ok, data}
+    if Protocol.mime_type?(mime) do
+      case data do
+        [envelope] when is_map(envelope) -> {:ok, envelope}
+        envelope when is_map(envelope) -> {:ok, envelope}
+        _ -> {:error, :multiple_envelopes}
+      end
     else
       {:error, :invalid_mime_type}
     end
@@ -101,7 +116,11 @@ defmodule A2UI.A2A.DataPart do
 
   def unwrap_envelope(%{"data" => data}) do
     # Lenient: accept DataPart without mimeType metadata
-    {:ok, data}
+    case data do
+      [envelope] when is_map(envelope) -> {:ok, envelope}
+      envelope when is_map(envelope) -> {:ok, envelope}
+      _ -> {:error, :multiple_envelopes}
+    end
   end
 
   def unwrap_envelope(_), do: {:error, :invalid_data_part}
@@ -111,7 +130,7 @@ defmodule A2UI.A2A.DataPart do
   """
   @spec a2ui_data_part?(data_part()) :: boolean()
   def a2ui_data_part?(%{"metadata" => %{"mimeType" => mime}}) do
-    mime == Protocol.mime_type()
+    Protocol.mime_type?(mime)
   end
 
   def a2ui_data_part?(_), do: false
@@ -151,15 +170,17 @@ defmodule A2UI.A2A.DataPart do
         }
       }
   """
-  @spec build_client_message(a2ui_envelope(), ClientCapabilities.t()) :: a2a_message()
-  def build_client_message(envelope, %ClientCapabilities{} = capabilities) do
+  @spec build_client_message(a2ui_envelope(), ClientCapabilities.t(), A2UI.Protocol.version()) ::
+          a2a_message()
+  def build_client_message(envelope, %ClientCapabilities{} = capabilities, version \\ :v0_8) do
     %{
       "message" => %{
         "role" => Protocol.client_role(),
         "metadata" => %{
-          Protocol.client_capabilities_key() => ClientCapabilities.to_a2a_metadata(capabilities)
+          Protocol.client_capabilities_key() =>
+            ClientCapabilities.to_a2a_metadata(capabilities, version)
         },
-        "parts" => [wrap_envelope(envelope)]
+        "parts" => [wrap_envelope(envelope, version)]
       }
     }
   end
@@ -181,11 +202,11 @@ defmodule A2UI.A2A.DataPart do
       }
   """
   @spec build_server_message(a2ui_envelope()) :: a2a_message()
-  def build_server_message(envelope) do
+  def build_server_message(envelope, version \\ :v0_8) do
     %{
       "message" => %{
         "role" => Protocol.server_role(),
-        "parts" => [wrap_envelope(envelope)]
+        "parts" => [wrap_envelope(envelope, version)]
       }
     }
   end
@@ -209,7 +230,13 @@ defmodule A2UI.A2A.DataPart do
   def extract_envelopes(%{"message" => %{"parts" => parts}}) when is_list(parts) do
     parts
     |> Enum.filter(&a2ui_data_part?/1)
-    |> Enum.map(fn part -> part["data"] end)
+    |> Enum.flat_map(fn part ->
+      case part["data"] do
+        envelopes when is_list(envelopes) -> Enum.filter(envelopes, &is_map/1)
+        envelope when is_map(envelope) -> [envelope]
+        _ -> []
+      end
+    end)
   end
 
   def extract_envelopes(_), do: []
@@ -239,6 +266,8 @@ defmodule A2UI.A2A.DataPart do
   def parse_client_capabilities(message) do
     case extract_client_capabilities(message) do
       {:ok, caps_map} ->
+        caps_map = caps_map["v0.9.1"] || caps_map["v0.9"] || caps_map
+
         capabilities =
           ClientCapabilities.new(
             supported_catalog_ids: caps_map["supportedCatalogIds"] || [],

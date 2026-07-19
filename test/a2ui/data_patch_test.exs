@@ -18,10 +18,10 @@ defmodule A2UI.DataPatchTest do
              }
     end
 
-    test "non-map replace_root returns empty map" do
-      assert DataPatch.apply_patch(%{"old" => "data"}, {:replace_root, "string"}) == %{}
-      assert DataPatch.apply_patch(%{"old" => "data"}, {:replace_root, 42}) == %{}
-      assert DataPatch.apply_patch(%{"old" => "data"}, {:replace_root, nil}) == %{}
+    test "non-map replace_root preserves native JSON values" do
+      assert DataPatch.apply_patch(%{"old" => "data"}, {:replace_root, "string"}) == "string"
+      assert DataPatch.apply_patch(%{"old" => "data"}, {:replace_root, 42}) == 42
+      assert DataPatch.apply_patch(%{"old" => "data"}, {:replace_root, nil}) == nil
     end
   end
 
@@ -79,7 +79,7 @@ defmodule A2UI.DataPatchTest do
     test "deletes element from list" do
       data = %{"items" => ["a", "b", "c"]}
       result = DataPatch.apply_patch(data, {:delete_at, "/items/1"})
-      assert result == %{"items" => ["a", "c"]}
+      assert result == %{"items" => ["a", nil, "c"]}
     end
   end
 
@@ -136,12 +136,12 @@ defmodule A2UI.DataPatchTest do
                {:replace_root, %{"name" => "Alice"}}
     end
 
-    test "root path with non-map wraps in _root" do
+    test "root path with non-map preserves native JSON values" do
       assert DataPatch.from_update(nil, "string") ==
-               {:replace_root, %{"_root" => "string"}}
+               {:replace_root, "string"}
 
       assert DataPatch.from_update(nil, 42) ==
-               {:replace_root, %{"_root" => 42}}
+               {:replace_root, 42}
     end
 
     test "nested path produces set_at" do

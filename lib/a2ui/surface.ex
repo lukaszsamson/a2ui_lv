@@ -27,7 +27,7 @@ defmodule A2UI.Surface do
   transport implementations should attach the surface data model to outgoing messages.
   """
 
-  @type protocol_version :: :v0_8 | :v0_9
+  @type protocol_version :: A2UI.Protocol.version()
 
   defstruct [
     :id,
@@ -36,9 +36,11 @@ defmodule A2UI.Surface do
     :styles,
     :catalog_status,
     :protocol_version,
+    :creator_id,
     components: %{},
     data_model: %{},
     ready?: false,
+    send_data_model?: false,
     broadcast_data_model?: false
   ]
 
@@ -57,9 +59,11 @@ defmodule A2UI.Surface do
           styles: map() | nil,
           catalog_status: catalog_status() | nil,
           protocol_version: protocol_version() | nil,
+          creator_id: term(),
           components: %{String.t() => A2UI.Component.t()},
-          data_model: map(),
+          data_model: term(),
           ready?: boolean(),
+          send_data_model?: boolean(),
           broadcast_data_model?: boolean()
         }
 
@@ -87,14 +91,23 @@ defmodule A2UI.Surface do
   """
   @spec apply_message(t(), SurfaceUpdate.t() | DataModelUpdate.t() | BeginRendering.t()) :: t()
   def apply_message(%__MODULE__{} = surface, %SurfaceUpdate{components: components}) do
-    # Merge components by ID (duplicates update existing)
+    # Existing IDs are intentionally replaced by later incremental messages.
+    # Duplicate IDs inside one wire message are rejected by A2UI.Validator.
     new_components =
       Enum.reduce(components, surface.components, fn comp, acc ->
         Map.put(acc, comp.id, comp)
       end)
 
     new_data_model = Initializers.apply(surface.data_model, components)
-    %{surface | components: new_components, data_model: new_data_model}
+
+    ready =
+      if surface.protocol_version in [:v0_9, :v0_9_1] do
+        surface.catalog_status == :ok and Map.has_key?(new_components, "root")
+      else
+        surface.ready?
+      end
+
+    %{surface | components: new_components, data_model: new_data_model, ready?: ready}
   end
 
   def apply_message(%__MODULE__{} = surface, %DataModelUpdate{} = update) do
@@ -138,8 +151,14 @@ defmodule A2UI.Surface do
   """
   @spec apply_begin_rendering(t(), BeginRendering.t(), catalog_status()) :: t()
   def apply_begin_rendering(%__MODULE__{} = surface, %BeginRendering{} = msg, catalog_status) do
-    # Only mark ready if catalog resolution succeeded
-    ready = catalog_status == :ok
+    # Released v0.9 surfaces buffer updates and only render after the mandatory
+    # `root` component arrives. v0.8 keeps beginRendering semantics.
+    ready =
+      if msg.protocol_version in [:v0_9, :v0_9_1] do
+        catalog_status == :ok and Map.has_key?(surface.components, "root")
+      else
+        catalog_status == :ok
+      end
 
     %{
       surface
@@ -148,7 +167,9 @@ defmodule A2UI.Surface do
         styles: msg.styles,
         catalog_status: catalog_status,
         protocol_version: msg.protocol_version,
+        creator_id: msg.creator_id,
         ready?: ready,
+        send_data_model?: msg.send_data_model? || false,
         broadcast_data_model?: msg.broadcast_data_model? || false
     }
   end

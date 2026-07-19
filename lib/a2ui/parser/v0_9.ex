@@ -43,22 +43,23 @@ defmodule A2UI.Parser.V0_9 do
       iex> A2UI.Parser.V0_9.parse_map(%{"unknown" => %{}})
       {:error, :unknown_message_type}
   """
-  @spec parse_map(map()) :: message()
-  def parse_map(%{"createSurface" => data}),
-    do: {:begin_rendering, BeginRendering.from_map_v09(data)}
+  @spec parse_map(map(), A2UI.Protocol.version()) :: message()
+  def parse_map(decoded, version \\ :v0_9)
 
-  def parse_map(%{"updateComponents" => data}),
-    do: {:surface_update, SurfaceUpdate.from_map_v09(data)}
+  def parse_map(%{"createSurface" => data}, version),
+    do: {:begin_rendering, BeginRendering.from_map_v09(data, version)}
 
-  def parse_map(%{"updateDataModel" => data}) do
-    msg = DataModelUpdate.from_map(data)
-    {:data_model_update, %{msg | protocol_version: :v0_9}}
+  def parse_map(%{"updateComponents" => data}, version),
+    do: {:surface_update, SurfaceUpdate.from_map_v09(data, version)}
+
+  def parse_map(%{"updateDataModel" => data}, version) do
+    {:data_model_update, DataModelUpdate.from_map(data, version)}
   end
 
-  def parse_map(%{"deleteSurface" => data}),
-    do: {:delete_surface, DeleteSurface.from_map(data)}
+  def parse_map(%{"deleteSurface" => data}, version),
+    do: {:delete_surface, DeleteSurface.from_map(data, version)}
 
-  def parse_map(_),
+  def parse_map(_, _version),
     do: {:error, :unknown_message_type}
 
   @doc """

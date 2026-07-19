@@ -18,12 +18,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - elixir: "1.15"
-            otp: "25"
+          - elixir: "1.16"
+            otp: "26"
+            compile_args: "--warnings-as-errors"
           - elixir: "1.17"
             otp: "27"
+            compile_args: "--warnings-as-errors"
+          - elixir: "1.18"
+            otp: "27"
+            compile_args: "--warnings-as-errors"
           - elixir: "1.19"
             otp: "28"
+            compile_args: "--warnings-as-errors"
+          - elixir: "1.20"
+            otp: "29"
+            # Elixir 1.20 reports type warnings from Phoenix-generated HEEx code.
+            compile_args: ""
 
     steps:
       - name: Checkout
@@ -55,7 +65,7 @@ jobs:
         run: mix deps.get
 
       - name: Compile
-        run: mix compile --warnings-as-errors
+        run: mix compile ${{ matrix.compile_args }}
 
       - name: Run tests
         run: mix test

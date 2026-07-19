@@ -86,7 +86,7 @@ defmodule A2UI.JsonPointerTest do
 
     test "deletes element from list" do
       data = %{"items" => ["a", "b", "c"]}
-      assert JsonPointer.delete(data, "/items/1") == %{"items" => ["a", "c"]}
+      assert JsonPointer.delete(data, "/items/1") == %{"items" => ["a", nil, "c"]}
     end
 
     test "deletes nested element within list" do

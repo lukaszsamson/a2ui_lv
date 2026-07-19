@@ -6,7 +6,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
   import A2UI.Phoenix.Components, only: [input: 1]
   import A2UI.Phoenix.Catalog.Standard.Helpers
 
-  alias A2UI.{Binding, Checks}
+  alias A2UI.{Binding, Checks, Value, Validator}
   alias A2UI.Props.Adapter
   alias A2UI.Phoenix.Catalog.Standard
 
@@ -23,8 +23,13 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
 
   def a2ui_button(assigns) do
     opts = binding_opts(assigns.surface)
-    primary = assigns.props["primary"] || false
-    has_action = assigns.props["action"] != nil and not assigns.suppress_events
+
+    variant =
+      assigns.props["variant"] || if(assigns.props["primary"], do: "primary", else: "default")
+
+    action = assigns.props["action"]
+    has_action = action != nil and not assigns.suppress_events
+    open_url = resolve_open_url(action, assigns.surface, assigns.scope_path, opts)
 
     checks = assigns.props["checks"]
     checks_pass = Checks.all_pass?(checks, assigns.surface.data_model, assigns.scope_path, opts)
@@ -32,31 +37,51 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
 
     assigns =
       assign(assigns,
-        primary: primary,
+        variant: variant,
         has_action: has_action,
+        open_url: open_url,
         disabled: disabled
       )
 
     ~H"""
-    <button
-      type="button"
-      class={button_classes(@primary, @disabled)}
-      phx-click={@has_action && !@disabled && "a2ui:action"}
-      phx-value-surface-id={@has_action && !@disabled && @surface.id}
-      phx-value-component-id={@has_action && !@disabled && @id}
-      phx-value-scope-path={@has_action && !@disabled && (@scope_path || "")}
-      disabled={@disabled}
-    >
-      <Standard.render_component
-        :if={@props["child"]}
-        id={@props["child"]}
-        surface={@surface}
-        scope_path={@scope_path}
-        depth={@depth + 1}
-        suppress_events={@suppress_events}
-        visited={@visited}
-      />
-    </button>
+    <%= if @open_url && !@disabled do %>
+      <a
+        href={@open_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        class={button_classes(@variant, false)}
+      >
+        <Standard.render_component
+          :if={@props["child"]}
+          id={@props["child"]}
+          surface={@surface}
+          scope_path={@scope_path}
+          depth={@depth + 1}
+          suppress_events={@suppress_events}
+          visited={@visited}
+        />
+      </a>
+    <% else %>
+      <button
+        type="button"
+        class={button_classes(@variant, @disabled)}
+        phx-click={@has_action && !@disabled && "a2ui:action"}
+        phx-value-surface-id={@has_action && !@disabled && @surface.id}
+        phx-value-component-id={@has_action && !@disabled && @id}
+        phx-value-scope-path={@has_action && !@disabled && (@scope_path || "")}
+        disabled={@disabled}
+      >
+        <Standard.render_component
+          :if={@props["child"]}
+          id={@props["child"]}
+          surface={@surface}
+          scope_path={@scope_path}
+          depth={@depth + 1}
+          suppress_events={@suppress_events}
+          visited={@visited}
+        />
+      </button>
+    <% end %>
     """
   end
 
@@ -300,18 +325,27 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
         opts
       )
 
-    enable_date = assigns.props["enableDate"] != false
-    enable_time = assigns.props["enableTime"] != false
+    enable_date = assigns.props["enableDate"] == true
+    enable_time = assigns.props["enableTime"] == true
 
     input_type =
       cond do
         enable_date and enable_time -> "datetime-local"
         enable_date -> "date"
         enable_time -> "time"
-        true -> "datetime-local"
+        true -> nil
       end
 
-    html_value = iso8601_to_html_datetime(value, input_type)
+    html_value = if input_type, do: iso8601_to_html_datetime(value, input_type), else: ""
+
+    min_value =
+      Binding.resolve(assigns.props["min"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    max_value =
+      Binding.resolve(assigns.props["max"], assigns.surface.data_model, assigns.scope_path, opts)
+
+    html_min = if input_type, do: iso8601_to_html_datetime(min_value, input_type), else: ""
+    html_max = if input_type, do: iso8601_to_html_datetime(max_value, input_type), else: ""
 
     step =
       case input_type do
@@ -331,6 +365,8 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
         label: label,
         html_value: html_value,
         input_type: input_type,
+        html_min: html_min,
+        html_max: html_max,
         path: path,
         step: step,
         errors: errors
@@ -352,10 +388,13 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
           {@label}
         </label>
         <input
+          :if={@input_type}
           type={@input_type}
           name="a2ui_input[value]"
           id={component_dom_id(@surface.id, @id, @scope_path, "input")}
           value={@html_value}
+          min={@html_min != "" && @html_min}
+          max={@html_max != "" && @html_max}
           step={@step}
           disabled={@suppress_events}
           class="block w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
@@ -398,9 +437,13 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
         opts
       )
 
+    is_single_select =
+      Adapter.choice_single_select?(assigns.props, assigns.surface.protocol_version || :v0_8)
+
     selections =
       cond do
         is_list(raw_selections) -> raw_selections
+        is_single_select and is_binary(raw_selections) -> [raw_selections]
         is_map(raw_selections) -> Map.values(raw_selections)
         true -> []
       end
@@ -411,7 +454,8 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
 
     max_allowed = assigns.props["maxAllowedSelections"]
 
-    is_single_select = Adapter.choice_single_select?(assigns.props)
+    display_style = assigns.props["displayStyle"] || "checkbox"
+    filterable = assigns.props["filterable"] == true
 
     raw_path = Binding.get_path(selections_prop)
     path = if raw_path, do: Binding.expand_path(raw_path, assigns.scope_path, opts), else: nil
@@ -430,6 +474,8 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
         max_allowed: max_allowed,
         path: path,
         is_single_select: is_single_select,
+        display_style: display_style,
+        filterable: filterable,
         max_reached: max_reached,
         binding_opts: opts,
         errors: errors
@@ -453,6 +499,27 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
         <label :if={@label} class="block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {@label}
         </label>
+        <input
+          :if={@filterable}
+          id={component_dom_id(@surface.id, @id, @scope_path, "filter")}
+          type="search"
+          placeholder="Filter options"
+          phx-hook=".A2UIChoiceFilter"
+          phx-update="ignore"
+          class="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <script :type={Phoenix.LiveView.ColocatedHook} name=".A2UIChoiceFilter">
+          export default {
+            mounted() {
+              this.el.addEventListener("input", () => {
+                const query = this.el.value.toLocaleLowerCase()
+                this.el.closest("form").querySelectorAll("[data-a2ui-choice-option]").forEach(option => {
+                  option.hidden = !option.textContent.toLocaleLowerCase().includes(query)
+                })
+              })
+            }
+          }
+        </script>
         <%= for option <- @options do %>
           <% opt_label =
             Binding.resolve(option["label"], @surface.data_model, @scope_path, @binding_opts)
@@ -461,10 +528,15 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
           opt_value = if is_binary(opt_value), do: opt_value, else: ""
           is_selected = opt_value != "" and opt_value in @selections
           is_disabled = @suppress_events or (@max_reached and not is_selected) %>
-          <label class={[
-            "flex items-center gap-2",
-            if(is_disabled, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")
-          ]}>
+          <label
+            class={[
+              "flex items-center gap-2",
+              @display_style == "chips" &&
+                "w-fit rounded-full border border-zinc-200 px-3 py-2 transition has-[:checked]:border-[var(--a2ui-primary-color)] has-[:checked]:bg-zinc-100 dark:border-zinc-700 dark:has-[:checked]:bg-zinc-800",
+              if(is_disabled, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")
+            ]}
+            data-a2ui-choice-option
+          >
             <%= if @is_single_select do %>
               <input
                 type="radio"
@@ -472,7 +544,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
                 value={opt_value}
                 checked={is_selected}
                 disabled={is_disabled}
-                class="size-4 border-zinc-300"
+                class={if(@display_style == "chips", do: "sr-only", else: "size-4 border-zinc-300")}
               />
             <% else %>
               <input
@@ -481,7 +553,12 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
                 value={opt_value}
                 checked={is_selected}
                 disabled={is_disabled}
-                class="size-4 rounded border-zinc-300 disabled:opacity-50"
+                class={
+                  if(@display_style == "chips",
+                    do: "sr-only",
+                    else: "size-4 rounded border-zinc-300 disabled:opacity-50"
+                  )
+                }
               />
             <% end %>
             <span class="text-sm text-zinc-900 dark:text-zinc-50">{opt_label}</span>
@@ -494,4 +571,20 @@ defmodule A2UI.Phoenix.Catalog.Standard.Input do
     </.form>
     """
   end
+
+  defp resolve_open_url(
+         %{"functionCall" => %{"call" => "openUrl", "args" => args}},
+         surface,
+         scope,
+         opts
+       ) do
+    url = Value.resolve(args["url"], surface.data_model, scope, opts)
+
+    case Validator.validate_open_url(url) do
+      {:ok, safe_url} -> safe_url
+      {:error, _} -> nil
+    end
+  end
+
+  defp resolve_open_url(_, _surface, _scope, _opts), do: nil
 end

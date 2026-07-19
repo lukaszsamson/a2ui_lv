@@ -132,14 +132,19 @@ defmodule A2UI.ClientCapabilities do
   - `supportedCatalogIds` - Array of catalog ID strings
   - `inlineCatalogs` - Array of catalog definition documents (only if non-empty)
   """
-  @spec to_a2a_metadata(t()) :: map()
-  def to_a2a_metadata(capabilities) do
+  @spec to_a2a_metadata(t(), A2UI.Protocol.version()) :: map()
+  def to_a2a_metadata(capabilities, version \\ :v0_8) do
     metadata = %{"supportedCatalogIds" => capabilities.supported_catalog_ids}
 
-    if length(capabilities.inline_catalogs) > 0 do
-      Map.put(metadata, "inlineCatalogs", capabilities.inline_catalogs)
-    else
-      metadata
+    metadata =
+      if capabilities.inline_catalogs != [],
+        do: Map.put(metadata, "inlineCatalogs", capabilities.inline_catalogs),
+        else: metadata
+
+    case version do
+      :v0_8 -> metadata
+      :v0_9 -> %{"v0.9" => metadata}
+      :v0_9_1 -> %{"v0.9.1" => metadata}
     end
   end
 end

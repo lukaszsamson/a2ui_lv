@@ -89,8 +89,25 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec register(String.t(), module()) :: :ok
   def register(catalog_id, module) when is_binary(catalog_id) and is_atom(module) do
+    schema =
+      if function_exported?(module, :a2ui_catalog_schema, 0),
+        do: module.a2ui_catalog_schema(),
+        else: nil
+
+    register(catalog_id, module, schema)
+  end
+
+  @doc """
+  Registers a renderer together with its Draft 2020-12 catalog schema.
+
+  Released custom catalogs must provide their schema so incoming component and
+  theme messages can be validated before rendering.
+  """
+  @spec register(String.t(), module(), map() | nil) :: :ok
+  def register(catalog_id, module, schema)
+      when is_binary(catalog_id) and is_atom(module) and (is_map(schema) or is_nil(schema)) do
     ensure_table()
-    :ets.insert(@table_name, {catalog_id, module})
+    :ets.insert(@table_name, {catalog_id, module, schema})
     :ok
   end
 
@@ -128,6 +145,13 @@ defmodule A2UI.Catalog.Registry do
     :ok
   end
 
+  @doc "Registers a renderer for the released v0.9 Basic Catalog (also used by v0.9.1)."
+  @spec register_v0_9_standard(module()) :: :ok
+  def register_v0_9_standard(module) when is_atom(module) do
+    Enum.each(A2UI.V0_9.standard_catalog_ids(), &register(&1, module))
+    :ok
+  end
+
   @doc """
   Looks up the catalog module for a catalog ID.
 
@@ -158,6 +182,7 @@ defmodule A2UI.Catalog.Registry do
 
       _ref ->
         case :ets.lookup(@table_name, catalog_id) do
+          [{^catalog_id, module, _schema}] -> {:ok, module}
           [{^catalog_id, module}] -> {:ok, module}
           [] -> {:error, :not_found}
         end
@@ -205,9 +230,10 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec unregister(String.t()) :: :ok
   def unregister(catalog_id) when is_binary(catalog_id) do
-    case :ets.whereis(@table_name) do
-      :undefined -> :ok
-      _ref -> :ets.delete(@table_name, catalog_id)
+    try do
+      :ets.delete(@table_name, catalog_id)
+    rescue
+      ArgumentError -> :ok
     end
 
     :ok
@@ -229,7 +255,7 @@ defmodule A2UI.Catalog.Registry do
       _ref ->
         @table_name
         |> :ets.tab2list()
-        |> Enum.map(fn {catalog_id, _module} -> catalog_id end)
+        |> Enum.map(fn entry -> elem(entry, 0) end)
     end
   end
 
@@ -249,7 +275,25 @@ defmodule A2UI.Catalog.Registry do
       _ref ->
         @table_name
         |> :ets.tab2list()
-        |> Map.new()
+        |> Map.new(fn
+          {catalog_id, module, _schema} -> {catalog_id, module}
+          {catalog_id, module} -> {catalog_id, module}
+        end)
+    end
+  end
+
+  @doc "Returns the validation schema registered for a catalog."
+  @spec schema(String.t()) :: {:ok, map()} | :error
+  def schema(catalog_id) when is_binary(catalog_id) do
+    case :ets.whereis(@table_name) do
+      :undefined ->
+        :error
+
+      _ref ->
+        case :ets.lookup(@table_name, catalog_id) do
+          [{^catalog_id, _module, schema}] when is_map(schema) -> {:ok, schema}
+          _ -> :error
+        end
     end
   end
 
@@ -277,7 +321,11 @@ defmodule A2UI.Catalog.Registry do
   """
   @spec registered?(String.t()) :: boolean()
   def registered?(catalog_id) when is_binary(catalog_id) do
-    :ets.member(@table_name, catalog_id)
+    try do
+      :ets.member(@table_name, catalog_id)
+    rescue
+      ArgumentError -> false
+    end
   end
 
   @doc """
@@ -306,8 +354,9 @@ defmodule A2UI.Catalog.Registry do
     # Register initial catalogs if provided
     initial_catalogs = Keyword.get(opts, :catalogs, %{})
 
-    Enum.each(initial_catalogs, fn {catalog_id, module} ->
-      register(catalog_id, module)
+    Enum.each(initial_catalogs, fn
+      {catalog_id, {module, schema}} -> register(catalog_id, module, schema)
+      {catalog_id, module} -> register(catalog_id, module)
     end)
 
     {:ok, %{}}

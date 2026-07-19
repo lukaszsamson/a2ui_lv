@@ -83,10 +83,47 @@ defmodule A2UI.Functions do
         {value, opts} = min_max_args(args)
         numeric(value, opts)
 
-      "string_format" ->
+      name when name in ["formatString", "string_format"] ->
         template = arg_from(args, "value", 0) || arg_from(args, "template", 1)
         version = Keyword.get(opts, :version, :v0_8)
         string_format(template, data_model, scope_path, version: version)
+
+      "formatNumber" ->
+        format_number(arg_from(args, "value", 0),
+          decimals: arg_from(args, "decimals", 1),
+          grouping: arg_from(args, "grouping", 2),
+          locale: function_locale(opts)
+        )
+
+      "formatCurrency" ->
+        format_currency(arg_from(args, "value", 0), arg_from(args, "currency", 1),
+          decimals: arg_from(args, "decimals", 2),
+          grouping: arg_from(args, "grouping", 3),
+          locale: function_locale(opts)
+        )
+
+      "formatDate" ->
+        format_date(arg_from(args, "value", 0), arg_from(args, "format", 1),
+          locale: function_locale(opts)
+        )
+
+      "pluralize" ->
+        pluralize(arg_from(args, "value", 0), args, locale: function_locale(opts))
+
+      "openUrl" ->
+        case A2UI.Validator.validate_open_url(arg_from(args, "url", 0)) do
+          {:ok, url} -> {:open_url, url}
+          {:error, _} -> nil
+        end
+
+      "and" ->
+        args |> arg_from("values", 0) |> List.wrap() |> Enum.all?(&truthy?/1)
+
+      "or" ->
+        args |> arg_from("values", 0) |> List.wrap() |> Enum.any?(&truthy?/1)
+
+      "not" ->
+        not truthy?(arg_from(args, "value", 0))
 
       "now" ->
         DateTime.utc_now() |> DateTime.to_iso8601()
@@ -304,6 +341,87 @@ defmodule A2UI.Functions do
 
   def email(_), do: false
 
+  @doc "Formats a number using CLDR locale rules and the Basic Catalog controls."
+  def format_number(value, opts \\ [])
+
+  def format_number(value, opts) when is_number(value) do
+    decimals = Keyword.get(opts, :decimals)
+    grouping? = Keyword.get(opts, :grouping, true) != false
+    locale = Keyword.get(opts, :locale, "en")
+
+    format = number_format(grouping?, decimals)
+    cldr_opts = [locale: locale, format: format]
+
+    cldr_opts =
+      if is_integer(decimals) and decimals >= 0,
+        do: Keyword.put(cldr_opts, :fractional_digits, decimals),
+        else: cldr_opts
+
+    case A2UI.Cldr.Number.to_string(value, cldr_opts) do
+      {:ok, rendered} -> rendered
+      {:error, _reason} -> ""
+    end
+  end
+
+  def format_number(_, _opts), do: ""
+
+  @doc "Formats an ISO 4217 currency using CLDR locale and currency data."
+  def format_currency(value, currency, opts \\ [])
+
+  def format_currency(value, currency, opts) when is_number(value) and is_binary(currency) do
+    locale = Keyword.get(opts, :locale, "en")
+    grouping? = Keyword.get(opts, :grouping, true) != false
+    decimals = Keyword.get(opts, :decimals)
+    format = if grouping?, do: :currency, else: currency_format_without_grouping(decimals)
+    cldr_opts = [locale: locale, currency: currency, format: format]
+
+    cldr_opts =
+      if is_integer(decimals) and decimals >= 0,
+        do: Keyword.put(cldr_opts, :fractional_digits, decimals),
+        else: cldr_opts
+
+    case A2UI.Cldr.Number.to_string(value, cldr_opts) do
+      {:ok, rendered} -> rendered
+      {:error, _reason} -> ""
+    end
+  end
+
+  def format_currency(_, _, _opts), do: ""
+
+  @doc "Formats an ISO-8601 date/time using a locale-aware Unicode TR35 pattern."
+  def format_date(value, format, opts \\ [])
+
+  def format_date(value, format, opts)
+      when (is_binary(value) or is_number(value)) and is_binary(format) do
+    with {:ok, date_time} <- parse_date_time(value) do
+      case A2UI.Cldr.DateTime.to_string(date_time,
+             format: format,
+             locale: Keyword.get(opts, :locale, "en")
+           ) do
+        {:ok, rendered} -> rendered
+        {:error, _reason} -> ""
+      end
+    else
+      _ -> ""
+    end
+  end
+
+  def format_date(_, _, _), do: ""
+
+  @doc "Selects a localized CLDR cardinal plural form with the required `other` fallback."
+  def pluralize(value, args, opts \\ [])
+
+  def pluralize(value, args, opts) when is_number(value) and is_map(args) do
+    key =
+      value
+      |> Cldr.Number.PluralRule.plural_type(A2UI.Cldr, locale: Keyword.get(opts, :locale, "en"))
+      |> Atom.to_string()
+
+    Map.get(args, key, Map.get(args, "other", ""))
+  end
+
+  def pluralize(_, _, _), do: ""
+
   # ============================================
   # String Interpolation
   # ============================================
@@ -488,7 +606,16 @@ defmodule A2UI.Functions do
   defp resolve_function_call(expr, data, scope, version) do
     case parse_function_call(expr) do
       {:ok, func_name, args} ->
-        resolved_args = Enum.map(args, &resolve_arg(&1, data, scope, version))
+        resolved_args =
+          if Enum.all?(args, &match?({:named, _, _}, parse_named_argument(&1))) do
+            Map.new(args, fn arg ->
+              {:named, name, value} = parse_named_argument(arg)
+              {name, resolve_arg(value, data, scope, version)}
+            end)
+          else
+            Enum.map(args, &resolve_arg(&1, data, scope, version))
+          end
+
         call(func_name, resolved_args, data, scope, version: version)
 
       :error ->
@@ -611,6 +738,13 @@ defmodule A2UI.Functions do
     end
   end
 
+  defp parse_named_argument(argument) do
+    case Regex.run(~r/^([a-zA-Z_][a-zA-Z0-9_]*)\s*:(.*)$/s, String.trim(argument)) do
+      [_, name, value] -> {:named, name, String.trim(value)}
+      _ -> :positional
+    end
+  end
+
   defp arg_from(args, key, _index) when is_map(args), do: Map.get(args, key)
   defp arg_from(args, _key, index) when is_list(args), do: Enum.at(args, index)
   defp arg_from(_args, _key, _index), do: nil
@@ -641,6 +775,56 @@ defmodule A2UI.Functions do
   defp min_max_opts(min, nil), do: [{:min, min}]
   defp min_max_opts(nil, max), do: [{:max, max}]
   defp min_max_opts(min, max), do: [{:min, min}, {:max, max}]
+
+  defp function_locale(opts),
+    do: Keyword.get(opts, :locale, Application.get_env(:a2ui_lv, :locale, "en"))
+
+  defp number_format(grouping?, decimals) do
+    integer = if grouping?, do: "#,##0", else: "0"
+
+    case decimals do
+      count when is_integer(count) and count > 0 -> integer <> "." <> String.duplicate("0", count)
+      0 -> integer
+      _ -> integer <> ".############"
+    end
+  end
+
+  defp currency_format_without_grouping(decimals) do
+    fraction =
+      case decimals do
+        count when is_integer(count) and count > 0 -> "." <> String.duplicate("0", count)
+        0 -> ""
+        _ -> ".00"
+      end
+
+    "¤0" <> fraction
+  end
+
+  defp parse_date_time(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, date_time, _offset} ->
+        {:ok, date_time}
+
+      _ ->
+        case NaiveDateTime.from_iso8601(value) do
+          {:ok, date_time} ->
+            {:ok, date_time}
+
+          _ ->
+            case Date.from_iso8601(value) do
+              {:ok, date} -> {:ok, NaiveDateTime.new!(date, ~T[00:00:00])}
+              error -> error
+            end
+        end
+    end
+  end
+
+  defp parse_date_time(value) when is_number(value) do
+    milliseconds = if abs(value) >= 100_000_000_000, do: round(value), else: round(value * 1_000)
+    DateTime.from_unix(milliseconds, :millisecond)
+  end
+
+  defp truthy?(value), do: value not in [false, nil, "", []]
 
   # Convert value to string for interpolation output
   defp to_string_value(nil), do: ""

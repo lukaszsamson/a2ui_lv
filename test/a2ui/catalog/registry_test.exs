@@ -51,6 +51,61 @@ defmodule A2UI.Catalog.RegistryTest do
       assert {:ok, TestCatalog} = Registry.lookup(catalog_id)
     end
 
+    test "registered released catalog schemas validate custom components" do
+      catalog_id = "https://example.com/a2ui/custom/catalog.json"
+
+      schema = %{
+        "$schema" => "https://json-schema.org/draft/2020-12/schema",
+        "$id" => catalog_id,
+        "$defs" => %{
+          "theme" => %{"type" => "object", "additionalProperties" => false},
+          "anyComponent" => %{
+            "type" => "object",
+            "properties" => %{
+              "id" => %{"type" => "string"},
+              "component" => %{"const" => "CustomLabel"},
+              "text" => %{"type" => "string"}
+            },
+            "required" => ~w(id component text),
+            "additionalProperties" => false
+          }
+        }
+      }
+
+      assert :ok = Registry.register(catalog_id, TestCatalog, schema)
+      assert {:ok, ^schema} = Registry.schema(catalog_id)
+
+      capabilities =
+        A2UI.ClientCapabilities.new(supported_catalog_ids: [catalog_id])
+
+      session = A2UI.Session.new(client_capabilities: capabilities)
+
+      {:ok, session} =
+        A2UI.Session.apply_json_line(
+          session,
+          Jason.encode!(%{
+            "version" => "v0.9.1",
+            "createSurface" => %{"surfaceId" => "custom", "catalogId" => catalog_id}
+          })
+        )
+
+      assert {:ok, session} =
+               A2UI.Session.apply_json_line(
+                 session,
+                 Jason.encode!(%{
+                   "version" => "v0.9.1",
+                   "updateComponents" => %{
+                     "surfaceId" => "custom",
+                     "components" => [
+                       %{"id" => "root", "component" => "CustomLabel", "text" => "hello"}
+                     ]
+                   }
+                 })
+               )
+
+      assert session.surfaces["custom"].components["root"].type == "CustomLabel"
+    end
+
     test "overwrites existing registration" do
       catalog_id = "https://example.com/overwrite-test.json"
 

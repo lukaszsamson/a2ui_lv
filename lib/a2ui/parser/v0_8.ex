@@ -49,7 +49,7 @@ defmodule A2UI.Parser.V0_8 do
   def parse_map(%{"surfaceUpdate" => data}) do
     # Adapt v0.8 format to v0.9, then parse as v0.9
     adapted = Adapter.adapt_surface_update(data)
-    {:surface_update, SurfaceUpdate.from_map_v09(adapted)}
+    {:surface_update, SurfaceUpdate.from_map_v09(adapted, :v0_8)}
   end
 
   def parse_map(%{"dataModelUpdate" => data}) do

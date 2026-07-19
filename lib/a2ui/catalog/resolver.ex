@@ -35,6 +35,7 @@ defmodule A2UI.Catalog.Resolver do
   """
 
   alias A2UI.ClientCapabilities
+  alias A2UI.Catalog.Registry
   alias A2UI.Protocol
 
   @type version :: Protocol.version()
@@ -75,7 +76,7 @@ defmodule A2UI.Catalog.Resolver do
   end
 
   # v0.9: catalogId is required
-  def resolve(nil, _capabilities, :v0_9) do
+  def resolve(nil, _capabilities, version) when version in [:v0_9, :v0_9_1] do
     {:error, :missing_catalog_id}
   end
 
@@ -93,9 +94,9 @@ defmodule A2UI.Catalog.Resolver do
       inline_catalog?(capabilities, catalog_id) ->
         {:error, :inline_catalog_not_supported}
 
-      # Check if client claims to support it (but we don't)
-      ClientCapabilities.supports_catalog?(capabilities, catalog_id) ->
-        {:error, :unsupported_catalog}
+      ClientCapabilities.supports_catalog?(capabilities, catalog_id) and
+        Registry.registered?(catalog_id) and match?({:ok, _}, Registry.schema(catalog_id)) ->
+        {:ok, catalog_id}
 
       # Unknown catalog
       true ->
@@ -116,7 +117,7 @@ defmodule A2UI.Catalog.Resolver do
   """
   @spec format_error(error_reason()) :: String.t()
   def format_error(:missing_catalog_id) do
-    "catalogId is required for v0.9 protocol"
+    "catalogId is required for v0.9/v0.9.1 protocol"
   end
 
   def format_error(:unsupported_catalog) do

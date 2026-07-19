@@ -22,7 +22,7 @@ defmodule A2UI.Messages.DataModelUpdate do
           surface_id: String.t(),
           path: String.t() | nil,
           value: term(),
-          protocol_version: :v0_8 | :v0_9 | nil,
+          protocol_version: A2UI.Protocol.version() | nil,
           patches: [A2UI.DataPatch.patch()]
         }
 
@@ -44,7 +44,7 @@ defmodule A2UI.Messages.DataModelUpdate do
       %A2UI.Messages.DataModelUpdate{surface_id: "main", path: "/temp", value: :delete}
   """
   @spec from_map(map()) :: t()
-  def from_map(%{"surfaceId" => sid} = data) do
+  def from_map(%{"surfaceId" => sid} = data, version \\ :v0_9) do
     # Missing "value" key means delete operation (we use :delete sentinel)
     value =
       if Map.has_key?(data, "value") do
@@ -66,7 +66,7 @@ defmodule A2UI.Messages.DataModelUpdate do
       surface_id: sid,
       path: Map.get(data, "path"),
       value: value,
-      protocol_version: :v0_9,
+      protocol_version: version,
       patches: patches
     }
   end

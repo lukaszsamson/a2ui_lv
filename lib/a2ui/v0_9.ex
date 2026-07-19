@@ -7,7 +7,7 @@ defmodule A2UI.V0_9 do
   ## Standard Catalog ID
 
   The v0.9 specification uses a single canonical catalog ID:
-  - `"https://a2ui.dev/specification/v0_9/standard_catalog.json"`
+  - `"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"`
 
   ## Wire Format Differences from v0.8
 
@@ -24,6 +24,23 @@ defmodule A2UI.V0_9 do
   """
 
   alias A2UI.Protocol
+
+  @doc "Parses and validates a released v0.9 JSONL message."
+  def parse_line(jsonl_line) do
+    with {:ok, decoded} <- A2UI.JSON.decode_line(jsonl_line),
+         :ok <- A2UI.Validator.validate_server_message(decoded, :v0_9) do
+      A2UI.Parser.V0_9.parse_map(Map.delete(decoded, "version"), :v0_9)
+    end
+  rescue
+    exception -> {:error, {:parse_exception, exception}}
+  end
+
+  @doc "Parses and validates a decoded released v0.9 message."
+  def parse_map(decoded) do
+    with :ok <- A2UI.Validator.validate_server_message(decoded, :v0_9) do
+      A2UI.Parser.V0_9.parse_map(Map.delete(decoded, "version"), :v0_9)
+    end
+  end
 
   @doc """
   Returns the canonical standard catalog ID for v0.9.
