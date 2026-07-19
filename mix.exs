@@ -10,6 +10,7 @@ defmodule A2UI.MixProject do
       version: @version,
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
+      aliases: aliases(),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
@@ -25,6 +26,10 @@ defmodule A2UI.MixProject do
     [
       extra_applications: [:logger]
     ]
+  end
+
+  def cli do
+    [preferred_envs: [precommit: :test]]
   end
 
   defp description do
@@ -64,7 +69,10 @@ defmodule A2UI.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_view, "~> 1.1"},
       {:jason, "~> 1.2"},
+      {:jsonschex, "~> 0.8"},
       {:earmark, "~> 1.4"},
+      {:ex_cldr_numbers, "~> 2.38"},
+      {:ex_cldr_dates_times, "~> 2.25"},
       # Optional: HTTP transport (SSE client)
       {:req, "~> 0.5", optional: true},
       # A2A protocol library
@@ -73,6 +81,12 @@ defmodule A2UI.MixProject do
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
       {:lazy_html, ">= 0.1.0", only: :test}
+    ]
+  end
+
+  defp aliases do
+    [
+      precommit: ["compile", "deps.unlock --unused", "format --check-formatted", "test"]
     ]
   end
 end

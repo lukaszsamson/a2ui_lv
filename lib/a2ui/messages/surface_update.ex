@@ -6,11 +6,12 @@ defmodule A2UI.Messages.SurfaceUpdate do
   Per Message Types Reference: "sending duplicate IDs updates existing components"
   """
 
-  defstruct [:surface_id, :components]
+  defstruct [:surface_id, :components, :protocol_version]
 
   @type t :: %__MODULE__{
           surface_id: String.t(),
-          components: [A2UI.Component.t()]
+          components: [A2UI.Component.t()],
+          protocol_version: A2UI.Protocol.version() | nil
         }
 
   @doc """
@@ -28,7 +29,8 @@ defmodule A2UI.Messages.SurfaceUpdate do
   def from_map(%{"surfaceId" => sid, "components" => comps}) do
     %__MODULE__{
       surface_id: sid,
-      components: Enum.map(comps, &A2UI.Component.from_map/1)
+      components: Enum.map(comps, &A2UI.Component.from_map/1),
+      protocol_version: :v0_8
     }
   end
 
@@ -36,10 +38,11 @@ defmodule A2UI.Messages.SurfaceUpdate do
   Parse v0.9 updateComponents message format.
   """
   @spec from_map_v09(map()) :: t()
-  def from_map_v09(%{"surfaceId" => sid, "components" => comps}) do
+  def from_map_v09(%{"surfaceId" => sid, "components" => comps}, version \\ :v0_9) do
     %__MODULE__{
       surface_id: sid,
-      components: Enum.map(comps, &A2UI.Component.from_map_v09/1)
+      components: Enum.map(comps, &A2UI.Component.from_map_v09/1),
+      protocol_version: version
     }
   end
 end

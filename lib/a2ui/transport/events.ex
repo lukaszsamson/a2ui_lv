@@ -192,20 +192,26 @@ defmodule A2UI.Transport.Events do
   @spec validate_envelope(event_envelope()) :: :ok | {:error, atom()}
   def validate_envelope(envelope) when is_map(envelope) do
     keys = Map.keys(envelope)
+    message_keys = keys -- ["version"]
 
     cond do
-      length(keys) != 1 ->
+      length(message_keys) != 1 ->
         {:error, :multiple_envelope_keys}
 
-      # v0.9 action key
-      "action" in keys ->
-        :ok
+      Map.has_key?(envelope, "version") and envelope["version"] not in ["v0.9", "v0.9.1"] ->
+        {:error, :invalid_version}
+
+      "action" in message_keys and Map.has_key?(envelope, "version") ->
+        validate_released_action(envelope["action"])
 
       # v0.8 userAction key
-      "userAction" in keys ->
+      "userAction" in message_keys and not Map.has_key?(envelope, "version") ->
         :ok
 
-      "error" in keys ->
+      "error" in message_keys and Map.has_key?(envelope, "version") ->
+        validate_released_error(envelope["error"])
+
+      "error" in message_keys ->
         :ok
 
       true ->
@@ -214,6 +220,53 @@ defmodule A2UI.Transport.Events do
   end
 
   def validate_envelope(_), do: {:error, :not_a_map}
+
+  defp validate_released_action(action) when is_map(action) do
+    required = ~w(name surfaceId sourceComponentId timestamp context)
+
+    cond do
+      not Enum.all?(required, &Map.has_key?(action, &1)) ->
+        {:error, :missing_required_action_property}
+
+      not Enum.all?(~w(name surfaceId sourceComponentId timestamp), &is_binary(action[&1])) ->
+        {:error, :invalid_action_property}
+
+      not is_map(action["context"]) ->
+        {:error, :invalid_action_context}
+
+      not iso8601_datetime?(action["timestamp"]) ->
+        {:error, :invalid_action_timestamp}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_released_action(_), do: {:error, :invalid_action}
+
+  defp validate_released_error(%{"code" => "VALIDATION_FAILED"} = error) do
+    required = ~w(code surfaceId path message)
+
+    if Map.keys(error) |> Enum.sort() == Enum.sort(required) and
+         Enum.all?(~w(surfaceId path message), &is_binary(error[&1])) do
+      :ok
+    else
+      {:error, :invalid_validation_error}
+    end
+  end
+
+  defp validate_released_error(%{"code" => code, "surfaceId" => surface_id, "message" => message})
+       when not is_nil(code) and code != "VALIDATION_FAILED" and is_binary(surface_id) and
+              is_binary(message),
+       do: :ok
+
+  defp validate_released_error(_), do: {:error, :invalid_error}
+
+  defp iso8601_datetime?(value) when is_binary(value) do
+    match?({:ok, _, _}, DateTime.from_iso8601(value))
+  end
+
+  defp iso8601_datetime?(_), do: false
 
   @doc """
   Returns the type of event in the envelope.

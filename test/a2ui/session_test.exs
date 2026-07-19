@@ -544,18 +544,14 @@ defmodule A2UI.SessionTest do
       # cannot happen at createSurface time. It's deferred to render time.
       session = Session.new()
 
-      # Create a surface WITHOUT a root component
-      surface_json =
-        ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"header","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
-
-      {:ok, session} = Session.apply_json_line(session, surface_json)
-
       # v0.9 createSurface - should succeed (root validation deferred)
       catalog_id = A2UI.V0_9.standard_catalog_id()
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+
+      create_json =
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
       assert {:ok, updated} = Session.apply_json_line(session, create_json)
-      assert updated.surfaces["test"].ready? == true
+      refute updated.surfaces["test"].ready?
       assert updated.surfaces["test"].protocol_version == :v0_9
     end
 
@@ -592,19 +588,12 @@ defmodule A2UI.SessionTest do
 
       # Should succeed - root validation is deferred to render time
       assert {:ok, updated} = Session.apply_message(session, begin_msg)
-      assert updated.surfaces["test"].ready? == true
+      refute updated.surfaces["test"].ready?
       assert updated.surfaces["test"].protocol_version == :v0_9
     end
 
     test "v0.9 createSurface succeeds even without root component (validation deferred)" do
       session = Session.new()
-
-      # Create a surface without root - this is the normal v0.9 flow
-      # where createSurface comes first, then updateComponents adds root
-      surface_json =
-        ~s({"surfaceUpdate":{"surfaceId":"test","components":[{"id":"child","component":{"Text":{"text":{"literalString":"Hi"}}}}]}})
-
-      {:ok, session} = Session.apply_json_line(session, surface_json)
 
       catalog_id = A2UI.V0_9.standard_catalog_id()
 
@@ -618,7 +607,7 @@ defmodule A2UI.SessionTest do
 
       # Should succeed - root validation is deferred to render time
       assert {:ok, updated} = Session.apply_message(session, begin_msg)
-      assert updated.surfaces["test"].ready? == true
+      refute updated.surfaces["test"].ready?
     end
   end
 
@@ -641,16 +630,19 @@ defmodule A2UI.SessionTest do
       assert updated.surfaces["test"].protocol_version == :v0_8
     end
 
-    test "v0.9 createSurface stores protocol_version :v0_9", %{session: session} do
+    test "v0.9 createSurface stores protocol_version :v0_9", %{session: _session} do
+      session = Session.new()
       catalog_id = A2UI.V0_9.standard_catalog_id()
       # Use v0.9 createSurface format (requires catalogId)
-      begin_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+      begin_json =
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
 
       assert {:ok, updated} = Session.apply_json_line(session, begin_json)
       assert updated.surfaces["test"].protocol_version == :v0_9
     end
 
-    test "v0.9 nil catalogId returns error (required in v0.9)", %{session: session} do
+    test "v0.9 nil catalogId returns error (required in v0.9)", %{session: _session} do
+      session = Session.new()
       # v0.9 createSurface without catalogId should fail
       begin_msg = %A2UI.Messages.BeginRendering{
         surface_id: "test",
@@ -661,11 +653,12 @@ defmodule A2UI.SessionTest do
       }
 
       assert {:error, error} = Session.apply_message(session, begin_msg)
-      assert error["error"]["type"] == "catalog_error"
+      assert error["error"]["code"] == "VALIDATION_FAILED"
       assert error["error"]["message"] =~ "required"
     end
 
-    test "v0.9 catalogId resolves successfully", %{session: session} do
+    test "v0.9 catalogId resolves successfully", %{session: _session} do
+      session = Session.new()
       catalog_id = A2UI.V0_9.standard_catalog_id()
 
       begin_msg = %A2UI.Messages.BeginRendering{
@@ -677,18 +670,20 @@ defmodule A2UI.SessionTest do
       }
 
       assert {:ok, updated} = Session.apply_message(session, begin_msg)
-      assert updated.surfaces["test"].ready? == true
+      refute updated.surfaces["test"].ready?
       assert updated.surfaces["test"].protocol_version == :v0_9
     end
 
-    test "v0.9 createSurface stores broadcast_data_model? flag", %{session: session} do
+    test "v0.9 createSurface stores send_data_model? flag", %{session: _session} do
+      session = Session.new()
       catalog_id = A2UI.V0_9.standard_catalog_id()
-      # Use v0.9 createSurface with broadcastDataModel
+      # Use released v0.9 createSurface with sendDataModel
       begin_json =
-        ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}","broadcastDataModel":true}})
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}","sendDataModel":true}})
 
       assert {:ok, updated} = Session.apply_json_line(session, begin_json)
       assert updated.surfaces["test"].broadcast_data_model? == true
+      assert updated.surfaces["test"].send_data_model? == true
     end
   end
 
@@ -699,28 +694,27 @@ defmodule A2UI.SessionTest do
       {:ok, session: session}
     end
 
-    test "complete v0.9 flow: updateComponents → createSurface → updateDataModel → deleteSurface",
+    test "complete released v0.9 flow: createSurface → updateComponents → updateDataModel → deleteSurface",
          %{session: session} do
       catalog_id = A2UI.V0_9.standard_catalog_id()
 
-      # 1. updateComponents first (v0.9 uses discriminator format)
-      # Note: Components including root must be sent BEFORE createSurface
-      components_json = ~s({"updateComponents":{
+      # 1. createSurface establishes the surface lifecycle.
+      create_json =
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"#{catalog_id}","sendDataModel":true}})
+
+      assert {:ok, session} = Session.apply_json_line(session, create_json)
+
+      # 2. updateComponents uses the released discriminator format.
+      components_json = ~s({"version":"v0.9","updateComponents":{
         "surfaceId":"main",
         "components":[
-          {"id":"root","component":"Column","children":[{"path":"/children"}]},
+          {"id":"root","component":"Column","children":["greeting","name_field"]},
           {"id":"greeting","component":"Text","text":"Hello, World!"},
-          {"id":"name_field","component":"TextField","value":{"path":"/form/name","_initialValue":"Alice"}}
+          {"id":"name_field","component":"TextField","label":"Name","value":{"path":"/form/name"}}
         ]
       }})
 
       assert {:ok, session} = Session.apply_json_line(session, components_json)
-
-      # 2. createSurface (marks surface ready, validates root exists)
-      create_json =
-        ~s({"createSurface":{"surfaceId":"main","catalogId":"#{catalog_id}","broadcastDataModel":true}})
-
-      assert {:ok, session} = Session.apply_json_line(session, create_json)
 
       surface = session.surfaces["main"]
       assert surface.ready? == true
@@ -733,14 +727,13 @@ defmodule A2UI.SessionTest do
       assert surface.components["root"].type == "Column"
       assert surface.components["greeting"].type == "Text"
       assert surface.components["greeting"].props == %{"text" => "Hello, World!"}
-      # Initializer should have set /form/name
-      assert surface.data_model == %{"form" => %{"name" => "Alice"}}
+      assert surface.data_model == %{}
 
       # 3. updateDataModel (v0.9 uses native JSON values)
-      data_json = ~s({"updateDataModel":{
+      data_json = ~s({"version":"v0.9","updateDataModel":{
         "surfaceId":"main",
-        "path":"/form/email",
-        "value":"alice@example.com"
+        "path":"/form",
+        "value":{"name":"Alice","email":"alice@example.com"}
       }})
 
       assert {:ok, session} = Session.apply_json_line(session, data_json)
@@ -750,7 +743,7 @@ defmodule A2UI.SessionTest do
       assert surface.data_model["form"]["name"] == "Alice"
 
       # 4. updateDataModel at root (replaces entire data model)
-      root_data_json = ~s({"updateDataModel":{
+      root_data_json = ~s({"version":"v0.9","updateDataModel":{
         "surfaceId":"main",
         "value":{"user":{"name":"Bob"},"status":"active"}
       }})
@@ -761,7 +754,7 @@ defmodule A2UI.SessionTest do
       assert surface.data_model == %{"user" => %{"name" => "Bob"}, "status" => "active"}
 
       # 5. updateDataModel delete operation (no value field)
-      delete_json = ~s({"updateDataModel":{
+      delete_json = ~s({"version":"v0.9","updateDataModel":{
         "surfaceId":"main",
         "path":"/status"
       }})
@@ -773,7 +766,7 @@ defmodule A2UI.SessionTest do
       refute Map.has_key?(surface.data_model, "status")
 
       # 6. deleteSurface
-      delete_surface_json = ~s({"deleteSurface":{"surfaceId":"main"}})
+      delete_surface_json = ~s({"version":"v0.9","deleteSurface":{"surfaceId":"main"}})
 
       assert {:ok, session} = Session.apply_json_line(session, delete_surface_json)
       assert session.surfaces == %{}
@@ -782,48 +775,53 @@ defmodule A2UI.SessionTest do
     test "v0.9 updateComponents with nested children binding", %{session: session} do
       catalog_id = A2UI.V0_9.standard_catalog_id()
 
-      # Send components first (with root) - Template pattern with path binding for children
-      components_json = ~s({"updateComponents":{
+      create_json =
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+
+      {:ok, session} = Session.apply_json_line(session, create_json)
+
+      components_json = ~s({"version":"v0.9","updateComponents":{
         "surfaceId":"test",
         "components":[
-          {"id":"root","component":"Column","children":[{"path":"/items"}]},
+          {"id":"root","component":"Column","children":{"componentId":"item_tmpl","path":"/items"}},
           {"id":"item_tmpl","component":"Text","text":{"path":"./name"}}
         ]
       }})
 
       assert {:ok, session} = Session.apply_json_line(session, components_json)
 
-      # Then create surface
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      {:ok, session} = Session.apply_json_line(session, create_json)
-
       surface = session.surfaces["test"]
-      assert surface.components["root"].props["children"] == [%{"path" => "/items"}]
+
+      assert surface.components["root"].props["children"] == %{
+               "componentId" => "item_tmpl",
+               "path" => "/items"
+             }
+
       assert surface.components["item_tmpl"].props["text"] == %{"path" => "./name"}
     end
 
     test "v0.9 data model replace semantics (not merge)", %{session: session} do
       catalog_id = A2UI.V0_9.standard_catalog_id()
 
-      # Send root component first
-      components_json = ~s({"updateComponents":{
+      create_json =
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
+
+      {:ok, session} = Session.apply_json_line(session, create_json)
+
+      components_json = ~s({"version":"v0.9","updateComponents":{
         "surfaceId":"test",
-        "components":[{"id":"root","component":"Column"}]
+        "components":[{"id":"root","component":"Column","children":[]}]
       }})
       {:ok, session} = Session.apply_json_line(session, components_json)
 
-      # Then create surface
-      create_json = ~s({"createSurface":{"surfaceId":"test","catalogId":"#{catalog_id}"}})
-      {:ok, session} = Session.apply_json_line(session, create_json)
-
-      initial_data_json = ~s({"updateDataModel":{
+      initial_data_json = ~s({"version":"v0.9","updateDataModel":{
         "surfaceId":"test",
         "value":{"user":{"name":"Alice","age":30,"email":"alice@test.com"}}
       }})
       {:ok, session} = Session.apply_json_line(session, initial_data_json)
 
       # v0.9: replacing at /user should replace the entire user object
-      update_json = ~s({"updateDataModel":{
+      update_json = ~s({"version":"v0.9","updateDataModel":{
         "surfaceId":"test",
         "path":"/user",
         "value":{"name":"Bob"}

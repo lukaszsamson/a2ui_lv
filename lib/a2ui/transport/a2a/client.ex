@@ -388,7 +388,7 @@ defmodule A2UI.Transport.A2A.Client do
     end
 
     defp do_create_task(state, initial_content) do
-      message = build_a2a_message(state.capabilities, initial_content)
+      message = build_a2a_message(state.capabilities, initial_content, state.protocol_version)
       config_opts = a2a_config_opts(state)
 
       case A2A.Client.send_message(state.base_url, [message: message], config_opts) do
@@ -423,7 +423,8 @@ defmodule A2UI.Transport.A2A.Client do
 
     defp post_event(state, event_envelope, task_id, opts) do
       # Build A2A message with capabilities
-      a2a_message_map = DataPart.build_client_message(event_envelope, state.capabilities)
+      a2a_message_map =
+        DataPart.build_client_message(event_envelope, state.capabilities, state.protocol_version)
 
       # Add data broadcast if present
       a2a_message_map =
@@ -434,7 +435,7 @@ defmodule A2UI.Transport.A2A.Client do
           broadcast ->
             put_in(
               a2a_message_map,
-              ["message", "metadata", "a2uiDataBroadcast"],
+              ["message", "metadata", Protocol.client_data_model_key()],
               broadcast
             )
         end
@@ -607,11 +608,12 @@ defmodule A2UI.Transport.A2A.Client do
       ]
     end
 
-    defp build_a2a_message(capabilities, content) do
+    defp build_a2a_message(capabilities, content, version) do
       %A2A.Types.Message{
         role: :user,
         metadata: %{
-          Protocol.client_capabilities_key() => ClientCapabilities.to_a2a_metadata(capabilities)
+          Protocol.client_capabilities_key() =>
+            ClientCapabilities.to_a2a_metadata(capabilities, version)
         },
         parts: [
           %A2A.Types.TextPart{

@@ -16,15 +16,17 @@ defmodule A2UI.Messages.BeginRendering do
   - Template binding: v0.8 scopes `/path` in templates, v0.9 treats `/path` as absolute
   """
 
-  @type protocol_version :: :v0_8 | :v0_9
+  @type protocol_version :: :v0_8 | :v0_9 | :v0_9_1
 
   defstruct [
     :surface_id,
     :root_id,
     :catalog_id,
     :styles,
+    :send_data_model?,
     :broadcast_data_model?,
-    :protocol_version
+    :protocol_version,
+    :creator_id
   ]
 
   @type t :: %__MODULE__{
@@ -32,8 +34,10 @@ defmodule A2UI.Messages.BeginRendering do
           root_id: String.t(),
           catalog_id: String.t() | nil,
           styles: map() | nil,
+          send_data_model?: boolean(),
           broadcast_data_model?: boolean(),
-          protocol_version: protocol_version()
+          protocol_version: protocol_version(),
+          creator_id: term()
         }
 
   @doc """
@@ -70,15 +74,19 @@ defmodule A2UI.Messages.BeginRendering do
       %A2UI.Messages.BeginRendering{surface_id: "main", root_id: "root", catalog_id: "test.catalog", broadcast_data_model?: false, protocol_version: :v0_9}
   """
   @spec from_map_v09(map()) :: t()
-  def from_map_v09(%{"surfaceId" => sid} = data) do
+  def from_map_v09(%{"surfaceId" => sid} = data, version \\ :v0_9) do
+    send_data_model? =
+      Map.get(data, "sendDataModel", Map.get(data, "broadcastDataModel", false))
+
     %__MODULE__{
       surface_id: sid,
       # v0.9 requires a component with id "root" - no explicit root field
       root_id: "root",
       catalog_id: Map.get(data, "catalogId"),
-      styles: nil,
-      broadcast_data_model?: Map.get(data, "broadcastDataModel", false),
-      protocol_version: :v0_9
+      styles: Map.get(data, "theme"),
+      send_data_model?: send_data_model?,
+      broadcast_data_model?: send_data_model?,
+      protocol_version: version
     }
   end
 end

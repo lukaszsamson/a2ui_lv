@@ -21,14 +21,20 @@ defmodule A2UI.A2A.ProtocolTest do
     test "returns v0.9 extension URI" do
       assert Protocol.extension_uri(:v0_9) == "https://a2ui.org/a2a-extension/a2ui/v0.9"
     end
+
+    test "returns v0.9.1 extension URI and released MIME type" do
+      assert Protocol.extension_uri(:v0_9_1) == "https://a2ui.org/a2a-extension/a2ui/v0.9.1"
+      assert Protocol.mime_type(:v0_9_1) == "application/a2ui+json"
+    end
   end
 
   describe "extension_uris/0" do
     test "returns all known extension URIs" do
       uris = Protocol.extension_uris()
-      assert length(uris) == 2
+      assert length(uris) == 3
       assert "https://a2ui.org/a2a-extension/a2ui/v0.8" in uris
       assert "https://a2ui.org/a2a-extension/a2ui/v0.9" in uris
+      assert "https://a2ui.org/a2a-extension/a2ui/v0.9.1" in uris
     end
   end
 

@@ -25,6 +25,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
     "edit" => "hero-pencil",
     "event" => "hero-calendar-days",
     "error" => "hero-exclamation-circle",
+    "fastForward" => "hero-forward",
     "favorite" => "hero-heart-solid",
     "favoriteOff" => "hero-heart",
     "flight" => "hero-paper-airplane",
@@ -41,24 +42,34 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
     "moreHoriz" => "hero-ellipsis-horizontal",
     "notifications" => "hero-bell",
     "notificationsOff" => "hero-bell-slash",
+    "pause" => "hero-pause",
     "payment" => "hero-credit-card",
     "person" => "hero-user",
     "phone" => "hero-phone",
     "photo" => "hero-photo",
+    "play" => "hero-play",
     "print" => "hero-printer",
     "refresh" => "hero-arrow-path",
+    "rewind" => "hero-backward",
     "schedule" => "hero-clock",
     "search" => "hero-magnifying-glass",
     "send" => "hero-paper-airplane",
     "settings" => "hero-cog-6-tooth",
     "share" => "hero-share",
     "shoppingCart" => "hero-shopping-cart",
+    "skipNext" => "hero-forward",
+    "skipPrevious" => "hero-backward",
     "star" => "hero-star-solid",
     "starHalf" => "hero-star",
     "starOff" => "hero-star",
+    "stop" => "hero-stop",
     "upload" => "hero-arrow-up-tray",
     "visibility" => "hero-eye",
     "visibilityOff" => "hero-eye-slash",
+    "volumeDown" => "hero-speaker-wave",
+    "volumeMute" => "hero-speaker-x-mark",
+    "volumeOff" => "hero-speaker-x-mark",
+    "volumeUp" => "hero-speaker-wave",
     "warning" => "hero-exclamation-triangle"
   }
 
@@ -75,23 +86,24 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
     # Get variant without default - nil means no variant specified
     variant = Adapter.variant_prop(assigns.props)
 
+    rendered_html = render_markdown(text)
+
     if variant == nil do
-      # No variant specified - render with markdown support
-      rendered_html = render_markdown(text)
       assigns = assign(assigns, rendered_html: rendered_html)
 
       ~H"""
-      <div class="a2ui-text-markdown text-zinc-900 dark:text-zinc-50">
+      <div class="a2ui-text-markdown">
         {Phoenix.HTML.raw(@rendered_html)}
       </div>
       """
     else
-      # Variant specified - render as plain styled text
       {style, class} = text_style(variant)
-      assigns = assign(assigns, text: text, style: style, class: class)
+      assigns = assign(assigns, rendered_html: rendered_html, style: style, class: class)
 
       ~H"""
-      <span class={@class} style={@style}>{@text}</span>
+      <div class={["a2ui-text-markdown", @class]} style={@style}>
+        {Phoenix.HTML.raw(@rendered_html)}
+      </div>
       """
     end
   end
@@ -123,11 +135,26 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
     name =
       Binding.resolve(assigns.props["name"], assigns.surface.data_model, assigns.scope_path, opts)
 
-    hero_name = Map.get(@icon_mapping, name, "hero-question-mark-circle")
-    assigns = assign(assigns, hero_name: hero_name)
+    {hero_name, svg_path} =
+      case name do
+        %{"svgPath" => path} when is_binary(path) -> {nil, path}
+        icon_name when is_binary(icon_name) -> {Map.get(@icon_mapping, icon_name), nil}
+        _ -> {nil, nil}
+      end
+
+    assigns = assign(assigns, hero_name: hero_name, svg_path: svg_path)
 
     ~H"""
-    <.icon name={@hero_name} class="a2ui-icon size-5" />
+    <svg
+      :if={@svg_path}
+      class="a2ui-icon size-5 text-current"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d={@svg_path} />
+    </svg>
+    <.icon :if={@hero_name} name={@hero_name} class="a2ui-icon size-5 text-current" />
     """
   end
 
@@ -145,16 +172,26 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
       Binding.resolve(assigns.props["url"], assigns.surface.data_model, assigns.scope_path, opts)
 
     url = A2UI.Validator.sanitize_media_url(raw_url)
-    fit = assigns.props["fit"] || "contain"
-    hint = Adapter.variant_prop(assigns.props)
+    released? = assigns.surface.protocol_version in [:v0_9, :v0_9_1]
+    fit = assigns.props["fit"] || if(released?, do: "fill", else: "contain")
+    hint = Adapter.variant_prop(assigns.props) || if(released?, do: "mediumFeature")
     {wrapper_class, wrapper_style} = image_size_style(hint)
+
+    description =
+      Binding.resolve(
+        assigns.props["description"],
+        assigns.surface.data_model,
+        assigns.scope_path,
+        opts
+      )
 
     assigns =
       assign(assigns,
         url: url,
         fit: fit,
         wrapper_class: wrapper_class,
-        wrapper_style: wrapper_style
+        wrapper_style: wrapper_style,
+        description: description || ""
       )
 
     ~H"""
@@ -168,6 +205,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Display do
       <%= if @url do %>
         <img
           src={@url}
+          alt={@description}
           class="a2ui-image w-full h-full"
           style={"object-fit: #{@fit};"}
           loading="lazy"

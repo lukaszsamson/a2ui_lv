@@ -90,6 +90,60 @@ defmodule A2UI.DataBroadcastTest do
     end
   end
 
+  describe "build_targeted/3" do
+    test "includes only the originating surface even when several surfaces opted in" do
+      surfaces = %{
+        "main" => %Surface{
+          id: "main",
+          data_model: %{"secret" => "main"},
+          send_data_model?: true
+        },
+        "other" => %Surface{
+          id: "other",
+          data_model: %{"secret" => "other"},
+          send_data_model?: true
+        }
+      }
+
+      assert DataBroadcast.build_targeted(surfaces, "main", :v0_9_1) == %{
+               "version" => "v0.9.1",
+               "surfaces" => %{"main" => %{"secret" => "main"}}
+             }
+    end
+
+    test "enforces the surface creator when a target transport is supplied" do
+      owner = self()
+
+      surfaces = %{
+        "main" => %Surface{
+          id: "main",
+          creator_id: owner,
+          data_model: %{"private" => true},
+          send_data_model?: true
+        }
+      }
+
+      assert DataBroadcast.build_targeted(surfaces, "main", :v0_9_1, owner)
+      assert DataBroadcast.build_targeted(surfaces, "main", :v0_9_1, make_ref()) == nil
+    end
+
+    test "released aggregate construction is disabled" do
+      surfaces = %{
+        "main" => %Surface{id: "main", data_model: %{}, send_data_model?: true},
+        "other" => %Surface{id: "other", data_model: %{}, send_data_model?: true}
+      }
+
+      assert DataBroadcast.build(surfaces, :v0_9) == nil
+      assert DataBroadcast.build(surfaces, :v0_9_1) == nil
+    end
+
+    test "returns nil for unknown or non-opted-in surfaces" do
+      surfaces = %{"main" => %Surface{id: "main", send_data_model?: false}}
+      assert DataBroadcast.build_targeted(surfaces, "main", :v0_9_1) == nil
+      assert DataBroadcast.build_targeted(surfaces, "missing", :v0_9_1) == nil
+    end
+  end
+
   describe "any_broadcasting?/1" do
     test "returns true when at least one surface has broadcasting enabled" do
       surfaces = %{

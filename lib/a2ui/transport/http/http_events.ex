@@ -146,7 +146,13 @@ defmodule A2UI.Transport.HTTP.HTTPEvents do
       timeout = Keyword.get(opts, :timeout, 5_000)
 
       # Build A2A message with capabilities
-      a2a_message = DataPart.build_client_message(event_envelope, state.capabilities)
+      version =
+        case A2UI.Event.detect_version(event_envelope) do
+          :unknown -> :v0_8
+          detected -> detected
+        end
+
+      a2a_message = DataPart.build_client_message(event_envelope, state.capabilities, version)
 
       # Add data broadcast if present
       a2a_message =
@@ -157,7 +163,7 @@ defmodule A2UI.Transport.HTTP.HTTPEvents do
           broadcast ->
             put_in(
               a2a_message,
-              ["message", "metadata", "a2uiDataBroadcast"],
+              ["message", "metadata", A2UI.A2A.Protocol.client_data_model_key()],
               broadcast
             )
         end

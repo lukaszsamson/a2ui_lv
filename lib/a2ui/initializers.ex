@@ -26,13 +26,15 @@ defmodule A2UI.Initializers do
 
   alias A2UI.{Binding, Component, JsonPointer}
 
-  @spec apply(map(), [Component.t()]) :: map()
+  @spec apply(term(), [Component.t()]) :: term()
   def apply(data_model, components) when is_map(data_model) and is_list(components) do
     Enum.reduce(components, data_model, fn %Component{} = component, acc ->
       props = component.props || %{}
       apply_in_term(acc, props, [])
     end)
   end
+
+  def apply(data_model, _components), do: data_model
 
   defp apply_in_term(data_model, %{} = term, path) do
     cond do

@@ -6,7 +6,7 @@ defmodule A2UI.Protocol do
   version detection across v0.8 and v0.9.
   """
 
-  @type version :: :v0_8 | :v0_9
+  @type version :: :v0_8 | :v0_9 | :v0_9_1
   @type server_envelope ::
           :surface_update | :data_model_update | :begin_rendering | :delete_surface
 
@@ -17,7 +17,7 @@ defmodule A2UI.Protocol do
     "a2ui.org:standard_catalog_0_8_0"
   ]
 
-  @standard_catalog_id_v0_9 "https://a2ui.dev/specification/v0_9/standard_catalog.json"
+  @standard_catalog_id_v0_9 "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
   @standard_catalog_ids_v0_9 [@standard_catalog_id_v0_9]
 
   @server_envelopes %{
@@ -32,12 +32,19 @@ defmodule A2UI.Protocol do
       data_model_update: "updateDataModel",
       begin_rendering: "createSurface",
       delete_surface: "deleteSurface"
+    },
+    v0_9_1: %{
+      surface_update: "updateComponents",
+      data_model_update: "updateDataModel",
+      begin_rendering: "createSurface",
+      delete_surface: "deleteSurface"
     }
   }
 
   @client_action_envelopes %{
     v0_8: "userAction",
-    v0_9: "action"
+    v0_9: "action",
+    v0_9_1: "action"
   }
 
   @doc """
@@ -46,6 +53,7 @@ defmodule A2UI.Protocol do
   @spec standard_catalog_id(version()) :: String.t()
   def standard_catalog_id(:v0_8), do: @standard_catalog_id_v0_8
   def standard_catalog_id(:v0_9), do: @standard_catalog_id_v0_9
+  def standard_catalog_id(:v0_9_1), do: @standard_catalog_id_v0_9
 
   @doc """
   Returns all known standard catalog ID aliases for a protocol version.
@@ -53,6 +61,7 @@ defmodule A2UI.Protocol do
   @spec standard_catalog_ids(version()) :: [String.t()]
   def standard_catalog_ids(:v0_8), do: @standard_catalog_ids_v0_8
   def standard_catalog_ids(:v0_9), do: @standard_catalog_ids_v0_9
+  def standard_catalog_ids(:v0_9_1), do: @standard_catalog_ids_v0_9
 
   @doc """
   Returns all known standard catalog IDs across versions.
@@ -68,6 +77,7 @@ defmodule A2UI.Protocol do
   @spec standard_catalog_id?(version(), String.t()) :: boolean()
   def standard_catalog_id?(:v0_8, catalog_id), do: catalog_id in @standard_catalog_ids_v0_8
   def standard_catalog_id?(:v0_9, catalog_id), do: catalog_id in @standard_catalog_ids_v0_9
+  def standard_catalog_id?(:v0_9_1, catalog_id), do: catalog_id in @standard_catalog_ids_v0_9
 
   @doc """
   Checks if a catalog ID is a known standard catalog alias in any version.
@@ -114,8 +124,9 @@ defmodule A2UI.Protocol do
   @spec detect_server_version(map()) :: version() | :unknown
   def detect_server_version(decoded) when is_map(decoded) do
     cond do
+      decoded["version"] == "v0.9.1" and server_message?(:v0_9_1, decoded) -> :v0_9_1
+      decoded["version"] == "v0.9" and server_message?(:v0_9, decoded) -> :v0_9
       server_message?(:v0_8, decoded) -> :v0_8
-      server_message?(:v0_9, decoded) -> :v0_9
       true -> :unknown
     end
   end
@@ -134,6 +145,8 @@ defmodule A2UI.Protocol do
   Detects the client event protocol version from decoded JSON.
   """
   @spec detect_client_version(map()) :: version() | :unknown
+  def detect_client_version(%{"version" => "v0.9.1", "action" => _}), do: :v0_9_1
+  def detect_client_version(%{"version" => "v0.9", "action" => _}), do: :v0_9
   def detect_client_version(%{unquote(@client_action_envelopes[:v0_9]) => _}), do: :v0_9
   def detect_client_version(%{unquote(@client_action_envelopes[:v0_8]) => _}), do: :v0_8
   def detect_client_version(_), do: :unknown
@@ -158,6 +171,7 @@ defmodule A2UI.Protocol do
     cond do
       uri == extension_uri(:v0_8) -> :v0_8
       uri == extension_uri(:v0_9) -> :v0_9
+      uri == extension_uri(:v0_9_1) -> :v0_9_1
       true -> :unknown
     end
   end

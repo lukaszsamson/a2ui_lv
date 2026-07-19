@@ -78,7 +78,7 @@ defmodule A2UI.Checks do
     checks
     |> Enum.filter(fn check ->
       # A check fails if its expression evaluates to false
-      not evaluate_expression(check, data_model, scope_path, opts)
+      not evaluate_expression(check["condition"] || check, data_model, scope_path, opts)
     end)
     |> Enum.map(fn check ->
       check["message"] || "Validation failed"
@@ -107,7 +107,7 @@ defmodule A2UI.Checks do
 
   def all_pass?(checks, data_model, scope_path, opts) when is_list(checks) do
     Enum.all?(checks, fn check ->
-      evaluate_expression(check, data_model, scope_path, opts)
+      evaluate_expression(check["condition"] || check, data_model, scope_path, opts)
     end)
   end
 
@@ -156,11 +156,11 @@ defmodule A2UI.Checks do
       when is_binary(func_name) do
     args = expr["args"] || %{}
     resolved_args = resolve_function_args(args, data, scope, opts)
-    Functions.call(func_name, resolved_args, data, scope, opts) != false
+    Functions.call(func_name, resolved_args, data, scope, opts) == true
   end
 
-  # Unknown expression - treat as true (fail-safe)
-  def evaluate_expression(_expr, _data, _scope, _opts), do: true
+  # Unknown expressions fail closed.
+  def evaluate_expression(_expr, _data, _scope, _opts), do: false
 
   # ============================================
   # Function Execution

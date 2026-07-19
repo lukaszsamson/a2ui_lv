@@ -223,8 +223,8 @@ defmodule A2UI.Props.Adapter do
       iex> A2UI.Props.Adapter.choice_single_select?(%{})
       false
   """
-  @spec choice_single_select?(map()) :: boolean()
-  def choice_single_select?(props) do
+  @spec choice_single_select?(map(), A2UI.Protocol.version()) :: boolean()
+  def choice_single_select?(props, version \\ :v0_8) do
     variant = props["variant"]
     max_allowed = props["maxAllowedSelections"]
 
@@ -234,6 +234,7 @@ defmodule A2UI.Props.Adapter do
       variant == "multipleSelection" -> false
       # Fall back to v0.8 maxAllowedSelections
       max_allowed == 1 -> true
+      version in [:v0_9, :v0_9_1] -> true
       true -> false
     end
   end

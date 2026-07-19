@@ -37,7 +37,10 @@ defmodule A2UI.Value do
   def resolve(value, _data, _scope, _opts) when is_binary(value), do: value
   def resolve(value, _data, _scope, _opts) when is_number(value), do: value
   def resolve(value, _data, _scope, _opts) when is_boolean(value), do: value
-  def resolve(value, _data, _scope, _opts) when is_list(value), do: value
+
+  def resolve(value, data, scope, opts) when is_list(value),
+    do: Enum.map(value, &resolve(&1, data, scope, opts))
+
   def resolve(nil, _data, _scope, _opts), do: nil
 
   def resolve(%{} = value, _data, _scope, _opts) do

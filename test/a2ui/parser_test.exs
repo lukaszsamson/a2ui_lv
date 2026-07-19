@@ -69,7 +69,7 @@ defmodule A2UI.ParserTest do
     end
 
     test "parses v0.8 deleteSurface" do
-      json = ~s({"deleteSurface":{"surfaceId":"main"}})
+      json = ~s({"version":"v0.9","deleteSurface":{"surfaceId":"main"}})
       assert {:delete_surface, %DeleteSurface{} = msg} = Parser.parse_line(json)
       assert msg.surface_id == "main"
     end
@@ -98,7 +98,9 @@ defmodule A2UI.ParserTest do
 
   describe "parse_line/1 (v0.9)" do
     test "parses v0.9 createSurface" do
-      json = ~s({"createSurface":{"surfaceId":"main","catalogId":"test.catalog"}})
+      json =
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"test.catalog"}})
+
       assert {:begin_rendering, %BeginRendering{} = msg} = Parser.parse_line(json)
       assert msg.surface_id == "main"
       assert msg.root_id == "root"
@@ -107,25 +109,25 @@ defmodule A2UI.ParserTest do
       assert msg.protocol_version == :v0_9
     end
 
-    test "parses v0.9 createSurface with broadcastDataModel" do
+    test "parses v0.9 createSurface with sendDataModel" do
       json =
-        ~s({"createSurface":{"surfaceId":"main","catalogId":"test","broadcastDataModel":true}})
+        ~s({"version":"v0.9","createSurface":{"surfaceId":"main","catalogId":"test","sendDataModel":true}})
 
       assert {:begin_rendering, %BeginRendering{} = msg} = Parser.parse_line(json)
       assert msg.broadcast_data_model? == true
     end
 
     test "parses v0.9 updateComponents" do
-      json = ~s({"updateComponents":{"surfaceId":"main","components":[]}})
-      assert {:surface_update, %SurfaceUpdate{} = msg} = Parser.parse_line(json)
-      assert msg.surface_id == "main"
-      assert msg.components == []
+      json = ~s({"version":"v0.9","updateComponents":{"surfaceId":"main","components":[]}})
+
+      assert {:error, {:validation_failed, "/updateComponents/components", _}} =
+               Parser.parse_line(json)
     end
 
     test "parses v0.9 updateComponents with components" do
       # v0.9 uses discriminator format: "component": "Text"
       json =
-        ~s({"updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Text","text":"Hello"}]}})
+        ~s({"version":"v0.9","updateComponents":{"surfaceId":"main","components":[{"id":"root","component":"Text","text":"Hello"}]}})
 
       assert {:surface_update, %SurfaceUpdate{} = msg} = Parser.parse_line(json)
       assert length(msg.components) == 1
@@ -136,7 +138,9 @@ defmodule A2UI.ParserTest do
     end
 
     test "parses v0.9 updateDataModel with value" do
-      json = ~s({"updateDataModel":{"surfaceId":"main","path":"/user/name","value":"Alice"}})
+      json =
+        ~s({"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/user/name","value":"Alice"}})
+
       assert {:data_model_update, %DataModelUpdate{} = msg} = Parser.parse_line(json)
       assert msg.surface_id == "main"
       assert msg.path == "/user/name"
@@ -144,14 +148,16 @@ defmodule A2UI.ParserTest do
     end
 
     test "parses v0.9 updateDataModel root replacement" do
-      json = ~s({"updateDataModel":{"surfaceId":"main","value":{"name":"Alice"}}})
+      json =
+        ~s({"version":"v0.9","updateDataModel":{"surfaceId":"main","value":{"name":"Alice"}}})
+
       assert {:data_model_update, %DataModelUpdate{} = msg} = Parser.parse_line(json)
       assert msg.path == nil
       assert msg.value == %{"name" => "Alice"}
     end
 
     test "parses v0.9 updateDataModel delete (no value)" do
-      json = ~s({"updateDataModel":{"surfaceId":"main","path":"/user/temp"}})
+      json = ~s({"version":"v0.9","updateDataModel":{"surfaceId":"main","path":"/user/temp"}})
       assert {:data_model_update, %DataModelUpdate{} = msg} = Parser.parse_line(json)
       assert msg.path == "/user/temp"
       assert msg.value == :delete
@@ -173,9 +179,9 @@ defmodule A2UI.ParserTest do
     end
 
     test "detects v0.9 messages" do
-      assert Parser.detect_version(%{"createSurface" => %{}}) == :v0_9
-      assert Parser.detect_version(%{"updateComponents" => %{}}) == :v0_9
-      assert Parser.detect_version(%{"updateDataModel" => %{}}) == :v0_9
+      assert Parser.detect_version(%{"version" => "v0.9", "createSurface" => %{}}) == :v0_9
+      assert Parser.detect_version(%{"version" => "v0.9", "updateComponents" => %{}}) == :v0_9
+      assert Parser.detect_version(%{"version" => "v0.9", "updateDataModel" => %{}}) == :v0_9
     end
 
     test "returns unknown for unrecognized messages" do

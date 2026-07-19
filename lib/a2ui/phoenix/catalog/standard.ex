@@ -77,13 +77,38 @@ defmodule A2UI.Phoenix.Catalog.Standard do
       :ok ->
         if component do
           new_visited = A2UI.Validator.track_visited(assigns.id, visited)
-          assigns = assign(assigns, component: component, visited: new_visited)
+          accessibility = component.props["accessibility"] || %{}
+          binding_options = binding_opts(assigns.surface)
+
+          assigns =
+            assign(assigns,
+              component: component,
+              visited: new_visited,
+              wrapper_class:
+                component_wrapper_class(component.type, assigns.surface.protocol_version),
+              accessibility_label:
+                Binding.resolve(
+                  accessibility["label"],
+                  assigns.surface.data_model,
+                  assigns.scope_path,
+                  binding_options
+                ),
+              accessibility_description:
+                Binding.resolve(
+                  accessibility["description"],
+                  assigns.surface.data_model,
+                  assigns.scope_path,
+                  binding_options
+                )
+            )
 
           ~H"""
           <div
-            class="a2ui-component contents"
+            class={@wrapper_class}
             id={component_dom_id(@surface.id, @id, @scope_path)}
             data-a2ui-scope={@scope_path || ""}
+            aria-label={@accessibility_label}
+            aria-description={@accessibility_description}
           >
             <%= if @depth > A2UI.Validator.max_depth() do %>
               <div class="a2ui-error rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100">
@@ -237,6 +262,16 @@ defmodule A2UI.Phoenix.Catalog.Standard do
         end
     end
   end
+
+  defp component_wrapper_class(type, version) when version in [:v0_9, :v0_9_1] do
+    if type in ~w(Row Column List) do
+      "a2ui-component contents"
+    else
+      "a2ui-component m-2 min-w-0"
+    end
+  end
+
+  defp component_wrapper_class(_type, _version), do: "a2ui-component contents"
 
   # ============================================
   # Children Rendering

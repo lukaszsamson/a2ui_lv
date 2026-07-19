@@ -24,7 +24,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Layout do
     ~H"""
     <div
       class="a2ui-column"
-      style={"display: flex; flex-direction: column; gap: 0.5rem; width: 100%; #{flex_style(@distribution, @alignment)}"}
+      style={"display: flex; flex-direction: column; width: 100%; #{flex_style(@distribution, @alignment)}"}
     >
       <Standard.render_children
         props={@props}
@@ -47,7 +47,10 @@ defmodule A2UI.Phoenix.Catalog.Standard.Layout do
   attr :visited, :any, default: nil
 
   def a2ui_row(assigns) do
-    {justify, align} = Adapter.row_column_props(assigns.props, "center")
+    default_align =
+      if assigns.surface.protocol_version in [:v0_9, :v0_9_1], do: "stretch", else: "center"
+
+    {justify, align} = Adapter.row_column_props(assigns.props, default_align)
     needs_full_width = justify != "start"
     width_style = if needs_full_width, do: "width: 100%;", else: ""
 
@@ -57,7 +60,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Layout do
     ~H"""
     <div
       class="a2ui-row"
-      style={"display: flex; flex-direction: row; gap: 0.5rem; #{@width_style} #{flex_style(@distribution, @alignment)}"}
+      style={"display: flex; flex-direction: row; #{@width_style} #{flex_style(@distribution, @alignment)}"}
     >
       <Standard.render_children
         props={@props}
@@ -82,7 +85,7 @@ defmodule A2UI.Phoenix.Catalog.Standard.Layout do
 
   def a2ui_card(assigns) do
     ~H"""
-    <div class="a2ui-card flex h-full w-full rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+    <div class="a2ui-card flex h-full w-full rounded-2xl border border-zinc-300 bg-transparent p-4 dark:border-zinc-700">
       <Standard.render_component
         :if={@props["child"]}
         id={@props["child"]}
@@ -109,13 +112,19 @@ defmodule A2UI.Phoenix.Catalog.Standard.Layout do
 
   def a2ui_list(assigns) do
     direction = assigns.props["direction"] || "vertical"
-    alignment = assigns.props["alignment"] || "stretch"
-    assigns = assign(assigns, direction: direction, alignment: alignment)
+    alignment = assigns.props["align"] || assigns.props["alignment"] || "stretch"
+
+    overflow =
+      if direction == "horizontal",
+        do: "overflow-x: auto; overflow-y: hidden;",
+        else: "overflow-y: auto; overflow-x: hidden;"
+
+    assigns = assign(assigns, direction: direction, alignment: alignment, overflow: overflow)
 
     ~H"""
     <div
       class="a2ui-list"
-      style={"display: flex; flex-direction: #{list_flex_direction(@direction)}; gap: 0.5rem; #{list_alignment_style(@alignment)}"}
+      style={"display: flex; flex-direction: #{list_flex_direction(@direction)}; #{@overflow} #{list_alignment_style(@alignment)}"}
     >
       <Standard.render_children
         props={@props}

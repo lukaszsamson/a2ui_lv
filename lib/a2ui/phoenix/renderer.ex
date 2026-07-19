@@ -31,6 +31,10 @@ defmodule A2UI.Phoenix.Renderer do
   attr :surface, :map, required: true
 
   def surface(assigns) do
+    theme = if is_map(assigns.surface.styles), do: assigns.surface.styles, else: %{}
+    icon_url = A2UI.Validator.sanitize_media_url(theme["iconUrl"])
+    assigns = assign(assigns, theme: theme, icon_url: icon_url)
+
     ~H"""
     <div
       class="a2ui-surface"
@@ -38,6 +42,13 @@ defmodule A2UI.Phoenix.Renderer do
       data-surface-id={@surface.id}
       style={surface_style(@surface)}
     >
+      <div
+        :if={@icon_url || @theme["agentDisplayName"]}
+        class="a2ui-agent-identity mb-3 flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-300"
+      >
+        <img :if={@icon_url} src={@icon_url} alt="" class="size-6 rounded-md object-cover" />
+        <span :if={@theme["agentDisplayName"]}>{@theme["agentDisplayName"]}</span>
+      </div>
       <%= if @surface.ready? do %>
         <.render_with_catalog surface={@surface} />
       <% else %>

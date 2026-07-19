@@ -74,7 +74,7 @@ defmodule A2UI.Event do
     }
 
     envelope_key = action_envelope_key(version)
-    %{envelope_key => payload}
+    maybe_put_version(%{envelope_key => payload}, version)
   end
 
   @doc """
@@ -174,6 +174,10 @@ defmodule A2UI.Event do
   """
   @spec detect_version(map()) :: protocol_version() | :unknown
   def detect_version(decoded), do: A2UI.Protocol.detect_client_version(decoded)
+
+  defp maybe_put_version(envelope, :v0_9), do: Map.put(envelope, "version", "v0.9")
+  defp maybe_put_version(envelope, :v0_9_1), do: Map.put(envelope, "version", "v0.9.1")
+  defp maybe_put_version(envelope, _version), do: envelope
 
   @doc """
   Returns the envelope type for a client→server event.

@@ -232,6 +232,12 @@ defmodule A2UI.Props.AdapterTest do
       assert Adapter.choice_single_select?(props) == false
     end
 
+    test "defaults released ChoicePicker to mutually exclusive" do
+      assert Adapter.choice_single_select?(%{}, :v0_9)
+      assert Adapter.choice_single_select?(%{}, :v0_9_1)
+      refute Adapter.choice_single_select?(%{}, :v0_8)
+    end
+
     test "returns true for v0.8 maxAllowedSelections = 1" do
       props = %{"maxAllowedSelections" => 1}
       assert Adapter.choice_single_select?(props) == true

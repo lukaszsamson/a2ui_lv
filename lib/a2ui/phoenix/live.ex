@@ -91,6 +91,7 @@ defmodule A2UI.Phoenix.Live do
       a2ui_event_transport: opts[:event_transport],
       a2ui_event_transport_module: opts[:event_transport_module] || A2UI.Transport.Local,
       a2ui_last_action: nil,
+      a2ui_last_function_result: nil,
       a2ui_last_error: nil
     )
   end
@@ -120,6 +121,7 @@ defmodule A2UI.Phoenix.Live do
       a2ui_session: session,
       a2ui_surfaces: session.surfaces,
       a2ui_last_action: nil,
+      a2ui_last_function_result: nil,
       a2ui_last_error: nil
     )
   end
@@ -139,7 +141,9 @@ defmodule A2UI.Phoenix.Live do
   def handle_a2ui_message({:a2ui, json_line}, socket) do
     session = socket.assigns.a2ui_session
 
-    case Session.apply_json_line(session, json_line) do
+    case Session.apply_json_line(session, json_line,
+           source: socket.assigns[:a2ui_event_transport]
+         ) do
       {:ok, updated_session} ->
         {:noreply, update_session(socket, updated_session)}
 
@@ -184,50 +188,17 @@ defmodule A2UI.Phoenix.Live do
     component = surface && surface.components[component_id]
     action = component && component.props["action"]
 
-    # Action can be a string (just the name) or a map with name and context
-    {action_name, action_context} =
-      case action do
-        name when is_binary(name) -> {name, []}
-        %{"name" => name} -> {name, action["context"] || []}
-        _ -> {nil, []}
-      end
+    case action do
+      %{"functionCall" => function_call} when is_map(function_call) ->
+        version = surface.protocol_version || :v0_8
 
-    if action_name do
-      # Determine protocol version from surface (defaults to v0.8 for compatibility)
-      version = surface.protocol_version || :v0_8
+        result =
+          DynamicValue.evaluate(function_call, surface.data_model, scope_path, version: version)
 
-      # Resolve all context bindings against current data model (version-aware)
-      resolved_context =
-        resolve_action_context(action_context, surface.data_model, scope_path, version)
+        {:noreply, Phoenix.Component.assign(socket, :a2ui_last_function_result, result)}
 
-      # Build version-aware action envelope
-      action_event =
-        Event.build_action(version,
-          name: action_name,
-          surface_id: surface_id,
-          component_id: component_id,
-          context: resolved_context
-        )
-
-      # Send via transport if configured
-      send_event_to_transport(socket, action_event)
-
-      # Dispatch to callback if configured (for local handling)
-      socket =
-        if callback = socket.assigns[:a2ui_action_callback] do
-          case callback.(action_event, socket) do
-            %Phoenix.LiveView.Socket{} = updated_socket -> updated_socket
-            {:noreply, %Phoenix.LiveView.Socket{} = updated_socket} -> updated_socket
-            _ -> socket
-          end
-        else
-          socket
-        end
-
-      {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, action_event)}
-    else
-      Logger.warning("A2UI action event for component without valid action: #{component_id}")
-      {:noreply, socket}
+      _ ->
+        dispatch_event_action(socket, surface, action, surface_id, component_id, scope_path)
     end
   end
 
@@ -320,6 +291,7 @@ defmodule A2UI.Phoenix.Live do
     path = input["path"]
     values = input["values"] || []
     max_allowed_str = input["max_allowed"]
+    single? = input["is_single"] == "true"
 
     # Filter out empty sentinel value and get actual selections
     selections = Enum.filter(values, &(&1 != "" and &1 != nil))
@@ -334,14 +306,60 @@ defmodule A2UI.Phoenix.Live do
         selections
       end
 
+    bound_value = if single?, do: Enum.take(selections, 1), else: selections
+
     if path && surface_id do
-      {:noreply, update_data_at_path(socket, surface_id, path, selections)}
+      {:noreply, update_data_at_path(socket, surface_id, path, bound_value)}
     else
       {:noreply, socket}
     end
   end
 
   # Private helpers
+
+  defp dispatch_event_action(socket, surface, action, surface_id, component_id, scope_path) do
+    # v0.8 direct actions and released event actions both dispatch to the server.
+    {action_name, action_context} =
+      case action do
+        name when is_binary(name) -> {name, []}
+        %{"name" => name} -> {name, action["context"] || %{}}
+        %{"event" => %{"name" => name} = event} -> {name, event["context"] || %{}}
+        _ -> {nil, []}
+      end
+
+    if action_name do
+      version = surface.protocol_version || :v0_8
+
+      resolved_context =
+        resolve_action_context(action_context, surface.data_model, scope_path, version)
+
+      action_event =
+        Event.build_action(version,
+          name: action_name,
+          surface_id: surface_id,
+          component_id: component_id,
+          context: resolved_context
+        )
+
+      send_event_to_transport(socket, action_event)
+
+      socket =
+        if callback = socket.assigns[:a2ui_action_callback] do
+          case callback.(action_event, socket) do
+            %Phoenix.LiveView.Socket{} = updated_socket -> updated_socket
+            {:noreply, %Phoenix.LiveView.Socket{} = updated_socket} -> updated_socket
+            _ -> socket
+          end
+        else
+          socket
+        end
+
+      {:noreply, Phoenix.Component.assign(socket, :a2ui_last_action, action_event)}
+    else
+      Logger.warning("A2UI action event for component without valid action: #{component_id}")
+      {:noreply, socket}
+    end
+  end
 
   defp update_session(socket, session) do
     Phoenix.Component.assign(socket,
@@ -510,7 +528,22 @@ defmodule A2UI.Phoenix.Live do
     if transport_pid && Process.alive?(transport_pid) do
       # Build data broadcast payload for surfaces with broadcasting enabled
       surfaces = socket.assigns[:a2ui_surfaces] || %{}
-      data_broadcast = DataBroadcast.build(surfaces)
+
+      version =
+        case event_envelope["version"] do
+          "v0.9.1" -> :v0_9_1
+          "v0.9" -> :v0_9
+          _ -> :v0_8
+        end
+
+      surface_id =
+        get_in(event_envelope, ["action", "surfaceId"]) ||
+          get_in(event_envelope, ["error", "surfaceId"])
+
+      data_broadcast =
+        if version in [:v0_9, :v0_9_1] do
+          DataBroadcast.build_targeted(surfaces, surface_id, version, transport_pid)
+        end
 
       opts = if data_broadcast, do: [data_broadcast: data_broadcast], else: []
 

@@ -4,7 +4,7 @@ defmodule A2UI.V0_9Test do
   describe "standard_catalog_id/0" do
     test "returns the canonical v0.9 catalog ID" do
       assert A2UI.V0_9.standard_catalog_id() ==
-               "https://a2ui.dev/specification/v0_9/standard_catalog.json"
+               "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
     end
   end
 
@@ -12,7 +12,7 @@ defmodule A2UI.V0_9Test do
     test "returns the single v0.9 catalog ID" do
       ids = A2UI.V0_9.standard_catalog_ids()
 
-      assert ids == ["https://a2ui.dev/specification/v0_9/standard_catalog.json"]
+      assert ids == ["https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"]
     end
 
     test "returns exactly 1 ID (v0.9 has no aliases)" do
@@ -23,7 +23,7 @@ defmodule A2UI.V0_9Test do
   describe "standard_catalog_id?/1" do
     test "returns true for the v0.9 catalog ID" do
       assert A2UI.V0_9.standard_catalog_id?(
-               "https://a2ui.dev/specification/v0_9/standard_catalog.json"
+               "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
              )
     end
 

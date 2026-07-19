@@ -175,7 +175,7 @@ defmodule A2UI.Binding do
         # v0.8: paths starting with / are scoped in templates
         # v0.9: paths starting with / are ALWAYS absolute
         case version do
-          :v0_9 -> path
+          version when version in [:v0_9, :v0_9_1] -> path
           _ -> join_pointer(scope_path, path)
         end
 

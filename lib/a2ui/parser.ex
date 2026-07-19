@@ -52,12 +52,12 @@ defmodule A2UI.Parser do
       iex> A2UI.Parser.parse_line("not json")
       {:error, {:json_decode, %Jason.DecodeError{...}}}
   """
-  @spec parse_line(String.t()) :: message()
-  def parse_line(json_line) do
+  @spec parse_line(String.t(), keyword()) :: message()
+  def parse_line(json_line, opts \\ []) do
     case JSON.decode_line(json_line) do
       {:ok, decoded} ->
         try do
-          dispatch_message(decoded)
+          dispatch_message(decoded, opts)
         rescue
           exception ->
             {:error, {:parse_exception, exception}}
@@ -79,23 +79,56 @@ defmodule A2UI.Parser do
       iex> A2UI.Parser.parse_map(%{"updateComponents" => %{"surfaceId" => "main", "components" => []}})
       {:surface_update, %A2UI.Messages.SurfaceUpdate{...}}
   """
-  @spec parse_map(map()) :: message()
-  def parse_map(decoded) when is_map(decoded), do: dispatch_message(decoded)
+  @spec parse_map(map(), keyword()) :: message()
+  def parse_map(decoded, opts \\ []) when is_map(decoded), do: dispatch_message(decoded, opts)
 
   @doc """
   Detects the protocol version of a decoded message.
 
   Returns `:v0_8`, `:v0_9`, or `:unknown`.
   """
-  @spec detect_version(map()) :: :v0_8 | :v0_9 | :unknown
+  @spec detect_version(map()) :: Protocol.version() | :unknown
   def detect_version(decoded), do: Protocol.detect_server_version(decoded)
 
   # Version-detecting dispatch
-  defp dispatch_message(decoded) do
+  defp dispatch_message(decoded, opts) do
     case Protocol.detect_server_version(decoded) do
       :v0_8 -> V0_8.parse_map(decoded)
-      :v0_9 -> V0_9.parse_map(decoded)
+      :v0_9 -> validate_and_parse(decoded, :v0_9, opts)
+      :v0_9_1 -> validate_and_parse(decoded, :v0_9_1, opts)
       :unknown -> {:error, :unknown_message_type}
+    end
+  end
+
+  defp validate_and_parse(decoded, version, opts) do
+    catalog_schema = resolve_catalog_schema(decoded, version, opts)
+
+    case A2UI.Validator.validate_server_message(decoded, version, catalog_schema) do
+      :ok -> V0_9.parse_map(Map.delete(decoded, "version"), version)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp resolve_catalog_schema(decoded, version, opts) do
+    cond do
+      is_map(opts[:catalog_schema]) ->
+        opts[:catalog_schema]
+
+      is_function(opts[:catalog_schema_resolver], 2) ->
+        opts[:catalog_schema_resolver].(decoded, version)
+
+      catalog_id = get_in(decoded, ["createSurface", "catalogId"]) ->
+        if A2UI.Protocol.standard_catalog_id?(version, catalog_id) do
+          nil
+        else
+          case A2UI.Schema.catalog_schema(catalog_id, version) do
+            {:ok, schema} -> schema
+            :error -> nil
+          end
+        end
+
+      true ->
+        nil
     end
   end
 end
