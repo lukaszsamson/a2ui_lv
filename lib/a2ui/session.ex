@@ -36,7 +36,7 @@ defmodule A2UI.Session do
   @type t :: %__MODULE__{
           surfaces: %{String.t() => Surface.t()},
           client_capabilities: ClientCapabilities.t(),
-          retired_surface_ids: MapSet.t()
+          retired_surface_ids: struct()
         }
 
   defstruct surfaces: %{},
@@ -63,7 +63,11 @@ defmodule A2UI.Session do
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) do
-    capabilities = opts[:client_capabilities] || ClientCapabilities.default()
+    capabilities =
+      case Keyword.get(opts, :client_capabilities) do
+        nil -> ClientCapabilities.default()
+        %ClientCapabilities{} = capabilities -> capabilities
+      end
 
     %__MODULE__{
       surfaces: %{},
