@@ -387,7 +387,6 @@ defmodule A2UI.Phoenix.Live do
   end
 
   defp html_datetime_to_iso8601("", _type), do: ""
-  defp html_datetime_to_iso8601(nil, _type), do: ""
 
   defp html_datetime_to_iso8601(value, "datetime-local") do
     with [date, time_raw] <- String.split(value, "T", parts: 2),
