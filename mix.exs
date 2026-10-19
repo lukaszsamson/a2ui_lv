@@ -65,6 +65,7 @@ defmodule A2UI.MixProject do
   # Library dependencies only - demo app has its own deps
   defp deps do
     [
+      {:spec_lint, "~> 0.1", only: [:dev, :test], runtime: false},
       {:phoenix, "~> 1.8"},
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_view, "~> 1.1"},
