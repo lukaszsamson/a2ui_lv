@@ -84,7 +84,16 @@ defmodule A2UI.MixProject do
       {:ex_doc, "~> 0.31", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
       {:lazy_html, ">= 0.1.0", only: :test}
-    ]
+    ] ++ spec_lint_deps()
+  end
+
+  # spec_lint needs Elixir >= 1.18; older CI matrix entries skip it.
+  defp spec_lint_deps do
+    if Version.match?(System.version(), ">= 1.18.0") do
+      [{:spec_lint, "~> 0.1", only: [:dev, :test], runtime: false}]
+    else
+      []
+    end
   end
 
   defp aliases do

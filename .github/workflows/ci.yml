@@ -136,3 +136,39 @@ jobs:
 
       - name: Check formatting
         run: mix format --check-formatted
+
+  spec_lint:
+    name: Spec lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.4"
+          otp-version: "29"
+
+      - name: Restore deps cache
+        uses: actions/cache@v5
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-29-1.20.4-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-29-1.20.4-
+
+      - name: Restore build cache
+        uses: actions/cache@v5
+        with:
+          path: _build
+          key: ${{ runner.os }}-build-29-1.20.4-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-29-1.20.4-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Spec lint
+        run: mix spec_lint
